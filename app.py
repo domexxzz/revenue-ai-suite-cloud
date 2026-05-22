@@ -424,6 +424,71 @@ hr {{ border:none !important; border-top:1px solid {hr_color} !important; margin
 
 /* ── Spinner ───────────────────────────────────────────────────────────── */
 [data-testid="stSpinner"] > div {{ border-top-color:#F59E0B !important; }}
+
+/* ── Selectbox / Dropdown ──────────────────────────────────────────────── */
+[data-baseweb="select"] > div {{
+  background:{input_bg} !important;
+  border-color:{border3} !important;
+  color:{txt1} !important;
+  border-radius:10px !important;
+}}
+[data-baseweb="select"] span {{ color:{txt1} !important; }}
+[data-baseweb="popover"] > div,
+[data-baseweb="popover"] ul {{
+  background:{bg2} !important;
+  border:1px solid {border2} !important;
+  border-radius:12px !important;
+  box-shadow:0 8px 32px rgba(0,0,0,{"0.4" if is_dark else "0.12"}) !important;
+}}
+[data-baseweb="option"] {{
+  background:{bg2} !important;
+  color:{txt2} !important;
+}}
+[data-baseweb="option"]:hover {{
+  background:{bg3} !important;
+  color:{txt1} !important;
+}}
+
+/* ── Text Area ─────────────────────────────────────────────────────────── */
+[data-testid="stTextArea"] textarea {{
+  background:{input_bg} !important;
+  border-color:{border3} !important;
+  color:{txt1} !important;
+  border-radius:10px !important;
+}}
+[data-testid="stTextArea"] textarea:focus {{
+  border-color:rgba(245,158,11,0.5) !important;
+  box-shadow:0 0 0 3px rgba(245,158,11,0.1) !important;
+}}
+
+/* ── File uploader inner ───────────────────────────────────────────────── */
+[data-testid="stFileUploaderDropzone"],
+[data-testid="stFileUploaderDropzoneInput"] + div {{
+  background:{bg2} !important;
+  color:{txt3} !important;
+}}
+[data-testid="stFileUploaderDropzone"] button {{
+  background:{bg3} !important;
+  color:{txt2} !important;
+  border:1px solid {border2} !important;
+  border-radius:8px !important;
+}}
+[data-testid="stFileUploaderDropzone"] small,
+[data-testid="stFileUploaderDropzone"] span {{
+  color:{txt4} !important;
+}}
+
+/* ── Checkbox ──────────────────────────────────────────────────────────── */
+[data-baseweb="checkbox"] > div:first-child {{
+  background:{input_bg} !important;
+  border-color:{border3} !important;
+  border-radius:5px !important;
+}}
+[data-testid="stCheckbox"] label p {{ color:{txt3} !important; }}
+
+/* ── Main content area text ────────────────────────────────────────────── */
+.main [data-testid="stMarkdownContainer"] p {{ color:{txt3} !important; }}
+.main label {{ color:{lbl_color} !important; }}
 </style>
 """, unsafe_allow_html=True)
 
