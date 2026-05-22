@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Logs (dev artifacts)
+pip_out.txt
+pip_err.txt
+st_err.txt
+st_out.txt
+st_phase0_err.txt
+st_phase0_out.txt
+st_theme_err.txt
+st_theme_out.txt
+
+# OS
+.DS_Store
+Thumbs.db
