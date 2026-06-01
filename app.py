@@ -1548,8 +1548,10 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
         st.subheader("📋 ข้อมูลธุรกิจ")
 
         biz_name = st.text_input("ชื่อร้าน / แบรนด์", value="ร้านของคุณ", placeholder="เช่น Café Bloom")
-        hero_product = st.text_input("สินค้า / เมนู Hero", value="", placeholder="เช่น ชาไทยเย็น, หมูกระทะ unlimited")
-        offer = st.text_input("Offer / ส่วนลด", value="", placeholder="เช่น ลด 30% วันนี้เท่านั้น")
+        hero_product = st.text_input("สินค้า / เมนู Hero", value="เมนูเด็ด", placeholder="เช่น ชาไทยเย็น, หมูกระทะ unlimited")
+        discount_pct = st.number_input("ส่วนลด (%)", min_value=5, max_value=80, value=20, step=5)
+        expiry_date = st.text_input("วันหมดอายุโปร", value="31 ธ.ค.", placeholder="เช่น 31 ธ.ค.")
+        cta_text = st.text_input("CTA / ลิงก์", value="ทักแชทเพื่อรับสิทธิ์", placeholder="เช่น คลิก https://...")
 
         target_segment = st.selectbox(
             "Target Segment",
@@ -1561,7 +1563,14 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
         else:
             days_inactive = 0
 
-        urgency = st.slider("ความเร่งด่วน (ชั่วโมง)", 1, 72, 24) if campaign_key == "flash_sale" else 0
+        if campaign_key == "flash_sale":
+            urgency = st.slider("ความเร่งด่วน (ชั่วโมง)", 1, 72, 24)
+            start_time = st.text_input("เวลาเริ่ม", value="17:00")
+            end_time = st.text_input("เวลาจบ", value="20:00")
+        else:
+            urgency = 0
+            start_time = "17:00"
+            end_time = "20:00"
 
     st.divider()
 
@@ -1570,10 +1579,24 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
     btn_label = "🤖 Generate with Claude AI" if use_claude else "⚡ Generate with Local AI"
 
     if st.button(btn_label, type="primary", use_container_width=True):
+        # Keys must match placeholders in content_studio.py templates
+        _brand = biz_name or "ร้านของคุณ"
+        _hero = hero_product or "เมนูเด็ด"
         context = {
-            "business_name": biz_name or "ร้านของคุณ",
-            "hero_product": hero_product or "เมนูแนะนำ",
-            "offer": offer or "โปรโมชันพิเศษ",
+            "brand_name": _brand,
+            "brand_tag": _brand.replace(" ", "").replace("ร้าน", ""),
+            "top_item": _hero,
+            "discount": discount_pct,
+            "expiry": expiry_date,
+            "cta": cta_text,
+            "days": days_inactive,
+            "hours": "10:00-22:00",
+            "start_time": start_time,
+            "end_time": end_time,
+            "countdown": urgency,
+            # also keep old keys for compatibility
+            "business_name": _brand,
+            "hero_product": _hero,
             "target_segment": target_segment,
             "days_inactive": days_inactive,
             "urgency_hours": urgency,
