@@ -57,12 +57,29 @@ def run_first_time_auth() -> str:
 
 
 def needs_auth() -> bool:
-    """Check if OAuth token exists and is valid."""
+    """Check if OAuth token is available (from secrets or local file)."""
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    import json
+
+    # Try Streamlit secrets first (cloud deployment)
+    try:
+        import streamlit as st
+        token_json = st.secrets.get("google_drive", {}).get("token_json", "")
+        if token_json:
+            creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+            if creds.valid:
+                return False
+            if creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                return False
+    except Exception:
+        pass
+
+    # Fallback to local token.json
     if not TOKEN_PATH.exists():
         return True
     try:
-        from google.oauth2.credentials import Credentials
-        from google.auth.transport.requests import Request
         creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
         if creds.valid:
             return False

@@ -49,7 +49,16 @@ def _do_post(platform_key: str, content: str, line_token: str, fb_token: str, fb
     else:
         st.toast(f"✅ บันทึกคอนเทนต์ {platform_key} แล้ว (โพสต์ manual)", icon="📋")
 
-GDRIVE_FOLDER_ID = "1-Kc-3l6C781lav4emTLCbZ202JVjExux"
+def _get_gdrive_folder_id() -> str:
+    """Read folder ID from Streamlit secrets, fall back to default."""
+    try:
+        import streamlit as st
+        return st.secrets.get("google_drive", {}).get("folder_id", "") or "1-Kc-3l6C781lav4emTLCbZ202JVjExux"
+    except Exception:
+        return "1-Kc-3l6C781lav4emTLCbZ202JVjExux"
+
+
+GDRIVE_FOLDER_ID = _get_gdrive_folder_id()
 
 try:
     from loyverse_connector import LoyverseConnector
