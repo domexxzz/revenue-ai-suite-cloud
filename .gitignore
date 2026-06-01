@@ -22,6 +22,12 @@ st_phase0_out.txt
 st_theme_err.txt
 st_theme_out.txt
 
+# Google credentials (never commit!)
+credentials.json
+oauth_credentials.json
+token.json
+*.json.key
+
 # OS
 .DS_Store
 Thumbs.db

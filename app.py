@@ -18,6 +18,14 @@ except ImportError:
     ANTHROPIC_AVAILABLE = False
 
 try:
+    from google_drive import upload_file, upload_text, upload_excel, needs_auth, run_first_time_auth
+    GDRIVE_AVAILABLE = True
+except ImportError:
+    GDRIVE_AVAILABLE = False
+
+GDRIVE_FOLDER_ID = "1-Kc-3l6C781lav4emTLCbZ202JVjExux"
+
+try:
     from loyverse_connector import LoyverseConnector
     LOYVERSE_AVAILABLE = True
 except ImportError:
@@ -1651,22 +1659,49 @@ def render_content_studio_page(ai_mode: str, api_key: str) -> None:
     else:
         st.info("เลือกแพลตฟอร์มอย่างน้อย 1 แพลตฟอร์มเพื่อดูตารางโพสต์")
 
-    # ── Google Drive mock export ───────────────────────────────────────────────
+    # ── Google Drive export ────────────────────────────────────────────────────
     st.divider()
-    drive_col, _ = st.columns([1, 2])
+    st.subheader("📁 Export ไป Google Drive")
+
+    all_content = "\n\n".join(
+        f"=== {PLATFORMS[p]['name'].upper()} ===\n{package.get(p, '')}"
+        for p in visible
+    )
+    filename = f"content_package_{dt.datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+
+    drive_col, dl_col = st.columns([1, 1])
     with drive_col:
-        all_content = "\n\n".join(
-            f"=== {PLATFORMS[p]['name'].upper()} ===\n{package.get(p, '')}"
-            for p in visible
-        )
+        if GDRIVE_AVAILABLE:
+            if needs_auth():
+                st.warning("ยังไม่ได้ authorize Google Drive")
+                if st.button("🔐 Authorize Google Drive", use_container_width=True):
+                    with st.spinner("กำลังเปิด browser..."):
+                        run_first_time_auth()
+                    st.success("Authorized แล้ว! กด Upload ได้เลย")
+                    st.rerun()
+            else:
+                if st.button("☁️ Upload ไป Google Drive", type="primary", use_container_width=True):
+                    with st.spinner("กำลัง upload..."):
+                        link = upload_text(all_content, filename, GDRIVE_FOLDER_ID)
+                    if link:
+                        st.success("Upload สำเร็จ!")
+                        st.markdown(f"[📄 เปิดไฟล์ใน Drive]({link})")
+                        st.session_state["last_drive_link"] = link
+                    else:
+                        st.error("Upload ไม่สำเร็จ")
+                if "last_drive_link" in st.session_state:
+                    st.markdown(f"[🔗 ไฟล์ล่าสุด]({st.session_state['last_drive_link']})")
+        else:
+            st.warning("ไม่พบ google_drive.py")
+
+    with dl_col:
         st.download_button(
-            label="📁 Export ทั้งหมดไป Google Drive (จำลอง)",
+            label="💾 Download ไฟล์",
             data=all_content.encode("utf-8"),
-            file_name=f"content_package_{dt.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+            file_name=filename,
             mime="text/plain",
             use_container_width=True,
         )
-        st.caption("ในเวอร์ชันจริงจะ sync อัตโนมัติกับ Google Drive API")
 
 
 # ── Sidebar ─────────────────────────────────────────────────────────────────────
