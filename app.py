@@ -1814,6 +1814,7 @@ with st.sidebar:
     st.markdown("**📱 Platform Tokens**")
     st.caption("ใส่ token เพื่อโพสต์จริง")
 
+    # ── LINE OA ──────────────────────────────────────────────────────────────
     line_token = st.text_input(
         "LINE OA Token",
         type="password",
@@ -1823,6 +1824,23 @@ with st.sidebar:
     if line_token:
         st.success("LINE OA พร้อมโพสต์")
 
+    with st.expander("📖 วิธีขอ LINE OA Token"):
+        st.markdown("""
+**ขั้นตอน:**
+1. ไปที่ [developers.line.biz](https://developers.line.biz)
+2. Login ด้วย LINE account
+3. กด **Create a new provider** (ครั้งแรก)
+4. กด **Create a new channel** → เลือก **Messaging API**
+5. กรอกข้อมูล Channel ให้ครบ
+6. ไปที่ tab **Messaging API**
+7. เลื่อนลงหา **Channel access token** → กด **Issue**
+8. Copy token มาวางในช่องด้านบน
+
+**หมายเหตุ:** ต้องมี LINE Official Account ก่อน
+→ สมัครได้ที่ [account.line.biz](https://account.line.biz)
+""")
+
+    # ── Facebook ─────────────────────────────────────────────────────────────
     fb_token = st.text_input(
         "Facebook Page Token",
         type="password",
@@ -1834,6 +1852,24 @@ with st.sidebar:
         fb_page_id = st.text_input("Facebook Page ID", placeholder="เช่น 123456789")
         if fb_page_id:
             st.success("Facebook พร้อมโพสต์")
+
+    with st.expander("📖 วิธีขอ Facebook Page Token"):
+        st.markdown("""
+**ขั้นตอน:**
+1. ไปที่ [developers.facebook.com](https://developers.facebook.com)
+2. กด **My Apps** → **Create App**
+3. เลือก **Business** → กรอกชื่อ app
+4. ไปที่ **Tools → Graph API Explorer**
+5. เลือก App ของคุณ
+6. คลิก **Generate Access Token** → เลือก Page ที่ต้องการ
+7. ติ๊ก permission: `pages_manage_posts`, `pages_read_engagement`
+8. กด **Generate** → Copy token
+
+**หา Page ID:**
+ไปที่ Facebook Page → **About** → เลื่อนลงจะเห็น **Page ID**
+
+**หมายเหตุ:** ต้องเป็น Admin ของ Facebook Page
+""")
 
     st.divider()
     st.caption("Built with Streamlit + Claude AI")
