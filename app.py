@@ -1252,7 +1252,7 @@ def render_roi_calculator() -> None:
         elif num_branches <= 3:
             setup_cost, monthly_cost, pkg_name = 95_000, 28_000 * num_branches, "Growth Automation"
         else:
-            setup_cost, monthly_cost, pkg_name = 180_000, 55_000, "Scale & Control Tower"
+            setup_cost, monthly_cost, pkg_name = 180_000, 55_000 * num_branches, "Scale & Control Tower"
 
         annual_cost = setup_cost + monthly_cost * 12
         net_roi = annual_gain - annual_cost
@@ -1577,14 +1577,13 @@ def render_content_studio_page(ai_mode: str, api_key: str) -> None:
     tabs = st.tabs(tab_labels)
 
     for tab, pid in zip(tabs, visible):
-        content = package.get(pid, {})
+        content = package.get(pid, "")
+        # content is a plain string from get_content_package()
+        full_text = content if isinstance(content, str) else ""
         pmeta   = PLATFORMS[pid]
         with tab:
             c_txt_col, c_act_col = st.columns([2, 1])
             with c_txt_col:
-                caption_text = content.get("caption", "")
-                hashtags     = content.get("hashtags", "")
-                full_text    = caption_text + ("\n\n" + hashtags if hashtags else "")
                 edited = st.text_area(
                     f"คอนเทนต์ {pmeta['name']}",
                     value=full_text,
@@ -1602,23 +1601,6 @@ def render_content_studio_page(ai_mode: str, api_key: str) -> None:
                     f'<p style="font-size:11px;color:#9CA3AF;margin:3px 0 0;">{char_count:,} / {max_chars:,} ตัวอักษร</p>',
                     unsafe_allow_html=True,
                 )
-
-                cta = content.get("cta", "")
-                if cta:
-                    st.caption(f"📌 CTA: {cta}")
-
-                visual_note = content.get("visual_suggestion", "")
-                if visual_note:
-                    _vn_bg = "#1a1f2e" if is_dark else "#F0F9FF"
-                    _vn_bd = "rgba(6,182,212,.3)"
-                    _vn_tx = "#67E8F9" if is_dark else "#0E7490"
-                    st.markdown(
-                        f'<div style="background:{_vn_bg};border-left:3px solid {_vn_bd};'
-                        f'padding:0.6rem 0.9rem;border-radius:0 8px 8px 0;margin-top:0.5rem;">'
-                        f'<span style="color:{_vn_tx};font-size:0.83rem;">🎨 ไอเดียภาพ: {visual_note}</span>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
 
             with c_act_col:
                 st.markdown(f"**Best Post Time**")
@@ -1658,18 +1640,14 @@ def render_content_studio_page(ai_mode: str, api_key: str) -> None:
     st.subheader("📅 ตารางโพสต์ที่แนะนำ")
 
     schedule_df = build_posting_schedule(visible, start_date=dt.date.today(), days=7)
-    if not schedule_df.empty:
-        sched_display = schedule_df.copy()
-        sched_display["platform_name"] = sched_display["platform"].map(
+    if schedule_df:
+        sched_display = pd.DataFrame(schedule_df)
+        sched_display["แพลตฟอร์ม"] = sched_display["platform_key"].map(
             lambda p: f"{PLATFORMS[p]['icon']} {PLATFORMS[p]['name']}" if p in PLATFORMS else p
         )
-        sched_display["post_time_str"] = sched_display["post_time"].dt.strftime("%a %d/%m %H:%M")
-        sched_display = sched_display.rename(columns={
-            "platform_name": "แพลตฟอร์ม",
-            "post_time_str": "เวลาโพสต์",
-            "content_type": "ประเภท",
-        })[["แพลตฟอร์ม", "เวลาโพสต์", "ประเภท"]]
-        st.dataframe(sched_display, use_container_width=True, hide_index=True)
+        sched_display["เวลาโพสต์"] = sched_display["date"].astype(str) + " " + sched_display["time"]
+        sched_display["สถานะ"] = sched_display["status"]
+        st.dataframe(sched_display[["แพลตฟอร์ม", "เวลาโพสต์", "สถานะ"]], use_container_width=True, hide_index=True)
     else:
         st.info("เลือกแพลตฟอร์มอย่างน้อย 1 แพลตฟอร์มเพื่อดูตารางโพสต์")
 
@@ -1678,7 +1656,7 @@ def render_content_studio_page(ai_mode: str, api_key: str) -> None:
     drive_col, _ = st.columns([1, 2])
     with drive_col:
         all_content = "\n\n".join(
-            f"=== {PLATFORMS[p]['name'].upper()} ===\n{package.get(p, {}).get('caption', '')}"
+            f"=== {PLATFORMS[p]['name'].upper()} ===\n{package.get(p, '')}"
             for p in visible
         )
         st.download_button(

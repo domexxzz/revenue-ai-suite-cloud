@@ -85,15 +85,14 @@ def _score_quantile(series: pd.Series, n: int = 5, ascending: bool = True) -> pd
 
 
 def _assign_segment(r: int, f: int, m: int) -> str:
-    rf = (r + f) / 2
     if r >= 5 and f >= 4 and m >= 4:
         return "Champions"
     if f >= 4 and m >= 3:
         return "Loyal Customers"
-    if r >= 4 and f <= 3:
-        return "Potential Loyalists"
     if r == 5 and f <= 2:
         return "Recent Customers"
+    if r >= 4 and f <= 3:
+        return "Potential Loyalists"
     if r >= 3 and f <= 2:
         return "Promising"
     if r <= 3 and f >= 2 and m >= 3:
