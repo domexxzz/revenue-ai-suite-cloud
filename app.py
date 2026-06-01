@@ -23,6 +23,32 @@ try:
 except ImportError:
     GDRIVE_AVAILABLE = False
 
+try:
+    from platform_poster import post_line_oa, post_facebook
+    POSTER_AVAILABLE = True
+except ImportError:
+    POSTER_AVAILABLE = False
+
+
+def _do_post(platform_key: str, content: str, line_token: str, fb_token: str, fb_page_id: str) -> None:
+    """Handle actual posting per platform."""
+    if platform_key == "line_oa":
+        if not line_token:
+            st.toast("❌ ใส่ LINE OA Token ในแถบซ้ายก่อน", icon="⚠️")
+            return
+        with st.spinner("กำลังส่งไป LINE OA..."):
+            ok, msg = post_line_oa(content, line_token)
+        st.toast(msg, icon="✅" if ok else "❌")
+    elif platform_key == "facebook":
+        if not fb_token or not fb_page_id:
+            st.toast("❌ ใส่ Facebook Token และ Page ID ในแถบซ้ายก่อน", icon="⚠️")
+            return
+        with st.spinner("กำลังโพสต์ Facebook..."):
+            ok, msg = post_facebook(content, fb_token, fb_page_id)
+        st.toast(msg, icon="✅" if ok else "❌")
+    else:
+        st.toast(f"✅ บันทึกคอนเทนต์ {platform_key} แล้ว (โพสต์ manual)", icon="📋")
+
 GDRIVE_FOLDER_ID = "1-Kc-3l6C781lav4emTLCbZ202JVjExux"
 
 try:
@@ -1393,7 +1419,7 @@ def render_yentafo_dashboard(y_data: dict[str, pd.DataFrame]) -> None:
 
 # ── Content Studio ──────────────────────────────────────────────────────────────
 
-def render_content_studio_page(ai_mode: str, api_key: str) -> None:
+def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "", fb_token: str = "", fb_page_id: str = "") -> None:
     st.title("📣 Content Studio")
     st.caption("AI สร้างคอนเทนต์จากข้อมูลธุรกิจ → Google Drive → โพสต์ทุกแพลตฟอร์ม")
 
@@ -1641,7 +1667,7 @@ def render_content_studio_page(ai_mode: str, api_key: str) -> None:
                         key=f"post_{pid}",
                         type="primary",
                     ):
-                        st.toast(f"✅ ส่งไปยัง {pmeta['name']} แล้ว (Demo Mode)", icon="🚀")
+                        _do_post(pid, edited, line_token, fb_token, fb_page_id)
 
     # ── Posting schedule ───────────────────────────────────────────────────────
     st.divider()
@@ -1785,6 +1811,31 @@ with st.sidebar:
             st.success("พร้อมใช้ Claude API")
 
     st.divider()
+    st.markdown("**📱 Platform Tokens**")
+    st.caption("ใส่ token เพื่อโพสต์จริง")
+
+    line_token = st.text_input(
+        "LINE OA Token",
+        type="password",
+        placeholder="Channel Access Token",
+        help="จาก LINE Developers → Messaging API → Channel Access Token",
+    )
+    if line_token:
+        st.success("LINE OA พร้อมโพสต์")
+
+    fb_token = st.text_input(
+        "Facebook Page Token",
+        type="password",
+        placeholder="Page Access Token",
+        help="จาก Meta Developer → Graph API → Page Token",
+    )
+    fb_page_id = ""
+    if fb_token:
+        fb_page_id = st.text_input("Facebook Page ID", placeholder="เช่น 123456789")
+        if fb_page_id:
+            st.success("Facebook พร้อมโพสต์")
+
+    st.divider()
     st.caption("Built with Streamlit + Claude AI")
 
 
@@ -1799,7 +1850,7 @@ if page == "🔌 Connect POS":
     st.stop()
 
 if page == "📣 Content Studio":
-    render_content_studio_page(ai_mode, api_key)
+    render_content_studio_page(ai_mode, api_key, line_token=line_token, fb_token=fb_token, fb_page_id=fb_page_id)
     st.stop()
 
 if page == "🧮 ROI Calculator":

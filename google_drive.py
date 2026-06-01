@@ -18,17 +18,30 @@ def _build_service():
     from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request
     from googleapiclient.discovery import build
+    import json
 
     creds = None
-    if TOKEN_PATH.exists():
+
+    # Try Streamlit secrets first (for cloud deployment)
+    try:
+        import streamlit as st
+        token_json = st.secrets.get("google_drive", {}).get("token_json", "")
+        if token_json:
+            creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+    except Exception:
+        pass
+
+    # Fallback to local token.json
+    if creds is None and TOKEN_PATH.exists():
         creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+            if TOKEN_PATH.exists():
+                TOKEN_PATH.write_text(creds.to_json())
         else:
-            return None  # needs first-time auth
-        TOKEN_PATH.write_text(creds.to_json())
+            return None
 
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
