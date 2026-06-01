@@ -1826,18 +1826,33 @@ with st.sidebar:
 
     with st.expander("📖 วิธีขอ LINE OA Token"):
         st.markdown("""
-**ขั้นตอน:**
-1. ไปที่ [developers.line.biz](https://developers.line.biz)
-2. Login ด้วย LINE account
-3. กด **Create a new provider** (ครั้งแรก)
-4. กด **Create a new channel** → เลือก **Messaging API**
-5. กรอกข้อมูล Channel ให้ครบ
-6. ไปที่ tab **Messaging API**
-7. เลื่อนลงหา **Channel access token** → กด **Issue**
-8. Copy token มาวางในช่องด้านบน
+##### ขั้นตอน
 
-**หมายเหตุ:** ต้องมี LINE Official Account ก่อน
-→ สมัครได้ที่ [account.line.biz](https://account.line.biz)
+**1.** เปิดเว็บ [developers.line.biz](https://developers.line.biz)
+
+**2.** Login ด้วย LINE account
+
+**3.** กดปุ่ม `Create a new provider` (ทำครั้งแรกครั้งเดียว)
+
+**4.** กดปุ่ม `Create a new channel`
+
+**5.** เลือกประเภท `Messaging API`
+
+**6.** กรอกข้อมูล Channel ให้ครบ แล้วกด Create
+
+**7.** เปิด tab `Messaging API`
+
+**8.** เลื่อนลงล่างสุดหา `Channel access token`
+
+**9.** กดปุ่ม `Issue` เพื่อสร้าง token
+
+**10.** Copy token มาวางในช่อง LINE OA Token ด้านบน
+
+---
+
+⚠️ ต้องมี LINE Official Account ก่อน
+
+สมัครฟรีที่ [account.line.biz](https://account.line.biz)
 """)
 
     # ── Facebook ─────────────────────────────────────────────────────────────
@@ -1855,20 +1870,45 @@ with st.sidebar:
 
     with st.expander("📖 วิธีขอ Facebook Page Token"):
         st.markdown("""
-**ขั้นตอน:**
-1. ไปที่ [developers.facebook.com](https://developers.facebook.com)
-2. กด **My Apps** → **Create App**
-3. เลือก **Business** → กรอกชื่อ app
-4. ไปที่ **Tools → Graph API Explorer**
-5. เลือก App ของคุณ
-6. คลิก **Generate Access Token** → เลือก Page ที่ต้องการ
-7. ติ๊ก permission: `pages_manage_posts`, `pages_read_engagement`
-8. กด **Generate** → Copy token
+##### ขั้นตอน
 
-**หา Page ID:**
-ไปที่ Facebook Page → **About** → เลื่อนลงจะเห็น **Page ID**
+**1.** เปิดเว็บ [developers.facebook.com](https://developers.facebook.com)
 
-**หมายเหตุ:** ต้องเป็น Admin ของ Facebook Page
+**2.** Login ด้วย Facebook account
+
+**3.** ที่เมนูบน คลิก `My Apps`
+
+**4.** กดปุ่ม `Create App`
+
+**5.** เลือกประเภท `Business` แล้วกรอกชื่อ app
+
+**6.** ไปที่เมนู `Tools` แล้วเลือก `Graph API Explorer`
+
+**7.** ที่แถบขวา เลือก App ที่เพิ่งสร้าง
+
+**8.** คลิก `Generate Access Token`
+
+**9.** เลือก Facebook Page ที่ต้องการโพสต์
+
+**10.** ติ๊ก permissions ทั้ง 2 ตัว:
+- `pages_manage_posts`
+- `pages_read_engagement`
+
+**11.** กดปุ่ม `Generate Token` แล้ว Copy token
+
+---
+
+##### วิธีหา Page ID
+
+**1.** เปิด Facebook Page ของคุณ
+
+**2.** คลิกที่แถบ `About`
+
+**3.** เลื่อนลงล่างสุด จะเห็น `Page ID`
+
+---
+
+⚠️ ต้องเป็น Admin ของ Facebook Page
 """)
 
     st.divider()
