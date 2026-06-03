@@ -130,3 +130,41 @@ def upload_text(text: str, filename: str, folder_id: str) -> Optional[str]:
 def upload_excel(file_bytes: bytes, filename: str, folder_id: str) -> Optional[str]:
     return upload_file(file_bytes, filename, folder_id,
                        mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+def upload_image_public(image_bytes: bytes, filename: str, folder_id: str,
+                        mime_type: str = "image/jpeg") -> Optional[str]:
+    """Upload image to Drive, make it public, return direct image URL.
+
+    The returned URL is suitable for LINE OA (HTTPS, returns image bytes).
+    """
+    try:
+        import io
+        from googleapiclient.http import MediaIoBaseUpload
+
+        service = _build_service()
+        if service is None:
+            return None
+
+        file_metadata = {"name": filename, "parents": [folder_id]}
+        media = MediaIoBaseUpload(io.BytesIO(image_bytes), mimetype=mime_type, resumable=False)
+
+        uploaded = (
+            service.files()
+            .create(body=file_metadata, media_body=media, fields="id")
+            .execute()
+        )
+        file_id = uploaded["id"]
+
+        # Make file readable by anyone with link
+        service.permissions().create(
+            fileId=file_id,
+            body={"type": "anyone", "role": "reader"},
+        ).execute()
+
+        # Return direct image URL (works for LINE OA / Facebook)
+        return f"https://drive.google.com/uc?export=view&id={file_id}"
+
+    except Exception as e:
+        logger.error("Google Drive image upload failed: %s", e)
+        return None

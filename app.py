@@ -24,27 +24,46 @@ except ImportError:
     GDRIVE_AVAILABLE = False
 
 try:
-    from platform_poster import post_line_oa, post_facebook
+    from platform_poster import post_line_oa, post_line_oa_with_image, post_facebook
     POSTER_AVAILABLE = True
 except ImportError:
     POSTER_AVAILABLE = False
 
 
-def _do_post(platform_key: str, content: str, line_token: str, fb_token: str, fb_page_id: str) -> None:
-    """Handle actual posting per platform."""
+def _do_post(platform_key: str, content: str, line_token: str, fb_token: str, fb_page_id: str,
+             image_bytes: bytes | None = None, image_name: str = "image.jpg") -> None:
+    """Handle actual posting per platform. If image_bytes provided, post with image."""
     if platform_key == "line_oa":
         if not line_token:
             st.toast("❌ ใส่ LINE OA Token ในแถบซ้ายก่อน", icon="⚠️")
             return
         with st.spinner("กำลังส่งไป LINE OA..."):
-            ok, msg = post_line_oa(content, line_token)
+            if image_bytes:
+                # Upload image to Drive to get public URL, then send to LINE
+                if not GDRIVE_AVAILABLE or needs_auth():
+                    st.toast("❌ ต้อง authorize Google Drive ก่อนส่งภาพไป LINE", icon="⚠️")
+                    return
+                img_url = None
+                try:
+                    from google_drive import upload_image_public
+                    img_url = upload_image_public(image_bytes, image_name, GDRIVE_FOLDER_ID)
+                except Exception as e:
+                    st.toast(f"❌ Upload ภาพไม่ได้: {e}", icon="❌")
+                    return
+                if not img_url:
+                    st.toast("❌ Upload ภาพไม่ได้", icon="❌")
+                    return
+                ok, msg = post_line_oa_with_image(content, img_url, line_token)
+            else:
+                ok, msg = post_line_oa(content, line_token)
         st.toast(msg, icon="✅" if ok else "❌")
     elif platform_key == "facebook":
         if not fb_token or not fb_page_id:
             st.toast("❌ ใส่ Facebook Token และ Page ID ในแถบซ้ายก่อน", icon="⚠️")
             return
         with st.spinner("กำลังโพสต์ Facebook..."):
-            ok, msg = post_facebook(content, fb_token, fb_page_id)
+            ok, msg = post_facebook(content, fb_token, fb_page_id,
+                                    image_bytes=image_bytes, image_name=image_name)
         st.toast(msg, icon="✅" if ok else "❌")
     else:
         st.toast(f"✅ บันทึกคอนเทนต์ {platform_key} แล้ว (โพสต์ manual)", icon="📋")
@@ -1572,6 +1591,24 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
             start_time = "17:00"
             end_time = "20:00"
 
+        st.markdown("**🖼️ รูปภาพประกอบ (ไม่บังคับ)**")
+        uploaded_image = st.file_uploader(
+            "อัปโหลดรูป",
+            type=["jpg", "jpeg", "png"],
+            help="ภาพจะแนบไปกับโพสต์ Facebook + LINE OA",
+            key="cs_image_upload",
+            label_visibility="collapsed",
+        )
+        if uploaded_image is not None:
+            st.session_state["cs_image_bytes"] = uploaded_image.getvalue()
+            st.session_state["cs_image_name"] = uploaded_image.name
+            st.image(uploaded_image, caption="✅ ภาพพร้อมโพสต์", width=200)
+        elif "cs_image_bytes" in st.session_state:
+            if st.button("🗑️ ลบรูปที่อัปโหลด", use_container_width=True):
+                del st.session_state["cs_image_bytes"]
+                del st.session_state["cs_image_name"]
+                st.rerun()
+
     st.divider()
 
     # ── Generate ───────────────────────────────────────────────────────────────
@@ -1699,7 +1736,11 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
                         key=f"post_{pid}",
                         type="primary",
                     ):
-                        _do_post(pid, edited, line_token, fb_token, fb_page_id)
+                        _do_post(
+                            pid, edited, line_token, fb_token, fb_page_id,
+                            image_bytes=st.session_state.get("cs_image_bytes"),
+                            image_name=st.session_state.get("cs_image_name", "image.jpg"),
+                        )
 
     # ── Posting schedule ───────────────────────────────────────────────────────
     st.divider()
