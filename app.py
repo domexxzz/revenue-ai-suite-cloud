@@ -24,32 +24,43 @@ except ImportError:
     GDRIVE_AVAILABLE = False
 
 try:
-    from platform_poster import post_line_oa, post_line_oa_with_image, post_facebook
+    from platform_poster import post_line_oa, post_line_oa_with_image, post_facebook, post_instagram
     POSTER_AVAILABLE = True
 except ImportError:
     POSTER_AVAILABLE = False
 
+try:
+    from youtube_uploader import upload_video as upload_youtube
+    YOUTUBE_AVAILABLE = True
+except ImportError:
+    YOUTUBE_AVAILABLE = False
 
-def _do_post(platform_key: str, content: str, line_token: str, fb_token: str, fb_page_id: str,
-             image_bytes: bytes | None = None, image_name: str = "image.jpg") -> None:
-    """Handle actual posting per platform. If image_bytes provided, post with image."""
+
+def _upload_to_drive_public(file_bytes: bytes, name: str, mime: str) -> str | None:
+    """Helper: upload bytes to Drive, return public URL."""
+    try:
+        from google_drive import upload_image_public
+        return upload_image_public(file_bytes, name, GDRIVE_FOLDER_ID, mime_type=mime)
+    except Exception as e:
+        return None
+
+
+def _do_post(platform_key: str, content: str,
+             line_token: str, fb_token: str, fb_page_id: str,
+             ig_business_id: str = "",
+             image_bytes: bytes | None = None, image_name: str = "image.jpg",
+             video_bytes: bytes | None = None, video_name: str = "video.mp4") -> None:
+    """Handle actual posting per platform."""
     if platform_key == "line_oa":
         if not line_token:
             st.toast("❌ ใส่ LINE OA Token ในแถบซ้ายก่อน", icon="⚠️")
             return
         with st.spinner("กำลังส่งไป LINE OA..."):
             if image_bytes:
-                # Upload image to Drive to get public URL, then send to LINE
                 if not GDRIVE_AVAILABLE or needs_auth():
-                    st.toast("❌ ต้อง authorize Google Drive ก่อนส่งภาพไป LINE", icon="⚠️")
+                    st.toast("❌ ต้อง authorize Google Drive ก่อนส่งภาพ", icon="⚠️")
                     return
-                img_url = None
-                try:
-                    from google_drive import upload_image_public
-                    img_url = upload_image_public(image_bytes, image_name, GDRIVE_FOLDER_ID)
-                except Exception as e:
-                    st.toast(f"❌ Upload ภาพไม่ได้: {e}", icon="❌")
-                    return
+                img_url = _upload_to_drive_public(image_bytes, image_name, "image/jpeg")
                 if not img_url:
                     st.toast("❌ Upload ภาพไม่ได้", icon="❌")
                     return
@@ -57,16 +68,63 @@ def _do_post(platform_key: str, content: str, line_token: str, fb_token: str, fb
             else:
                 ok, msg = post_line_oa(content, line_token)
         st.toast(msg, icon="✅" if ok else "❌")
+
     elif platform_key == "facebook":
         if not fb_token or not fb_page_id:
-            st.toast("❌ ใส่ Facebook Token และ Page ID ในแถบซ้ายก่อน", icon="⚠️")
+            st.toast("❌ ใส่ Facebook Token และ Page ID ก่อน", icon="⚠️")
             return
         with st.spinner("กำลังโพสต์ Facebook..."):
             ok, msg = post_facebook(content, fb_token, fb_page_id,
                                     image_bytes=image_bytes, image_name=image_name)
         st.toast(msg, icon="✅" if ok else "❌")
+
+    elif platform_key == "instagram":
+        if not fb_token or not ig_business_id:
+            st.toast("❌ ใส่ FB Token + IG Business ID ก่อน", icon="⚠️")
+            return
+        if not image_bytes and not video_bytes:
+            st.toast("❌ IG ต้องมีรูปหรือวิดีโอ", icon="⚠️")
+            return
+        if not GDRIVE_AVAILABLE or needs_auth():
+            st.toast("❌ ต้อง authorize Google Drive ก่อน", icon="⚠️")
+            return
+        with st.spinner("กำลังโพสต์ Instagram (อาจใช้เวลานานหากเป็นวิดีโอ)..."):
+            img_url = vid_url = None
+            if video_bytes:
+                vid_url = _upload_to_drive_public(video_bytes, video_name, "video/mp4")
+            elif image_bytes:
+                img_url = _upload_to_drive_public(image_bytes, image_name, "image/jpeg")
+            if not img_url and not vid_url:
+                st.toast("❌ Upload media ไม่ได้", icon="❌")
+                return
+            ok, msg = post_instagram(content, img_url, vid_url, ig_business_id, fb_token)
+        st.toast(msg, icon="✅" if ok else "❌")
+
+    elif platform_key == "youtube":
+        if not video_bytes:
+            st.toast("❌ YouTube ต้องมีวิดีโอ — กรุณาอัปโหลดวิดีโอก่อน", icon="⚠️")
+            return
+        if not YOUTUBE_AVAILABLE:
+            st.toast("❌ YouTube module ไม่ได้ติดตั้ง", icon="❌")
+            return
+        title = content.split("\n")[0][:100] or "AI Revenue Intelligence Post"
+        with st.spinner("กำลังอัปโหลด YouTube (อาจใช้เวลา 1-3 นาที)..."):
+            ok, result = upload_youtube(video_bytes, title=title, description=content)
+        if ok:
+            st.success(f"YouTube สำเร็จ ✅")
+            st.markdown(f"[🔗 เปิดวิดีโอ]({result})")
+        else:
+            st.toast(f"❌ {result}", icon="❌")
+
+    elif platform_key == "tiktok":
+        # TikTok: ดาวน์โหลดให้น้องอัปโหลดเอง
+        if video_bytes:
+            st.info("📥 TikTok: ดาวน์โหลดวิดีโอ + caption ด้านล่าง แล้วเปิดแอป TikTok อัปโหลด")
+            st.session_state["tiktok_video_ready"] = True
+        else:
+            st.toast("❌ TikTok ต้องมีวิดีโอ", icon="⚠️")
     else:
-        st.toast(f"✅ บันทึกคอนเทนต์ {platform_key} แล้ว (โพสต์ manual)", icon="📋")
+        st.toast(f"✅ บันทึกคอนเทนต์ {platform_key} แล้ว", icon="📋")
 
 def _get_gdrive_folder_id() -> str:
     """Read folder ID from Streamlit secrets, fall back to default."""
@@ -1447,7 +1505,7 @@ def render_yentafo_dashboard(y_data: dict[str, pd.DataFrame]) -> None:
 
 # ── Content Studio ──────────────────────────────────────────────────────────────
 
-def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "", fb_token: str = "", fb_page_id: str = "") -> None:
+def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "", fb_token: str = "", fb_page_id: str = "", ig_business_id: str = "") -> None:
     st.title("📣 Content Studio")
     st.caption("AI สร้างคอนเทนต์จากข้อมูลธุรกิจ → Google Drive → โพสต์ทุกแพลตฟอร์ม")
 
@@ -1595,7 +1653,7 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
         uploaded_image = st.file_uploader(
             "อัปโหลดรูป",
             type=["jpg", "jpeg", "png"],
-            help="ภาพจะแนบไปกับโพสต์ Facebook + LINE OA",
+            help="ภาพจะแนบไปกับ Facebook + LINE OA + Instagram (feed)",
             key="cs_image_upload",
             label_visibility="collapsed",
         )
@@ -1604,9 +1662,28 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
             st.session_state["cs_image_name"] = uploaded_image.name
             st.image(uploaded_image, caption="✅ ภาพพร้อมโพสต์", width=200)
         elif "cs_image_bytes" in st.session_state:
-            if st.button("🗑️ ลบรูปที่อัปโหลด", use_container_width=True):
+            if st.button("🗑️ ลบรูป", use_container_width=True, key="del_img"):
                 del st.session_state["cs_image_bytes"]
                 del st.session_state["cs_image_name"]
+                st.rerun()
+
+        st.markdown("**🎬 วิดีโอ (ไม่บังคับ)**")
+        uploaded_video = st.file_uploader(
+            "อัปโหลดวิดีโอ",
+            type=["mp4", "mov"],
+            help="วิดีโอจะใช้กับ Instagram Reels + YouTube + TikTok",
+            key="cs_video_upload",
+            label_visibility="collapsed",
+        )
+        if uploaded_video is not None:
+            st.session_state["cs_video_bytes"] = uploaded_video.getvalue()
+            st.session_state["cs_video_name"] = uploaded_video.name
+            size_mb = len(st.session_state["cs_video_bytes"]) / 1024 / 1024
+            st.success(f"✅ วิดีโอพร้อม ({size_mb:.1f} MB)")
+        elif "cs_video_bytes" in st.session_state:
+            if st.button("🗑️ ลบวิดีโอ", use_container_width=True, key="del_vid"):
+                del st.session_state["cs_video_bytes"]
+                del st.session_state["cs_video_name"]
                 st.rerun()
 
     st.divider()
@@ -1738,9 +1815,24 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
                     ):
                         _do_post(
                             pid, edited, line_token, fb_token, fb_page_id,
+                            ig_business_id=ig_business_id,
                             image_bytes=st.session_state.get("cs_image_bytes"),
                             image_name=st.session_state.get("cs_image_name", "image.jpg"),
+                            video_bytes=st.session_state.get("cs_video_bytes"),
+                            video_name=st.session_state.get("cs_video_name", "video.mp4"),
                         )
+
+                    # TikTok download helper (always shown for tiktok tab)
+                    if pid == "tiktok" and st.session_state.get("cs_video_bytes"):
+                        st.download_button(
+                            "📥 Download วิดีโอ (สำหรับ TikTok)",
+                            data=st.session_state["cs_video_bytes"],
+                            file_name=st.session_state.get("cs_video_name", "video.mp4"),
+                            mime="video/mp4",
+                            key=f"dl_tiktok_{pid}",
+                            use_container_width=True,
+                        )
+                        st.markdown("[🔗 เปิด TikTok เพื่ออัปโหลด](https://www.tiktok.com/upload)")
 
     # ── Posting schedule ───────────────────────────────────────────────────────
     st.divider()
@@ -1936,10 +2028,46 @@ with st.sidebar:
         help="จาก Meta Developer → Graph API → Page Token",
     )
     fb_page_id = ""
+    ig_business_id = ""
     if fb_token:
         fb_page_id = st.text_input("Facebook Page ID", placeholder="เช่น 123456789")
         if fb_page_id:
             st.success("Facebook พร้อมโพสต์")
+        ig_business_id = st.text_input(
+            "Instagram Business Account ID",
+            placeholder="เช่น 17841...",
+            help="ID ของ IG Business Account ที่ผูกกับ Facebook Page (ใช้ FB Token เดียวกัน)",
+        )
+        if ig_business_id:
+            st.success("Instagram พร้อมโพสต์")
+
+    with st.expander("📖 วิธีหา IG Business ID"):
+        st.markdown("""
+##### ขั้นตอน (ใช้ FB Token เดิม)
+
+**1.** ต้องเชื่อม Instagram กับ Facebook Page ก่อน
+
+**2.** เปิด [Graph API Explorer](https://developers.facebook.com/tools/explorer)
+
+**3.** Method: `GET`
+
+**4.** URL: `{PAGE_ID}?fields=instagram_business_account` (แทน PAGE_ID ด้วย Facebook Page ID)
+
+**5.** กด **ส่ง**
+
+**6.** Response จะมี:
+```
+"instagram_business_account": {
+  "id": "17841xxxxxxxxx"   ← copy เลขนี้
+}
+```
+
+**7.** วางในช่อง Instagram Business Account ID
+
+---
+
+⚠️ Instagram ต้องเป็น Business/Creator Account
+""")
 
     with st.expander("📖 วิธีขอ Facebook Page Token"):
         st.markdown("""
@@ -1999,7 +2127,7 @@ if page == "🔌 Connect POS":
     st.stop()
 
 if page == "📣 Content Studio":
-    render_content_studio_page(ai_mode, api_key, line_token=line_token, fb_token=fb_token, fb_page_id=fb_page_id)
+    render_content_studio_page(ai_mode, api_key, line_token=line_token, fb_token=fb_token, fb_page_id=fb_page_id, ig_business_id=ig_business_id)
     st.stop()
 
 if page == "🧮 ROI Calculator":

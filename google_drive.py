@@ -9,7 +9,10 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+SCOPES = [
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/youtube.upload",
+]
 TOKEN_PATH = Path(__file__).parent / "token.json"
 OAUTH_PATH = Path(__file__).parent / "oauth_credentials.json"
 
