@@ -35,6 +35,12 @@ try:
 except ImportError:
     YOUTUBE_AVAILABLE = False
 
+try:
+    from chat_inbox import fetch_conversations, send_message, generate_ai_reply, DEFAULT_PROFILE
+    CHAT_INBOX_AVAILABLE = True
+except ImportError:
+    CHAT_INBOX_AVAILABLE = False
+
 
 def _upload_to_drive_public(file_bytes: bytes, name: str, mime: str) -> str | None:
     """Helper: upload bytes to Drive, return public URL."""
@@ -1959,6 +1965,151 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
             st.rerun()
 
 
+# ── AI Chat Inbox ───────────────────────────────────────────────────────────────
+
+def render_ai_inbox_page(ai_mode: str, api_key: str, fb_token: str = "",
+                         fb_page_id: str = "", line_token: str = "") -> None:
+    st.title("💬 AI Chat Inbox")
+    st.caption("อ่านแชทลูกค้าจาก Facebook Messenger / Instagram DM แล้วให้ AI ช่วยตอบ")
+
+    if not CHAT_INBOX_AVAILABLE:
+        st.error("ไม่พบ chat_inbox.py")
+        return
+
+    with st.expander("📖 ต้องเปิดสิทธิ์อะไรเพิ่ม (ครั้งแรกครั้งเดียว)"):
+        st.markdown("""
+##### Facebook Messenger / Instagram DM
+
+**1.** เปิด [Graph API Explorer](https://developers.facebook.com/tools/explorer)
+
+**2.** เพิ่ม permissions:
+- `pages_messaging` (อ่าน+ตอบแชท Messenger)
+- `instagram_manage_messages` (อ่าน+ตอบ IG DM)
+
+**3.** เลือก "ผู้ใช้หรือเพจ" เป็นเพจของคุณ → กด `Generate Access Token`
+
+**4.** Copy token ใหม่มาวางในช่อง Facebook Page Token (แถบซ้าย)
+
+---
+
+##### LINE OA
+
+LINE ไม่ให้ดึงแชทย้อนหลังผ่าน API — ต้องใช้ **webhook bot**
+ดูวิธีตั้งค่าที่หัวข้อ 💚 LINE Auto-Reply Bot ด้านล่างสุด
+""")
+
+    # ── Shop profile (AI knowledge) ────────────────────────────────────────────
+    st.subheader("🏪 ข้อมูลร้าน (สมองของ AI)")
+    prof = st.session_state.setdefault("shop_profile", dict(DEFAULT_PROFILE))
+    c1, c2 = st.columns(2)
+    with c1:
+        prof["shop_name"] = st.text_input("ชื่อร้าน", prof["shop_name"])
+        prof["hours"] = st.text_input("เวลาเปิด-ปิด", prof["hours"])
+        prof["address"] = st.text_input("ที่อยู่ / การเดินทาง", prof["address"])
+    with c2:
+        prof["menu"] = st.text_input("เมนูแนะนำ + ราคา", prof["menu"])
+        prof["promo"] = st.text_input("โปรโมชันตอนนี้", prof["promo"])
+        prof["booking"] = st.text_input("นโยบายจองโต๊ะ", prof["booking"])
+
+    _ai_key = api_key.strip() if (ai_mode == "Claude API" and api_key.strip()) else ""
+    st.caption(f"โหมด AI: {'🤖 Claude API (ฉลาด เข้าใจบริบท)' if _ai_key else '⚡ Rule-based (ตอบตามคีย์เวิร์ด — ใส่ Claude API key เพื่ออัปเกรด)'}")
+
+    st.divider()
+
+    # ── Inbox ──────────────────────────────────────────────────────────────────
+    plat = st.radio("แพลตฟอร์ม", ["🔵 Facebook Messenger", "🟣 Instagram DM"], horizontal=True)
+    platform_key = "messenger" if "Facebook" in plat else "instagram"
+
+    if not fb_token or not fb_page_id:
+        st.warning("ใส่ Facebook Page Token + Page ID ในแถบซ้ายก่อน")
+        return
+
+    if st.button("🔄 ดึงแชทล่าสุด", type="primary"):
+        with st.spinner("กำลังดึงแชท..."):
+            convs, msg = fetch_conversations(fb_token, fb_page_id, platform=platform_key)
+        if convs is None:
+            st.error(msg)
+            st.info("ถ้าเจอ error เรื่อง permission — เปิด expander ด้านบนแล้วทำตามขั้นตอนเพิ่มสิทธิ์")
+            return
+        st.session_state["inbox_convs"] = convs
+
+    convs = st.session_state.get("inbox_convs", [])
+    if not convs:
+        st.info("กด '🔄 ดึงแชทล่าสุด' เพื่อเริ่ม")
+    else:
+        waiting = [cv for cv in convs if cv["messages"] and cv["messages"][-1]["from_customer"]]
+        st.caption(f"พบ {len(convs)} บทสนทนา — 🔴 รอตอบ {len(waiting)} แชท")
+
+        # ── Auto-reply batch ───────────────────────────────────────────────────
+        replied: set = st.session_state.setdefault("auto_replied_ids", set())
+        pending = [cv for cv in waiting if cv["messages"][-1]["id"] not in replied]
+        if pending:
+            if st.button(f"⚡ ให้ AI ตอบ {len(pending)} แชทที่รอ — อัตโนมัติทั้งหมด",
+                         type="primary", use_container_width=True):
+                prog = st.progress(0.0)
+                done = 0
+                for j, cv in enumerate(pending):
+                    reply = generate_ai_reply(cv["messages"], prof, _ai_key)
+                    ok, m = send_message(fb_token, fb_page_id, cv["customer_id"], reply)
+                    if ok:
+                        replied.add(cv["messages"][-1]["id"])
+                        done += 1
+                    prog.progress((j + 1) / len(pending),
+                                  text=f"{cv['customer_name']}: {'✅' if ok else '❌ ' + m}")
+                st.success(f"🤖 AI ตอบไปแล้ว {done}/{len(pending)} แชท")
+
+        # ── Conversation list ──────────────────────────────────────────────────
+        for i, cv in enumerate(convs):
+            is_waiting = cv["messages"] and cv["messages"][-1]["from_customer"]
+            badge = "🔴 รอตอบ" if is_waiting else "🟢 ตอบแล้ว"
+            with st.expander(f"{badge} — {cv['customer_name']} ({cv['updated'][:16]})",
+                             expanded=bool(is_waiting and i < 2)):
+                for m in cv["messages"]:
+                    if not m["text"]:
+                        continue
+                    who = "🧑 ลูกค้า" if m["from_customer"] else "🏪 ร้าน"
+                    st.markdown(f"**{who}:** {m['text']}")
+                st.divider()
+                draft_key = f"draft_{cv['conversation_id']}"
+                if st.button("🤖 ให้ AI ร่างคำตอบ", key=f"ai_{i}"):
+                    with st.spinner("AI กำลังคิด..."):
+                        st.session_state[draft_key] = generate_ai_reply(cv["messages"], prof, _ai_key)
+                reply_text = st.text_area("คำตอบ", value=st.session_state.get(draft_key, ""),
+                                          key=f"txt_{i}", height=100)
+                if st.button("📨 ส่งตอบ", key=f"send_{i}", type="primary"):
+                    ok, m = send_message(fb_token, fb_page_id, cv["customer_id"], reply_text)
+                    (st.success if ok else st.error)(m)
+
+    # ── LINE bot guide ─────────────────────────────────────────────────────────
+    st.divider()
+    with st.expander("💚 LINE OA Auto-Reply Bot — วิธีตั้งค่า"):
+        st.markdown("""
+LINE ตอบอัตโนมัติต้องใช้ webhook bot (ไฟล์ `line_ai_bot.py` ในโปรเจกต์นี้ พร้อมใช้แล้ว)
+
+**รันบนเครื่องตัวเอง:**
+```bash
+pip install fastapi uvicorn
+export LINE_CHANNEL_SECRET="จาก LINE Developers → Basic settings"
+export LINE_CHANNEL_ACCESS_TOKEN="token ตัวเดียวกับที่ใช้โพสต์"
+export ANTHROPIC_API_KEY="sk-ant-..."   # ไม่ใส่ = rule-based
+uvicorn line_ai_bot:app --port 8001
+```
+
+**เปิด tunnel ให้ LINE เรียกถึง:**
+```bash
+brew install cloudflared
+cloudflared tunnel --url http://localhost:8001
+```
+
+**ตั้งค่าใน [LINE Developers Console](https://developers.line.biz/console/):**
+1. Messaging API → Webhook URL = `https://<tunnel-url>/webhook`
+2. เปิด **Use webhook**
+3. ปิด **Auto-reply messages** (ของ LINE เดิม) เพื่อให้ bot ตอบแทน
+
+ทดสอบ: ทักแชทหา OA → AI ตอบกลับทันที 🤖
+""")
+
+
 # ── Sidebar ─────────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -2000,7 +2151,7 @@ with st.sidebar:
 
     page = st.radio(
         "เมนู",
-        ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "📣 Content Studio", "🧮 ROI Calculator"],
+        ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "📣 Content Studio", "💬 AI Inbox", "🧮 ROI Calculator"],
         label_visibility="collapsed",
     )
 
@@ -2216,6 +2367,10 @@ if page == "🔌 Connect POS":
 
 if page == "📣 Content Studio":
     render_content_studio_page(ai_mode, api_key, line_token=line_token, fb_token=fb_token, fb_page_id=fb_page_id, ig_business_id=ig_business_id)
+    st.stop()
+
+if page == "💬 AI Inbox":
+    render_ai_inbox_page(ai_mode, api_key, fb_token=fb_token, fb_page_id=fb_page_id, line_token=line_token)
     st.stop()
 
 if page == "🧮 ROI Calculator":
