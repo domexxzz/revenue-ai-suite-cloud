@@ -45,86 +45,104 @@ def _upload_to_drive_public(file_bytes: bytes, name: str, mime: str) -> str | No
         return None
 
 
+PLATFORM_THAI_NAMES = {
+    "line_oa": "💚 LINE OA", "facebook": "🔵 Facebook", "instagram": "🟣 Instagram",
+    "tiktok": "⬛ TikTok", "youtube": "🔴 YouTube",
+}
+
+
+def _record_post(platform_key: str, ok: bool, detail: str) -> None:
+    """Append a post attempt to session history."""
+    st.session_state.setdefault("post_history", []).append({
+        "เวลา": dt.datetime.now().strftime("%d/%m %H:%M"),
+        "แพลตฟอร์ม": PLATFORM_THAI_NAMES.get(platform_key, platform_key),
+        "สถานะ": "✅ สำเร็จ" if ok else "❌ ไม่สำเร็จ",
+        "รายละเอียด": detail[:160],
+    })
+
+
 def _do_post(platform_key: str, content: str,
              line_token: str, fb_token: str, fb_page_id: str,
              ig_business_id: str = "",
              image_bytes: bytes | None = None, image_name: str = "image.jpg",
-             video_bytes: bytes | None = None, video_name: str = "video.mp4") -> None:
-    """Handle actual posting per platform."""
+             video_bytes: bytes | None = None, video_name: str = "video.mp4",
+             quiet: bool = False) -> tuple[bool, str]:
+    """Post to one platform. Returns (ok, message) and records history."""
+    ok, msg = False, ""
+
     if platform_key == "line_oa":
         if not line_token:
-            st.toast("❌ ใส่ LINE OA Token ในแถบซ้ายก่อน", icon="⚠️")
-            return
-        with st.spinner("กำลังส่งไป LINE OA..."):
-            if image_bytes:
-                if not GDRIVE_AVAILABLE or needs_auth():
-                    st.toast("❌ ต้อง authorize Google Drive ก่อนส่งภาพ", icon="⚠️")
-                    return
-                img_url = _upload_to_drive_public(image_bytes, image_name, "image/jpeg")
-                if not img_url:
-                    st.toast("❌ Upload ภาพไม่ได้", icon="❌")
-                    return
-                ok, msg = post_line_oa_with_image(content, img_url, line_token)
-            else:
-                ok, msg = post_line_oa(content, line_token)
-        st.toast(msg, icon="✅" if ok else "❌")
+            msg = "ใส่ LINE OA Token ในแถบซ้ายก่อน"
+        else:
+            with st.spinner("กำลังส่งไป LINE OA..."):
+                if image_bytes:
+                    if not GDRIVE_AVAILABLE or needs_auth():
+                        msg = "ต้อง authorize Google Drive ก่อนส่งภาพ"
+                    else:
+                        img_url = _upload_to_drive_public(image_bytes, image_name, "image/jpeg")
+                        if not img_url:
+                            msg = "Upload ภาพไม่ได้"
+                        else:
+                            ok, msg = post_line_oa_with_image(content, img_url, line_token)
+                else:
+                    ok, msg = post_line_oa(content, line_token)
 
     elif platform_key == "facebook":
         if not fb_token or not fb_page_id:
-            st.toast("❌ ใส่ Facebook Token และ Page ID ก่อน", icon="⚠️")
-            return
-        with st.spinner("กำลังโพสต์ Facebook..."):
-            ok, msg = post_facebook(content, fb_token, fb_page_id,
-                                    image_bytes=image_bytes, image_name=image_name)
-        st.toast(msg, icon="✅" if ok else "❌")
+            msg = "ใส่ Facebook Token และ Page ID ก่อน"
+        else:
+            with st.spinner("กำลังโพสต์ Facebook..."):
+                ok, msg = post_facebook(content, fb_token, fb_page_id,
+                                        image_bytes=image_bytes, image_name=image_name)
 
     elif platform_key == "instagram":
         if not fb_token or not ig_business_id:
-            st.toast("❌ ใส่ FB Token + IG Business ID ก่อน", icon="⚠️")
-            return
-        if not image_bytes and not video_bytes:
-            st.toast("❌ IG ต้องมีรูปหรือวิดีโอ", icon="⚠️")
-            return
-        if not GDRIVE_AVAILABLE or needs_auth():
-            st.toast("❌ ต้อง authorize Google Drive ก่อน", icon="⚠️")
-            return
-        with st.spinner("กำลังโพสต์ Instagram (อาจใช้เวลานานหากเป็นวิดีโอ)..."):
-            img_url = vid_url = None
-            if video_bytes:
-                vid_url = _upload_to_drive_public(video_bytes, video_name, "video/mp4")
-            elif image_bytes:
-                img_url = _upload_to_drive_public(image_bytes, image_name, "image/jpeg")
-            if not img_url and not vid_url:
-                st.toast("❌ Upload media ไม่ได้", icon="❌")
-                return
-            ok, msg = post_instagram(content, img_url, vid_url, ig_business_id, fb_token)
-        st.toast(msg, icon="✅" if ok else "❌")
+            msg = "ใส่ FB Token + IG Business ID ก่อน"
+        elif not image_bytes and not video_bytes:
+            msg = "IG ต้องมีรูปหรือวิดีโอ"
+        elif not GDRIVE_AVAILABLE or needs_auth():
+            msg = "ต้อง authorize Google Drive ก่อน"
+        else:
+            with st.spinner("กำลังโพสต์ Instagram (วิดีโออาจใช้เวลานาน)..."):
+                img_url = vid_url = None
+                if video_bytes:
+                    vid_url = _upload_to_drive_public(video_bytes, video_name, "video/mp4")
+                elif image_bytes:
+                    img_url = _upload_to_drive_public(image_bytes, image_name, "image/jpeg")
+                if not img_url and not vid_url:
+                    msg = "Upload media ไม่ได้"
+                else:
+                    ok, msg = post_instagram(content, img_url, vid_url, ig_business_id, fb_token)
 
     elif platform_key == "youtube":
         if not video_bytes:
-            st.toast("❌ YouTube ต้องมีวิดีโอ — กรุณาอัปโหลดวิดีโอก่อน", icon="⚠️")
-            return
-        if not YOUTUBE_AVAILABLE:
-            st.toast("❌ YouTube module ไม่ได้ติดตั้ง", icon="❌")
-            return
-        title = content.split("\n")[0][:100] or "AI Revenue Intelligence Post"
-        with st.spinner("กำลังอัปโหลด YouTube (อาจใช้เวลา 1-3 นาที)..."):
-            ok, result = upload_youtube(video_bytes, title=title, description=content)
-        if ok:
-            st.success(f"YouTube สำเร็จ ✅")
-            st.markdown(f"[🔗 เปิดวิดีโอ]({result})")
+            msg = "YouTube ต้องมีวิดีโอ — อัปโหลดวิดีโอก่อน"
+        elif not YOUTUBE_AVAILABLE:
+            msg = "YouTube module ไม่ได้ติดตั้ง"
         else:
-            st.toast(f"❌ {result}", icon="❌")
+            title = content.split("\n")[0][:100] or "AI Revenue Intelligence Post"
+            with st.spinner("กำลังอัปโหลด YouTube (อาจใช้เวลา 1-3 นาที)..."):
+                ok, result = upload_youtube(video_bytes, title=title, description=content)
+            msg = result
+            if ok and not quiet:
+                st.success("YouTube สำเร็จ ✅")
+                st.markdown(f"[🔗 เปิดวิดีโอ]({result})")
 
     elif platform_key == "tiktok":
-        # TikTok: ดาวน์โหลดให้น้องอัปโหลดเอง
         if video_bytes:
-            st.info("📥 TikTok: ดาวน์โหลดวิดีโอ + caption ด้านล่าง แล้วเปิดแอป TikTok อัปโหลด")
+            ok, msg = True, "วิดีโอพร้อม — ดาวน์โหลดแล้วอัปโหลดในแอป TikTok"
+            if not quiet:
+                st.info("📥 TikTok: ดาวน์โหลดวิดีโอ + caption ด้านล่าง แล้วเปิดแอป TikTok อัปโหลด")
             st.session_state["tiktok_video_ready"] = True
         else:
-            st.toast("❌ TikTok ต้องมีวิดีโอ", icon="⚠️")
+            msg = "TikTok ต้องมีวิดีโอ"
     else:
-        st.toast(f"✅ บันทึกคอนเทนต์ {platform_key} แล้ว", icon="📋")
+        ok, msg = True, "บันทึกคอนเทนต์แล้ว"
+
+    _record_post(platform_key, ok, msg)
+    if not quiet and platform_key != "youtube":
+        st.toast(("✅ " if ok else "❌ ") + msg, icon="✅" if ok else "❌")
+    return ok, msg
 
 def _get_gdrive_folder_id() -> str:
     """Read folder ID from Streamlit secrets, fall back to default."""
@@ -1834,6 +1852,42 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
                         )
                         st.markdown("[🔗 เปิด TikTok เพื่ออัปโหลด](https://www.tiktok.com/upload)")
 
+    # ── Post All ───────────────────────────────────────────────────────────────
+    st.divider()
+    pa_left, pa_right = st.columns([2, 1])
+    with pa_left:
+        st.markdown("**⚡ โพสต์ทุกแพลตฟอร์มในคลิกเดียว**")
+        st.caption("ใช้คอนเทนต์ของแต่ละ tab (รวมที่แก้ไขแล้ว) — TikTok จะเตรียมไฟล์ให้ดาวน์โหลด")
+    with pa_right:
+        post_all_clicked = st.button("🚀 Post All", type="primary", use_container_width=True, key="post_all")
+
+    if post_all_clicked:
+        results = []
+        progress = st.progress(0.0, text="เริ่มโพสต์...")
+        for i, pid in enumerate(visible):
+            pname = PLATFORM_THAI_NAMES.get(pid, pid)
+            progress.progress(i / len(visible), text=f"กำลังโพสต์ {pname}...")
+            content_i = st.session_state.get(f"cs_text_{pid}") or package.get(pid, "")
+            ok, msg = _do_post(
+                pid, content_i, line_token, fb_token, fb_page_id,
+                ig_business_id=ig_business_id,
+                image_bytes=st.session_state.get("cs_image_bytes"),
+                image_name=st.session_state.get("cs_image_name", "image.jpg"),
+                video_bytes=st.session_state.get("cs_video_bytes"),
+                video_name=st.session_state.get("cs_video_name", "video.mp4"),
+                quiet=True,
+            )
+            results.append((pname, ok, msg))
+        progress.progress(1.0, text="เสร็จแล้ว!")
+
+        n_ok = sum(1 for _, ok, _ in results if ok)
+        if n_ok == len(results):
+            st.success(f"🎉 โพสต์สำเร็จครบ {n_ok}/{len(results)} แพลตฟอร์ม")
+        else:
+            st.warning(f"สำเร็จ {n_ok}/{len(results)} แพลตฟอร์ม — ดูรายละเอียดด้านล่าง")
+        for pname, ok, msg in results:
+            st.markdown(f"{'✅' if ok else '❌'} **{pname}** — {msg}")
+
     # ── Posting schedule ───────────────────────────────────────────────────────
     st.divider()
     st.subheader("📅 ตารางโพสต์ที่แนะนำ")
@@ -1893,6 +1947,16 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
             mime="text/plain",
             use_container_width=True,
         )
+
+    # ── Post history ───────────────────────────────────────────────────────────
+    history = st.session_state.get("post_history", [])
+    if history:
+        st.divider()
+        st.subheader("🕐 ประวัติการโพสต์ (เซสชันนี้)")
+        st.dataframe(pd.DataFrame(reversed(history)), use_container_width=True, hide_index=True)
+        if st.button("🗑️ ล้างประวัติ", key="clear_history"):
+            st.session_state["post_history"] = []
+            st.rerun()
 
 
 # ── Sidebar ─────────────────────────────────────────────────────────────────────
@@ -2111,6 +2175,30 @@ with st.sidebar:
 
 ⚠️ ต้องเป็น Admin ของ Facebook Page
 """)
+
+    st.divider()
+    if st.button("🔌 เช็คการเชื่อมต่อทั้งหมด", use_container_width=True):
+        from platform_poster import test_line_token, test_facebook_token, test_instagram_account
+        with st.spinner("กำลังเช็ค..."):
+            if line_token:
+                ok, m = test_line_token(line_token)
+                (st.success if ok else st.error)(m)
+            else:
+                st.caption("➖ LINE OA: ยังไม่ใส่ token")
+            if fb_token and fb_page_id:
+                ok, m = test_facebook_token(fb_token, fb_page_id)
+                (st.success if ok else st.error)(m)
+            else:
+                st.caption("➖ Facebook: ยังไม่ใส่ token/Page ID")
+            if fb_token and ig_business_id:
+                ok, m = test_instagram_account(ig_business_id, fb_token)
+                (st.success if ok else st.error)(m)
+            else:
+                st.caption("➖ Instagram: ยังไม่ใส่ IG ID")
+            if GDRIVE_AVAILABLE and not needs_auth():
+                st.success("Google Drive + YouTube: พร้อม")
+            else:
+                st.error("Google Drive: ยังไม่ได้ authorize")
 
     st.divider()
     st.caption("Built with Streamlit + Claude AI")

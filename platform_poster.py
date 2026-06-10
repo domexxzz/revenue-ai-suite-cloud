@@ -164,3 +164,39 @@ def test_line_token(token: str) -> tuple[bool, str]:
         return False, f"Token ไม่ถูกต้อง ({resp.status_code})"
     except Exception as e:
         return False, f"Error: {e}"
+
+
+def test_facebook_token(token: str, page_id: str) -> tuple[bool, str]:
+    """Verify Facebook Page token + page id, return page name."""
+    try:
+        resp = requests.get(
+            f"https://graph.facebook.com/v19.0/{page_id}",
+            params={"access_token": token, "fields": "name,fan_count"},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            d = resp.json()
+            fans = d.get("fan_count")
+            extra = f" ({fans:,} followers)" if isinstance(fans, int) else ""
+            return True, f"Facebook Page: {d.get('name', 'Unknown')}{extra}"
+        return False, f"Token/Page ID ไม่ถูกต้อง ({resp.status_code})"
+    except Exception as e:
+        return False, f"Error: {e}"
+
+
+def test_instagram_account(ig_business_id: str, token: str) -> tuple[bool, str]:
+    """Verify IG business account, return username."""
+    try:
+        resp = requests.get(
+            f"https://graph.facebook.com/v19.0/{ig_business_id}",
+            params={"access_token": token, "fields": "username,followers_count"},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            d = resp.json()
+            fol = d.get("followers_count")
+            extra = f" ({fol:,} followers)" if isinstance(fol, int) else ""
+            return True, f"Instagram: @{d.get('username', 'unknown')}{extra}"
+        return False, f"IG ID/Token ไม่ถูกต้อง ({resp.status_code})"
+    except Exception as e:
+        return False, f"Error: {e}"

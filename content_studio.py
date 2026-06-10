@@ -283,6 +283,148 @@ _LOCAL_TEMPLATES: dict[str, dict[str, str]] = {
             "shallow depth of field, warm tones, appetizing"
         ),
     },
+    "vip_reward": {
+        "line_oa": (
+            "👑 ขอบคุณที่เป็นลูกค้าคนพิเศษของเรา!\n\n"
+            "คุณคือ Top Customer ของ {brand_name} 💛\n\n"
+            "🎁 สิทธิพิเศษเฉพาะ VIP:\n"
+            "✨ ส่วนลด {discount}% ทุกออเดอร์\n"
+            "🍽️ {top_item} ฟรี เมื่อมาครั้งถัดไป\n"
+            "⏰ ถึง {expiry}\n\n"
+            "👉 {cta}"
+        ),
+        "facebook": (
+            "👑 TO OUR VIP CUSTOMERS 👑\n\n"
+            "ขอบคุณที่อยู่กับ {brand_name} เสมอมา\n"
+            "ความภักดีของคุณมีค่ากับเราที่สุด 💛\n\n"
+            "สิทธิพิเศษที่เตรียมไว้ให้:\n"
+            "🎁 ส่วนลด {discount}% สำหรับสมาชิก VIP\n"
+            "⭐ สิทธิ์จองก่อนใครทุกเมนูใหม่\n"
+            "🍽️ {top_item} ฟรีในเดือนเกิด\n\n"
+            "#VIPOnly #{brand_tag} #ThankYou"
+        ),
+        "instagram": (
+            "For our VIPs only 👑\n\n"
+            "ขอบคุณที่รัก {brand_name} เสมอมา\n"
+            "ส่วนลด {discount}% + {top_item} ฟรี รอคุณอยู่\n\n"
+            "#VIP #{brand_tag} #LoyaltyRewards #ขอบคุณลูกค้า"
+        ),
+        "tiktok": (
+            "[HOOK 0:00-0:03]\n"
+            "\"ร้านนี้รัก VIP แค่ไหน? ดูนี่!\"\n\n"
+            "[SCENE 0:03-0:15]\n"
+            "โชว์สิทธิพิเศษ VIP ทีละข้อ พร้อม text overlay\n\n"
+            "[CTA 0:15-0:20]\n"
+            "\"อยากเป็น VIP? มาบ่อยๆ สิ!\"\n\n"
+            "#{brand_tag} #VIP #fyp"
+        ),
+        "youtube": (
+            "Title: ขอบคุณลูกค้า VIP — สิทธิพิเศษจาก {brand_name} 👑\n\n"
+            "Description:\n"
+            "ขอบคุณลูกค้าคนพิเศษทุกท่าน! วิดีโอนี้รวมสิทธิพิเศษ VIP ทั้งหมด\n"
+            "ส่วนลด {discount}% | {top_item} ฟรี | สิทธิ์จองก่อนใคร\n\n"
+            "Tags: {brand_name}, VIP, loyalty program"
+        ),
+        "image_prompt": (
+            "Luxury VIP card design, gold and black premium colors, elegant typography, "
+            "{top_item} subtly featured, exclusive membership aesthetic, high-end restaurant branding"
+        ),
+    },
+    "new_customer": {
+        "line_oa": (
+            "🌟 ยินดีต้อนรับสู่ครอบครัว {brand_name}!\n\n"
+            "ขอบคุณที่มาลองครั้งแรก 💛\n\n"
+            "🎁 ของขวัญต้อนรับ:\n"
+            "ส่วนลด {discount}% สำหรับครั้งที่ 2\n"
+            "⏰ ใช้ได้ภายใน 7 วัน\n\n"
+            "เมนูห้ามพลาด: {top_item} ⭐\n\n"
+            "👉 {cta}"
+        ),
+        "facebook": (
+            "🌟 WELCOME TO {brand_name}! 🌟\n\n"
+            "ขอบคุณลูกค้าใหม่ทุกท่านที่แวะมาหาเรา\n\n"
+            "ครั้งแรกอาจจะยังลองไม่ครบ — กลับมาอีกนะ!\n"
+            "🎁 รับส่วนลด {discount}% สำหรับการมาครั้งที่ 2\n"
+            "⭐ อย่าลืมลอง {top_item} เมนูที่ทุกคนหลงรัก\n\n"
+            "#Welcome #{brand_tag} #ลูกค้าใหม่"
+        ),
+        "instagram": (
+            "First time? Welcome! 🌟\n\n"
+            "มาครั้งแรกต้องลอง {top_item}\n"
+            "ครั้งที่ 2 รับส่วนลด {discount}% เลย\n\n"
+            "#{brand_tag} #Welcome #FirstVisit #ร้านใหม่ต้องลอง"
+        ),
+        "tiktok": (
+            "[HOOK 0:00-0:03]\n"
+            "\"มาครั้งแรกต้องสั่งอะไร? เดี๋ยวบอก!\"\n\n"
+            "[SCENE 0:03-0:15]\n"
+            "พาทัวร์ร้าน + โชว์ {top_item} แบบ close-up\n\n"
+            "[CTA 0:15-0:20]\n"
+            "\"มาครั้งแรกรับส่วนลดครั้งหน้า {discount}%!\"\n\n"
+            "#{brand_tag} #ร้านใหม่ #fyp #มาลอง"
+        ),
+        "youtube": (
+            "Title: มาครั้งแรกต้องสั่งอะไร? คู่มือ {brand_name} ฉบับมือใหม่ 🌟\n\n"
+            "Description:\n"
+            "คู่มือสำหรับลูกค้าใหม่! เมนูแนะนำ วิธีสั่ง และโปรต้อนรับ\n"
+            "00:00 - แนะนำร้าน\n"
+            "00:45 - เมนูห้ามพลาด: {top_item}\n"
+            "01:30 - โปรลูกค้าใหม่ {discount}%\n\n"
+            "Tags: {brand_name}, ร้านอาหาร, เมนูแนะนำ"
+        ),
+        "image_prompt": (
+            "Welcoming restaurant entrance, warm inviting atmosphere, friendly staff greeting, "
+            "{top_item} on display, bright cheerful lighting, first-impression aesthetic"
+        ),
+    },
+    "seasonal": {
+        "line_oa": (
+            "🎉 เทศกาลพิเศษที่ {brand_name}!\n\n"
+            "ฉลองด้วยกันกับโปรสุดพิเศษ\n\n"
+            "🎁 ส่วนลด {discount}% ทุกเมนู\n"
+            "⭐ เมนูพิเศษเฉพาะเทศกาล: {top_item}\n"
+            "⏰ ถึง {expiry} เท่านั้น\n\n"
+            "👉 {cta}"
+        ),
+        "facebook": (
+            "🎉 เทศกาลแห่งความสุขมาถึงแล้ว! 🎉\n\n"
+            "{brand_name} ขอร่วมฉลองกับทุกคน\n\n"
+            "✨ ไฮไลท์เทศกาลนี้:\n"
+            "🎁 ส่วนลด {discount}% ทุกเมนู\n"
+            "⭐ {top_item} เวอร์ชันพิเศษ limited!\n"
+            "📅 ถึง {expiry} เท่านั้น\n\n"
+            "ชวนครอบครัวมาฉลองด้วยกันนะ 💛\n\n"
+            "#เทศกาล #{brand_tag} #Celebration"
+        ),
+        "instagram": (
+            "'Tis the season! 🎉\n\n"
+            "{top_item} ฉบับเทศกาล limited edition\n"
+            "พร้อมส่วนลด {discount}% ถึง {expiry}\n\n"
+            "#{brand_tag} #Seasonal #LimitedEdition #เทศกาล"
+        ),
+        "tiktok": (
+            "[HOOK 0:00-0:03]\n"
+            "\"เมนูนี้มีแค่ช่วงเทศกาล!\" (FOMO hook)\n\n"
+            "[SCENE 0:03-0:15]\n"
+            "โชว์ {top_item} ฉบับเทศกาล + บรรยากาศตกแต่งร้าน\n\n"
+            "[CTA 0:15-0:20]\n"
+            "\"หมดเขต {expiry} — รีบมา!\"\n\n"
+            "#{brand_tag} #เทศกาล #limited #fyp"
+        ),
+        "youtube": (
+            "Title: ฉลองเทศกาลกับ {brand_name} — เมนูพิเศษ limited! 🎉\n\n"
+            "Description:\n"
+            "เทศกาลนี้เรามีอะไรพิเศษ? มาดูกัน!\n"
+            "00:00 - บรรยากาศเทศกาลที่ร้าน\n"
+            "00:40 - เมนูพิเศษ: {top_item}\n"
+            "01:20 - โปรโมชั่น {discount}% ถึง {expiry}\n\n"
+            "Tags: {brand_name}, เทศกาล, เมนูพิเศษ, โปรโมชั่น"
+        ),
+        "image_prompt": (
+            "Festive restaurant scene, seasonal decorations, {top_item} as centerpiece, "
+            "celebration atmosphere, warm festive lighting, holiday color palette, joyful mood"
+        ),
+    },
 }
 
 
