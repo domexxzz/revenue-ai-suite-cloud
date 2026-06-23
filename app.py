@@ -603,10 +603,16 @@ section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] 
   display:none !important;
 }}
 section[data-testid="stSidebar"] [data-testid="stRadio"] label p {{
-  font-size:0.95rem !important;
+  font-size:1.02rem !important;
   font-weight:600 !important;
+  letter-spacing:-0.01em !important;
+  line-height:1.3 !important;
   color:{txt2} !important;
   margin:0 !important;
+}}
+/* make the leading emoji icon read a touch larger than the text */
+section[data-testid="stSidebar"] [data-testid="stRadio"] label p::first-letter {{
+  font-size:1.2em !important;
 }}
 /* selected option — amber highlight */
 section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {{
@@ -617,6 +623,30 @@ section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > l
 section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) p {{
   color:{txt1} !important;
   font-weight:700 !important;
+}}
+
+/* ── Mode switch → 2-button segmented control (side by side) ────────────── */
+section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] [role="radiogroup"] {{
+  flex-direction:row !important;
+  gap:8px !important;
+}}
+section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] [role="radiogroup"] > label {{
+  flex:1 1 0 !important;
+  width:auto !important;
+  justify-content:center !important;
+  text-align:center !important;
+  padding:12px 6px !important;
+}}
+section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] [role="radiogroup"] > label:hover {{
+  transform:translateY(-1px) !important;
+}}
+section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] label p {{
+  font-size:0.84rem !important;
+  white-space:nowrap !important;
+}}
+/* keep the mode-switch icon modest so the label fits on one line */
+section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] label p::first-letter {{
+  font-size:1.05em !important;
 }}
 
 /* ── Spinner ───────────────────────────────────────────────────────────── */
