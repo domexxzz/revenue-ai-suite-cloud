@@ -32,10 +32,31 @@ def base_url() -> str:
     return (os.getenv("AFFILIATE_BACKEND_URL") or DEFAULT_BASE).rstrip("/")
 
 
+def api_token() -> str:
+    """Shared token for the backend (when it runs behind a public Funnel).
+    Priority: session override → secrets → env. Empty = backend has no auth."""
+    try:
+        import streamlit as st
+
+        v = st.session_state.get("aff_token")
+        if v:
+            return str(v)
+        sv = st.secrets.get("affiliate", {}).get("token", "")
+        if sv:
+            return str(sv)
+    except Exception:
+        pass
+    return os.getenv("AFFILIATE_BACKEND_TOKEN", "")
+
+
 def _req(method: str, path: str, timeout: int = 20, **kw) -> tuple[bool, object]:
     url = base_url() + path
+    headers = dict(kw.pop("headers", {}) or {})
+    tok = api_token()
+    if tok:
+        headers["X-API-Token"] = tok
     try:
-        r = requests.request(method, url, timeout=timeout, **kw)
+        r = requests.request(method, url, timeout=timeout, headers=headers, **kw)
         if r.status_code >= 400:
             return False, f"HTTP {r.status_code}: {r.text[:200]}"
         try:

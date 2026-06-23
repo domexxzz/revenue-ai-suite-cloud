@@ -51,6 +51,15 @@ def sidebar_controls() -> None:
     )
     if val:
         st.session_state["aff_base_url"] = val.rstrip("/")
+    tok = st.text_input(
+        "API token",
+        value=st.session_state.get("aff_token", ""),
+        type="password",
+        help="ใส่เมื่อ backend เปิด token auth (รันหลัง public Funnel) — ต้องตรงกับ API_TOKEN ใน .env",
+        label_visibility="collapsed",
+        placeholder="API token (ใส่ถ้า backend เปิด auth)",
+    )
+    st.session_state["aff_token"] = tok or ""
     online = ac.is_online()
     if online:
         st.success("🟢 เชื่อมต่อ backend แล้ว")
@@ -58,7 +67,18 @@ def sidebar_controls() -> None:
         st.error("🔴 ยังไม่เชื่อมต่อ backend")
 
 
-def _offline_card() -> None:
+def _offline_card(err: str = "") -> None:
+    # auth failure (backend reachable but token missing/wrong) → token-specific hint
+    if err and ("401" in str(err) or "unauthorized" in str(err).lower()):
+        st.error("🔑 backend ต้องใช้ token แต่ token ไม่ถูกต้อง/ยังไม่ได้ใส่")
+        st.markdown(
+            "ใส่ **API token** ให้ตรงกับ `API_TOKEN` ใน `.env` ของ backend "
+            "(ช่องในแถบซ้าย หรือหน้า ⚙️ ตั้งค่า) — หรือบน Streamlit Cloud ตั้งใน "
+            "`st.secrets[\"affiliate\"][\"token\"]`"
+        )
+        if st.button("🔄 ลองอีกครั้ง", key="aff_retry_auth"):
+            st.rerun()
+        return
     st.warning("🔴 ยังเชื่อมต่อ Affiliate Backend ไม่ได้")
     st.markdown(
         f"""
@@ -104,7 +124,7 @@ def _page_overview() -> None:
 
     ok, data = ac.dashboard()
     if not ok:
-        _offline_card()
+        _offline_card(data)
         return
 
     c1, c2, c3, c4 = st.columns(4)
@@ -326,8 +346,12 @@ def _page_setup() -> None:
     st.markdown(f"Backend ปัจจุบัน: `{ac.base_url()}`")
 
     new = st.text_input("เปลี่ยน Backend URL", value=ac.base_url())
-    if st.button("บันทึก URL"):
+    new_tok = st.text_input(
+        "API token (ใส่ถ้า backend เปิด auth)", value=st.session_state.get("aff_token", ""),
+        type="password", help="ต้องตรงกับ API_TOKEN ใน .env ของ backend")
+    if st.button("บันทึก"):
         st.session_state["aff_base_url"] = new.rstrip("/")
+        st.session_state["aff_token"] = new_tok or ""
         st.rerun()
 
     ok, _ = ac.health()
