@@ -570,10 +570,53 @@ hr {{ border:none !important; border-top:1px solid {hr_color} !important; margin
   background:#F59E0B !important; border-color:#F59E0B !important;
 }}
 
-/* ── Radio ─────────────────────────────────────────────────────────────── */
+/* ── Radio (main area, default look) ───────────────────────────────────── */
 [data-testid="stRadio"] label p {{ color:{txt3} !important; font-size:0.875rem !important; }}
 [data-testid="stRadio"] [data-baseweb="radio"] div:first-child {{
   border-color:{border3} !important;
+}}
+
+/* ── Sidebar nav: radios rendered as big, full-width tappable buttons ───── */
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] {{
+  gap:7px !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label {{
+  width:100% !important;
+  margin:0 !important;
+  padding:11px 14px !important;
+  min-height:44px !important;
+  border:1px solid {border2} !important;
+  border-radius:11px !important;
+  background:{bg2} !important;
+  cursor:pointer !important;
+  transition:background .15s ease, border-color .15s ease, transform .12s ease, box-shadow .15s ease !important;
+  display:flex !important;
+  align-items:center !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:hover {{
+  border-color:rgba(245,158,11,0.55) !important;
+  background:{bg3} !important;
+  transform:translateX(2px) !important;
+}}
+/* hide the tiny radio circle — the whole row is the click target */
+section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child {{
+  display:none !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stRadio"] label p {{
+  font-size:0.95rem !important;
+  font-weight:600 !important;
+  color:{txt2} !important;
+  margin:0 !important;
+}}
+/* selected option — amber highlight */
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {{
+  background:linear-gradient(135deg,rgba(245,158,11,0.20),rgba(245,158,11,0.08)) !important;
+  border-color:#F59E0B !important;
+  box-shadow:0 2px 12px rgba(245,158,11,0.18) !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) p {{
+  color:{txt1} !important;
+  font-weight:700 !important;
 }}
 
 /* ── Spinner ───────────────────────────────────────────────────────────── */
@@ -2163,11 +2206,9 @@ with st.sidebar:
     mode = st.radio(
         "โหมดการใช้งาน",
         [MODE_SHOP, MODE_AFFILIATE],
-        horizontal=True,
         label_visibility="collapsed",
         key="app_mode",
     )
-    st.caption("🏪 จัดการร้านของคุณ  ·  🚀 การตลาดแอฟฟิลิเอต Shopee Food")
     st.divider()
 
     if mode == MODE_AFFILIATE:
