@@ -1,8 +1,39 @@
-# 📊 AI Revenue Intelligence
+# 📊 F&B Growth Suite (AI Revenue Intelligence + Affiliate Autopilot)
 
-ระบบ AI ช่วยร้านอาหาร/คาเฟ่/ธุรกิจ F&B วิเคราะห์ยอดขาย สร้างคอนเทนต์ โพสต์ทุกแพลตฟอร์ม และตอบแชทลูกค้าอัตโนมัติ — ครบในที่เดียว
+ระบบ AI ครบวงจรสำหรับร้านอาหาร/คาเฟ่/ธุรกิจ F&B — **2 โหมดในแอปเดียว สลับได้จาก sidebar:**
+
+- 🏪 **โหมดร้านของฉัน** — วิเคราะห์ยอดขาย (RFM, forecast), สร้างคอนเทนต์, โพสต์ทุกแพลตฟอร์ม, ตอบแชทลูกค้าอัตโนมัติ
+- 🚀 **โหมดแอฟฟิลิเอต** — ดึงร้าน Shopee Food → AI ผลิตคอนเทนต์/วิดีโอ → โพสต์หลายแพลตฟอร์ม → A/B auto-optimize
 
 **เว็บแอป (ใช้งานจริง):** https://ai-revenue-intelligence-4zroa95urtomyx8v5mmxuk.streamlit.app
+
+---
+
+## 🔀 สถาปัตยกรรมระบบรวม
+
+```
+            ┌───────────────────────────────────────────────┐
+            │   Streamlit (แอปนี้) — UI รวม + สลับโหมด          │
+            │   🏪 ร้านของฉัน      |     🚀 แอฟฟิลิเอต          │
+            └───────┬───────────────────────────┬───────────┘
+                    │ in-process                │ REST (offline-safe)
+        RFM · content · chat · POS      affiliate_client.py
+        (Loyverse/FB/IG/LINE/YT)                 │
+                                                 ▼
+                              Affiliate Autopilot backend (FastAPI/Docker :8088)
+                              Shopee scrape · Gemini/Flow video · phone farm · A/B
+```
+
+- **โหมดร้าน** ใช้งานได้เต็มที่ทันที **ไม่ต้องมี backend** (rule-based fallback)
+- **โหมดแอฟฟิลิเอต** ต่อกับ backend `affiliate-autopilot` ที่ `http://localhost:8088`
+  (เปลี่ยน URL ได้ใน sidebar หรือ `st.secrets["affiliate"]["base_url"]` — ใช้ Cloudflare Funnel ได้)
+  ถ้า backend ปิดอยู่ หน้าจะแสดงวิธีเปิดให้ และโหมดร้านยังใช้ได้ปกติ
+
+```powershell
+# เปิด backend แอฟฟิลิเอต (ครั้งเดียว บนเครื่อง server)
+cd ../affiliate-autopilot
+docker compose up -d --build      # → http://localhost:8088
+```
 
 ---
 
@@ -44,6 +75,8 @@ streamlit run app.py
 | `youtube_uploader.py` | upload วิดีโอขึ้น YouTube |
 | `chat_inbox.py` | อ่าน+ตอบแชท FB Messenger/IG DM + AI reply agent |
 | `line_ai_bot.py` | webhook bot ตอบแชท LINE OA อัตโนมัติ (รันแยกด้วย FastAPI) |
+| **`affiliate_client.py`** | REST client เรียก affiliate-autopilot backend (offline-safe) |
+| **`affiliate_ui.py`** | หน้าโหมดแอฟฟิลิเอต (ภาพรวม/ร้านค้า/คอนเทนต์ A-B/โพสต์/ตั้งค่า) |
 | `data/` | ข้อมูล mock + ข้อมูลลูกค้าจริง (yentafo excel) |
 
 ---

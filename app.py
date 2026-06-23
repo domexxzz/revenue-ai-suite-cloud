@@ -41,6 +41,16 @@ try:
 except ImportError:
     CHAT_INBOX_AVAILABLE = False
 
+try:
+    import affiliate_ui
+    AFFILIATE_AVAILABLE = True
+except ImportError:
+    AFFILIATE_AVAILABLE = False
+
+# Top-level mode switch labels (shop owner vs affiliate marketing)
+MODE_SHOP = "🏪 ร้านของฉัน"
+MODE_AFFILIATE = "🚀 แอฟฟิลิเอต"
+
 
 def _upload_to_drive_public(file_bytes: bytes, name: str, mime: str) -> str | None:
     """Helper: upload bytes to Drive, return public URL."""
@@ -560,11 +570,115 @@ hr {{ border:none !important; border-top:1px solid {hr_color} !important; margin
   background:#F59E0B !important; border-color:#F59E0B !important;
 }}
 
-/* ── Radio ─────────────────────────────────────────────────────────────── */
+/* ── Radio (main area, default look) ───────────────────────────────────── */
 [data-testid="stRadio"] label p {{ color:{txt3} !important; font-size:0.875rem !important; }}
 [data-testid="stRadio"] [data-baseweb="radio"] div:first-child {{
   border-color:{border3} !important;
 }}
+
+/* ── Sidebar nav: radios rendered as big, full-width tappable buttons ───── */
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] {{
+  gap:7px !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label {{
+  width:100% !important;
+  margin:0 !important;
+  padding:11px 14px !important;
+  min-height:44px !important;
+  border:1px solid {border2} !important;
+  border-radius:11px !important;
+  background:{bg2} !important;
+  cursor:pointer !important;
+  transition:background .15s ease, border-color .15s ease, transform .12s ease, box-shadow .15s ease !important;
+  display:flex !important;
+  align-items:center !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:hover {{
+  border-color:rgba(245,158,11,0.55) !important;
+  background:{bg3} !important;
+  transform:translateX(2px) !important;
+}}
+/* hide the tiny radio circle — the whole row is the click target */
+section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child {{
+  display:none !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stRadio"] label p {{
+  font-size:1.02rem !important;
+  font-weight:600 !important;
+  letter-spacing:-0.01em !important;
+  line-height:1.3 !important;
+  color:{txt2} !important;
+  margin:0 !important;
+}}
+/* make the leading emoji icon read a touch larger than the text */
+section[data-testid="stSidebar"] [data-testid="stRadio"] label p::first-letter {{
+  font-size:1.2em !important;
+}}
+/* selected option — amber highlight */
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {{
+  background:linear-gradient(135deg,rgba(245,158,11,0.20),rgba(245,158,11,0.08)) !important;
+  border-color:#F59E0B !important;
+  box-shadow:0 2px 12px rgba(245,158,11,0.18) !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) p {{
+  color:{txt1} !important;
+  font-weight:700 !important;
+}}
+
+/* ── Mode switch → 2-button segmented control (side by side) ────────────── */
+section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] [role="radiogroup"] {{
+  flex-direction:row !important;
+  gap:8px !important;
+}}
+section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] [role="radiogroup"] > label {{
+  flex:1 1 0 !important;
+  width:auto !important;
+  justify-content:center !important;
+  text-align:center !important;
+  padding:12px 6px !important;
+}}
+section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] [role="radiogroup"] > label:hover {{
+  transform:translateY(-1px) !important;
+}}
+section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] label p {{
+  font-size:0.84rem !important;
+  white-space:nowrap !important;
+}}
+/* keep the mode-switch icon modest so the label fits on one line */
+section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] label p::first-letter {{
+  font-size:1.05em !important;
+}}
+
+/* ── Themed tables (affiliate pages) — light/dark safe, unlike st.dataframe ─ */
+.fnb-table-wrap {{
+  overflow-x:auto;
+  border:1px solid {border2} !important;
+  border-radius:12px;
+  margin:0.25rem 0 0.75rem;
+}}
+.fnb-table {{
+  width:100%;
+  border-collapse:collapse;
+  font-size:0.9rem;
+  background:{bg2} !important;
+}}
+.fnb-table thead th {{
+  background:{bg3} !important;
+  color:{txt3} !important;
+  text-align:left;
+  font-weight:600;
+  padding:10px 14px;
+  border-bottom:1px solid {border2} !important;
+  white-space:nowrap;
+}}
+.fnb-table tbody td {{
+  color:{txt2} !important;
+  padding:9px 14px;
+  border-bottom:1px solid {border} !important;
+  white-space:nowrap;
+}}
+.fnb-table tbody tr:last-child td {{ border-bottom:none !important; }}
+.fnb-table tbody tr:hover td {{ background:{bg3} !important; }}
 
 /* ── Spinner ───────────────────────────────────────────────────────────── */
 [data-testid="stSpinner"] > div {{ border-top-color:#F59E0B !important; }}
@@ -2120,13 +2234,26 @@ with st.sidebar:
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">
     <div style="width:34px;height:34px;background:linear-gradient(135deg,#B45309,#F59E0B);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;box-shadow:0 4px 14px rgba(245,158,11,0.28);">📊</div>
     <div>
-      <div style="font-weight:700;font-size:14.5px;color:{_txt_logo};letter-spacing:-0.02em;line-height:1.25;">AI Revenue</div>
-      <div style="font-weight:700;font-size:14.5px;color:#F59E0B;letter-spacing:-0.02em;line-height:1.25;">Intelligence</div>
+      <div style="font-weight:700;font-size:14.5px;color:{_txt_logo};letter-spacing:-0.02em;line-height:1.25;">F&amp;B Growth</div>
+      <div style="font-weight:700;font-size:14.5px;color:#F59E0B;letter-spacing:-0.02em;line-height:1.25;">Suite</div>
     </div>
   </div>
-  <div style="font-size:10px;color:{_txt_ver};font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding-left:44px;">Prototype v2.0</div>
+  <div style="font-size:10px;color:{_txt_ver};font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding-left:44px;">ร้าน + แอฟฟิลิเอต · v3.0</div>
 </div>
 """, unsafe_allow_html=True)
+
+    # ── Mode switch — MUST be the first sidebar widget. The theme toggle below
+    #    calls st.rerun(), which aborts the run before any widget under it is
+    #    instantiated; if the keyed mode radio hasn't rendered yet, Streamlit
+    #    drops `app_mode` and the app falls back to shop mode. Rendering it
+    #    first keeps the selected mode sticky across theme changes. ───────────
+    mode = st.radio(
+        "โหมดการใช้งาน",
+        [MODE_SHOP, MODE_AFFILIATE],
+        label_visibility="collapsed",
+        key="app_mode",
+    )
+    st.divider()
 
     # ── Theme toggle ───────────────────────────────────────────────────────
     tc1, tc2 = st.columns(2)
@@ -2149,11 +2276,22 @@ with st.sidebar:
 
     st.divider()
 
-    page = st.radio(
-        "เมนู",
-        ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "📣 Content Studio", "💬 AI Inbox", "🧮 ROI Calculator"],
-        label_visibility="collapsed",
-    )
+    if mode == MODE_AFFILIATE:
+        page = st.radio(
+            "เมนูแอฟฟิลิเอต",
+            affiliate_ui.PAGES if AFFILIATE_AVAILABLE else ["📈 ภาพรวม"],
+            label_visibility="collapsed",
+            key="aff_menu",
+        )
+        st.divider()
+        if AFFILIATE_AVAILABLE:
+            affiliate_ui.sidebar_controls()
+    else:
+        page = st.radio(
+            "เมนู",
+            ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "📣 Content Studio", "💬 AI Inbox", "🧮 ROI Calculator"],
+            label_visibility="collapsed",
+        )
 
     demo_profile = "General Business"
     lv_token = ""
@@ -2173,39 +2311,45 @@ with st.sidebar:
         lv_token = st.text_input("API Token", type="password", placeholder="ใส่ token จาก Loyverse Back Office")
         lv_days = st.slider("ดึงข้อมูลย้อนหลัง (วัน)", 7, 90, 30)
 
-    st.divider()
-    st.markdown("**⚙️ Settings**")
-
-    ai_mode = st.radio(
-        "AI Insights Mode",
-        ["Local Smart", "Claude API"],
-        help="Local Smart ใช้ rule-based logic ทำงานได้ทันที | Claude API ต้องใส่ API key",
-    )
-
+    # Defaults so affiliate mode never references undefined shop variables
+    ai_mode = "Local Smart"
     api_key = ""
-    if ai_mode == "Claude API":
-        if not ANTHROPIC_AVAILABLE:
-            st.warning("ติดตั้ง anthropic ก่อน:\n`pip install anthropic`")
-        api_key = st.text_input("Anthropic API Key", type="password", placeholder="sk-ant-...")
-        if api_key:
-            st.success("พร้อมใช้ Claude API")
+    line_token = fb_token = fb_page_id = ig_business_id = ""
 
-    st.divider()
-    st.markdown("**📱 Platform Tokens**")
-    st.caption("ใส่ token เพื่อโพสต์จริง")
+    if mode == MODE_SHOP:
+        st.divider()
+        st.markdown("**⚙️ Settings**")
 
-    # ── LINE OA ──────────────────────────────────────────────────────────────
-    line_token = st.text_input(
-        "LINE OA Token",
-        type="password",
-        placeholder="Channel Access Token",
-        help="จาก LINE Developers → Messaging API → Channel Access Token",
-    )
-    if line_token:
-        st.success("LINE OA พร้อมโพสต์")
+        ai_mode = st.radio(
+            "AI Insights Mode",
+            ["Local Smart", "Claude API"],
+            help="Local Smart ใช้ rule-based logic ทำงานได้ทันที | Claude API ต้องใส่ API key",
+        )
 
-    with st.expander("📖 วิธีขอ LINE OA Token"):
-        st.markdown("""
+        api_key = ""
+        if ai_mode == "Claude API":
+            if not ANTHROPIC_AVAILABLE:
+                st.warning("ติดตั้ง anthropic ก่อน:\n`pip install anthropic`")
+            api_key = st.text_input("Anthropic API Key", type="password", placeholder="sk-ant-...")
+            if api_key:
+                st.success("พร้อมใช้ Claude API")
+
+        st.divider()
+        st.markdown("**📱 Platform Tokens**")
+        st.caption("ใส่ token เพื่อโพสต์จริง")
+
+        # ── LINE OA ──────────────────────────────────────────────────────────────
+        line_token = st.text_input(
+            "LINE OA Token",
+            type="password",
+            placeholder="Channel Access Token",
+            help="จาก LINE Developers → Messaging API → Channel Access Token",
+        )
+        if line_token:
+            st.success("LINE OA พร้อมโพสต์")
+
+        with st.expander("📖 วิธีขอ LINE OA Token"):
+            st.markdown("""
 ##### ขั้นตอน
 
 **1.** เปิดเว็บ [developers.line.biz](https://developers.line.biz)
@@ -2235,29 +2379,29 @@ with st.sidebar:
 สมัครฟรีที่ [account.line.biz](https://account.line.biz)
 """)
 
-    # ── Facebook ─────────────────────────────────────────────────────────────
-    fb_token = st.text_input(
-        "Facebook Page Token",
-        type="password",
-        placeholder="Page Access Token",
-        help="จาก Meta Developer → Graph API → Page Token",
-    )
-    fb_page_id = ""
-    ig_business_id = ""
-    if fb_token:
-        fb_page_id = st.text_input("Facebook Page ID", placeholder="เช่น 123456789")
-        if fb_page_id:
-            st.success("Facebook พร้อมโพสต์")
-        ig_business_id = st.text_input(
-            "Instagram Business Account ID",
-            placeholder="เช่น 17841...",
-            help="ID ของ IG Business Account ที่ผูกกับ Facebook Page (ใช้ FB Token เดียวกัน)",
+        # ── Facebook ─────────────────────────────────────────────────────────────
+        fb_token = st.text_input(
+            "Facebook Page Token",
+            type="password",
+            placeholder="Page Access Token",
+            help="จาก Meta Developer → Graph API → Page Token",
         )
-        if ig_business_id:
-            st.success("Instagram พร้อมโพสต์")
+        fb_page_id = ""
+        ig_business_id = ""
+        if fb_token:
+            fb_page_id = st.text_input("Facebook Page ID", placeholder="เช่น 123456789")
+            if fb_page_id:
+                st.success("Facebook พร้อมโพสต์")
+            ig_business_id = st.text_input(
+                "Instagram Business Account ID",
+                placeholder="เช่น 17841...",
+                help="ID ของ IG Business Account ที่ผูกกับ Facebook Page (ใช้ FB Token เดียวกัน)",
+            )
+            if ig_business_id:
+                st.success("Instagram พร้อมโพสต์")
 
-    with st.expander("📖 วิธีหา IG Business ID"):
-        st.markdown("""
+        with st.expander("📖 วิธีหา IG Business ID"):
+            st.markdown("""
 ##### ขั้นตอน (ใช้ FB Token เดิม)
 
 **1.** ต้องเชื่อม Instagram กับ Facebook Page ก่อน
@@ -2284,8 +2428,8 @@ with st.sidebar:
 ⚠️ Instagram ต้องเป็น Business/Creator Account
 """)
 
-    with st.expander("📖 วิธีขอ Facebook Page Token"):
-        st.markdown("""
+        with st.expander("📖 วิธีขอ Facebook Page Token"):
+            st.markdown("""
 ##### ขั้นตอน
 
 **1.** เปิดเว็บ [developers.facebook.com](https://developers.facebook.com)
@@ -2327,35 +2471,45 @@ with st.sidebar:
 ⚠️ ต้องเป็น Admin ของ Facebook Page
 """)
 
-    st.divider()
-    if st.button("🔌 เช็คการเชื่อมต่อทั้งหมด", use_container_width=True):
-        from platform_poster import test_line_token, test_facebook_token, test_instagram_account
-        with st.spinner("กำลังเช็ค..."):
-            if line_token:
-                ok, m = test_line_token(line_token)
-                (st.success if ok else st.error)(m)
-            else:
-                st.caption("➖ LINE OA: ยังไม่ใส่ token")
-            if fb_token and fb_page_id:
-                ok, m = test_facebook_token(fb_token, fb_page_id)
-                (st.success if ok else st.error)(m)
-            else:
-                st.caption("➖ Facebook: ยังไม่ใส่ token/Page ID")
-            if fb_token and ig_business_id:
-                ok, m = test_instagram_account(ig_business_id, fb_token)
-                (st.success if ok else st.error)(m)
-            else:
-                st.caption("➖ Instagram: ยังไม่ใส่ IG ID")
-            if GDRIVE_AVAILABLE and not needs_auth():
-                st.success("Google Drive + YouTube: พร้อม")
-            else:
-                st.error("Google Drive: ยังไม่ได้ authorize")
+        st.divider()
+        if st.button("🔌 เช็คการเชื่อมต่อทั้งหมด", use_container_width=True):
+            from platform_poster import test_line_token, test_facebook_token, test_instagram_account
+            with st.spinner("กำลังเช็ค..."):
+                if line_token:
+                    ok, m = test_line_token(line_token)
+                    (st.success if ok else st.error)(m)
+                else:
+                    st.caption("➖ LINE OA: ยังไม่ใส่ token")
+                if fb_token and fb_page_id:
+                    ok, m = test_facebook_token(fb_token, fb_page_id)
+                    (st.success if ok else st.error)(m)
+                else:
+                    st.caption("➖ Facebook: ยังไม่ใส่ token/Page ID")
+                if fb_token and ig_business_id:
+                    ok, m = test_instagram_account(ig_business_id, fb_token)
+                    (st.success if ok else st.error)(m)
+                else:
+                    st.caption("➖ Instagram: ยังไม่ใส่ IG ID")
+                if GDRIVE_AVAILABLE and not needs_auth():
+                    st.success("Google Drive + YouTube: พร้อม")
+                else:
+                    st.error("Google Drive: ยังไม่ได้ authorize")
 
-    st.divider()
-    st.caption("Built with Streamlit + Claude AI")
+        st.divider()
+        st.caption("Built with Streamlit + Claude AI")
 
 
-# ── Page routing ────────────────────────────────────────────────────────────────
+# ── Affiliate mode routing ───────────────────────────────────────────────────────
+
+if mode == MODE_AFFILIATE:
+    if AFFILIATE_AVAILABLE:
+        affiliate_ui.render(page)
+    else:
+        st.error("โหลดโมดูลแอฟฟิลิเอตไม่ได้ (affiliate_ui.py) — ตรวจสอบไฟล์")
+    st.stop()
+
+
+# ── Page routing (shop owner mode) ───────────────────────────────────────────────
 
 if page == "📁 Upload Data":
     render_csv_upload_page(ai_mode, api_key)
