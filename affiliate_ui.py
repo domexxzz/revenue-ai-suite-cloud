@@ -6,11 +6,34 @@ Everything degrades gracefully when the backend is offline.
 """
 from __future__ import annotations
 
+import html as _html
+
 import streamlit as st
 
 import affiliate_client as ac
 
 PAGES = ["📈 ภาพรวม", "🏬 ร้านค้า", "🎬 คอนเทนต์ A/B", "📤 โพสต์", "⚙️ ตั้งค่า/เชื่อมต่อ"]
+
+
+def _table(rows: list[dict]) -> None:
+    """Render a list-of-dicts as a theme-aware HTML table.
+
+    Used instead of st.dataframe, whose canvas cells honour the hardcoded dark
+    native theme (config.toml) and stay dark in light mode.
+    """
+    if not rows:
+        return
+    cols = list(rows[0].keys())
+    head = "".join(f"<th>{_html.escape(str(c))}</th>" for c in cols)
+    body = "".join(
+        "<tr>" + "".join(f"<td>{_html.escape(str(r.get(c, '')))}</td>" for c in cols) + "</tr>"
+        for r in rows
+    )
+    st.markdown(
+        f'<div class="fnb-table-wrap"><table class="fnb-table">'
+        f"<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>",
+        unsafe_allow_html=True,
+    )
 
 
 # ── shared helpers ────────────────────────────────────────────────────────────
@@ -111,7 +134,7 @@ def _page_overview() -> None:
              "clicks": d.get("clicks", 0), "ctr": f"{d.get('ctr', 0) * 100:.2f}%"}
             for p, d in by_plat.items()
         ]
-        st.dataframe(rows, use_container_width=True, hide_index=True)
+        _table(rows)
 
     st.divider()
     st.subheader("ควบคุมระบบ")
@@ -180,7 +203,7 @@ def _page_stores() -> None:
              "กำไร": f"฿{s.get('profit', 0):,.0f}"}
             for s in stores
         ]
-        st.dataframe(table, use_container_width=True, hide_index=True)
+        _table(table)
 
         ids = [s["id"] for s in stores]
         names = {s["id"]: s["name"] for s in stores}
@@ -295,7 +318,7 @@ def _page_posts() -> None:
          "error": (p.get("error") or "")[:60]}
         for p in posts
     ]
-    st.dataframe(table, use_container_width=True, hide_index=True)
+    _table(table)
 
 
 def _page_setup() -> None:

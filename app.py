@@ -649,6 +649,37 @@ section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] label 
   font-size:1.05em !important;
 }}
 
+/* ── Themed tables (affiliate pages) — light/dark safe, unlike st.dataframe ─ */
+.fnb-table-wrap {{
+  overflow-x:auto;
+  border:1px solid {border2} !important;
+  border-radius:12px;
+  margin:0.25rem 0 0.75rem;
+}}
+.fnb-table {{
+  width:100%;
+  border-collapse:collapse;
+  font-size:0.9rem;
+  background:{bg2} !important;
+}}
+.fnb-table thead th {{
+  background:{bg3} !important;
+  color:{txt3} !important;
+  text-align:left;
+  font-weight:600;
+  padding:10px 14px;
+  border-bottom:1px solid {border2} !important;
+  white-space:nowrap;
+}}
+.fnb-table tbody td {{
+  color:{txt2} !important;
+  padding:9px 14px;
+  border-bottom:1px solid {border} !important;
+  white-space:nowrap;
+}}
+.fnb-table tbody tr:last-child td {{ border-bottom:none !important; }}
+.fnb-table tbody tr:hover td {{ background:{bg3} !important; }}
+
 /* ── Spinner ───────────────────────────────────────────────────────────── */
 [data-testid="stSpinner"] > div {{ border-top-color:#F59E0B !important; }}
 
@@ -2211,6 +2242,19 @@ with st.sidebar:
 </div>
 """, unsafe_allow_html=True)
 
+    # ── Mode switch — MUST be the first sidebar widget. The theme toggle below
+    #    calls st.rerun(), which aborts the run before any widget under it is
+    #    instantiated; if the keyed mode radio hasn't rendered yet, Streamlit
+    #    drops `app_mode` and the app falls back to shop mode. Rendering it
+    #    first keeps the selected mode sticky across theme changes. ───────────
+    mode = st.radio(
+        "โหมดการใช้งาน",
+        [MODE_SHOP, MODE_AFFILIATE],
+        label_visibility="collapsed",
+        key="app_mode",
+    )
+    st.divider()
+
     # ── Theme toggle ───────────────────────────────────────────────────────
     tc1, tc2 = st.columns(2)
     with tc1:
@@ -2230,15 +2274,6 @@ with st.sidebar:
             st.session_state["theme"] = "light"
             st.rerun()
 
-    st.divider()
-
-    # ── Mode switch: shop owner vs affiliate marketing ──────────────────────
-    mode = st.radio(
-        "โหมดการใช้งาน",
-        [MODE_SHOP, MODE_AFFILIATE],
-        label_visibility="collapsed",
-        key="app_mode",
-    )
     st.divider()
 
     if mode == MODE_AFFILIATE:
