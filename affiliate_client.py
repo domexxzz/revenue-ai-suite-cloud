@@ -52,6 +52,8 @@ def api_token() -> str:
 def _req(method: str, path: str, timeout: int = 20, **kw) -> tuple[bool, object]:
     url = base_url() + path
     headers = dict(kw.pop("headers", {}) or {})
+    # skip the ngrok free-tier browser interstitial so API calls return JSON
+    headers.setdefault("ngrok-skip-browser-warning", "true")
     tok = api_token()
     if tok:
         headers["X-API-Token"] = tok
