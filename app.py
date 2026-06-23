@@ -41,6 +41,16 @@ try:
 except ImportError:
     CHAT_INBOX_AVAILABLE = False
 
+try:
+    import affiliate_ui
+    AFFILIATE_AVAILABLE = True
+except ImportError:
+    AFFILIATE_AVAILABLE = False
+
+# Top-level mode switch labels (shop owner vs affiliate marketing)
+MODE_SHOP = "🏪 ร้านของฉัน"
+MODE_AFFILIATE = "🚀 แอฟฟิลิเอต"
+
 
 def _upload_to_drive_public(file_bytes: bytes, name: str, mime: str) -> str | None:
     """Helper: upload bytes to Drive, return public URL."""
@@ -2120,11 +2130,11 @@ with st.sidebar:
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">
     <div style="width:34px;height:34px;background:linear-gradient(135deg,#B45309,#F59E0B);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;box-shadow:0 4px 14px rgba(245,158,11,0.28);">📊</div>
     <div>
-      <div style="font-weight:700;font-size:14.5px;color:{_txt_logo};letter-spacing:-0.02em;line-height:1.25;">AI Revenue</div>
-      <div style="font-weight:700;font-size:14.5px;color:#F59E0B;letter-spacing:-0.02em;line-height:1.25;">Intelligence</div>
+      <div style="font-weight:700;font-size:14.5px;color:{_txt_logo};letter-spacing:-0.02em;line-height:1.25;">F&amp;B Growth</div>
+      <div style="font-weight:700;font-size:14.5px;color:#F59E0B;letter-spacing:-0.02em;line-height:1.25;">Suite</div>
     </div>
   </div>
-  <div style="font-size:10px;color:{_txt_ver};font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding-left:44px;">Prototype v2.0</div>
+  <div style="font-size:10px;color:{_txt_ver};font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding-left:44px;">ร้าน + แอฟฟิลิเอต · v3.0</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -2149,11 +2159,33 @@ with st.sidebar:
 
     st.divider()
 
-    page = st.radio(
-        "เมนู",
-        ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "📣 Content Studio", "💬 AI Inbox", "🧮 ROI Calculator"],
+    # ── Mode switch: shop owner vs affiliate marketing ──────────────────────
+    mode = st.radio(
+        "โหมดการใช้งาน",
+        [MODE_SHOP, MODE_AFFILIATE],
+        horizontal=True,
         label_visibility="collapsed",
+        key="app_mode",
     )
+    st.caption("🏪 จัดการร้านของคุณ  ·  🚀 การตลาดแอฟฟิลิเอต Shopee Food")
+    st.divider()
+
+    if mode == MODE_AFFILIATE:
+        page = st.radio(
+            "เมนูแอฟฟิลิเอต",
+            affiliate_ui.PAGES if AFFILIATE_AVAILABLE else ["📈 ภาพรวม"],
+            label_visibility="collapsed",
+            key="aff_menu",
+        )
+        st.divider()
+        if AFFILIATE_AVAILABLE:
+            affiliate_ui.sidebar_controls()
+    else:
+        page = st.radio(
+            "เมนู",
+            ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "📣 Content Studio", "💬 AI Inbox", "🧮 ROI Calculator"],
+            label_visibility="collapsed",
+        )
 
     demo_profile = "General Business"
     lv_token = ""
@@ -2173,39 +2205,45 @@ with st.sidebar:
         lv_token = st.text_input("API Token", type="password", placeholder="ใส่ token จาก Loyverse Back Office")
         lv_days = st.slider("ดึงข้อมูลย้อนหลัง (วัน)", 7, 90, 30)
 
-    st.divider()
-    st.markdown("**⚙️ Settings**")
-
-    ai_mode = st.radio(
-        "AI Insights Mode",
-        ["Local Smart", "Claude API"],
-        help="Local Smart ใช้ rule-based logic ทำงานได้ทันที | Claude API ต้องใส่ API key",
-    )
-
+    # Defaults so affiliate mode never references undefined shop variables
+    ai_mode = "Local Smart"
     api_key = ""
-    if ai_mode == "Claude API":
-        if not ANTHROPIC_AVAILABLE:
-            st.warning("ติดตั้ง anthropic ก่อน:\n`pip install anthropic`")
-        api_key = st.text_input("Anthropic API Key", type="password", placeholder="sk-ant-...")
-        if api_key:
-            st.success("พร้อมใช้ Claude API")
+    line_token = fb_token = fb_page_id = ig_business_id = ""
 
-    st.divider()
-    st.markdown("**📱 Platform Tokens**")
-    st.caption("ใส่ token เพื่อโพสต์จริง")
+    if mode == MODE_SHOP:
+        st.divider()
+        st.markdown("**⚙️ Settings**")
 
-    # ── LINE OA ──────────────────────────────────────────────────────────────
-    line_token = st.text_input(
-        "LINE OA Token",
-        type="password",
-        placeholder="Channel Access Token",
-        help="จาก LINE Developers → Messaging API → Channel Access Token",
-    )
-    if line_token:
-        st.success("LINE OA พร้อมโพสต์")
+        ai_mode = st.radio(
+            "AI Insights Mode",
+            ["Local Smart", "Claude API"],
+            help="Local Smart ใช้ rule-based logic ทำงานได้ทันที | Claude API ต้องใส่ API key",
+        )
 
-    with st.expander("📖 วิธีขอ LINE OA Token"):
-        st.markdown("""
+        api_key = ""
+        if ai_mode == "Claude API":
+            if not ANTHROPIC_AVAILABLE:
+                st.warning("ติดตั้ง anthropic ก่อน:\n`pip install anthropic`")
+            api_key = st.text_input("Anthropic API Key", type="password", placeholder="sk-ant-...")
+            if api_key:
+                st.success("พร้อมใช้ Claude API")
+
+        st.divider()
+        st.markdown("**📱 Platform Tokens**")
+        st.caption("ใส่ token เพื่อโพสต์จริง")
+
+        # ── LINE OA ──────────────────────────────────────────────────────────────
+        line_token = st.text_input(
+            "LINE OA Token",
+            type="password",
+            placeholder="Channel Access Token",
+            help="จาก LINE Developers → Messaging API → Channel Access Token",
+        )
+        if line_token:
+            st.success("LINE OA พร้อมโพสต์")
+
+        with st.expander("📖 วิธีขอ LINE OA Token"):
+            st.markdown("""
 ##### ขั้นตอน
 
 **1.** เปิดเว็บ [developers.line.biz](https://developers.line.biz)
@@ -2235,29 +2273,29 @@ with st.sidebar:
 สมัครฟรีที่ [account.line.biz](https://account.line.biz)
 """)
 
-    # ── Facebook ─────────────────────────────────────────────────────────────
-    fb_token = st.text_input(
-        "Facebook Page Token",
-        type="password",
-        placeholder="Page Access Token",
-        help="จาก Meta Developer → Graph API → Page Token",
-    )
-    fb_page_id = ""
-    ig_business_id = ""
-    if fb_token:
-        fb_page_id = st.text_input("Facebook Page ID", placeholder="เช่น 123456789")
-        if fb_page_id:
-            st.success("Facebook พร้อมโพสต์")
-        ig_business_id = st.text_input(
-            "Instagram Business Account ID",
-            placeholder="เช่น 17841...",
-            help="ID ของ IG Business Account ที่ผูกกับ Facebook Page (ใช้ FB Token เดียวกัน)",
+        # ── Facebook ─────────────────────────────────────────────────────────────
+        fb_token = st.text_input(
+            "Facebook Page Token",
+            type="password",
+            placeholder="Page Access Token",
+            help="จาก Meta Developer → Graph API → Page Token",
         )
-        if ig_business_id:
-            st.success("Instagram พร้อมโพสต์")
+        fb_page_id = ""
+        ig_business_id = ""
+        if fb_token:
+            fb_page_id = st.text_input("Facebook Page ID", placeholder="เช่น 123456789")
+            if fb_page_id:
+                st.success("Facebook พร้อมโพสต์")
+            ig_business_id = st.text_input(
+                "Instagram Business Account ID",
+                placeholder="เช่น 17841...",
+                help="ID ของ IG Business Account ที่ผูกกับ Facebook Page (ใช้ FB Token เดียวกัน)",
+            )
+            if ig_business_id:
+                st.success("Instagram พร้อมโพสต์")
 
-    with st.expander("📖 วิธีหา IG Business ID"):
-        st.markdown("""
+        with st.expander("📖 วิธีหา IG Business ID"):
+            st.markdown("""
 ##### ขั้นตอน (ใช้ FB Token เดิม)
 
 **1.** ต้องเชื่อม Instagram กับ Facebook Page ก่อน
@@ -2284,8 +2322,8 @@ with st.sidebar:
 ⚠️ Instagram ต้องเป็น Business/Creator Account
 """)
 
-    with st.expander("📖 วิธีขอ Facebook Page Token"):
-        st.markdown("""
+        with st.expander("📖 วิธีขอ Facebook Page Token"):
+            st.markdown("""
 ##### ขั้นตอน
 
 **1.** เปิดเว็บ [developers.facebook.com](https://developers.facebook.com)
@@ -2327,35 +2365,45 @@ with st.sidebar:
 ⚠️ ต้องเป็น Admin ของ Facebook Page
 """)
 
-    st.divider()
-    if st.button("🔌 เช็คการเชื่อมต่อทั้งหมด", use_container_width=True):
-        from platform_poster import test_line_token, test_facebook_token, test_instagram_account
-        with st.spinner("กำลังเช็ค..."):
-            if line_token:
-                ok, m = test_line_token(line_token)
-                (st.success if ok else st.error)(m)
-            else:
-                st.caption("➖ LINE OA: ยังไม่ใส่ token")
-            if fb_token and fb_page_id:
-                ok, m = test_facebook_token(fb_token, fb_page_id)
-                (st.success if ok else st.error)(m)
-            else:
-                st.caption("➖ Facebook: ยังไม่ใส่ token/Page ID")
-            if fb_token and ig_business_id:
-                ok, m = test_instagram_account(ig_business_id, fb_token)
-                (st.success if ok else st.error)(m)
-            else:
-                st.caption("➖ Instagram: ยังไม่ใส่ IG ID")
-            if GDRIVE_AVAILABLE and not needs_auth():
-                st.success("Google Drive + YouTube: พร้อม")
-            else:
-                st.error("Google Drive: ยังไม่ได้ authorize")
+        st.divider()
+        if st.button("🔌 เช็คการเชื่อมต่อทั้งหมด", use_container_width=True):
+            from platform_poster import test_line_token, test_facebook_token, test_instagram_account
+            with st.spinner("กำลังเช็ค..."):
+                if line_token:
+                    ok, m = test_line_token(line_token)
+                    (st.success if ok else st.error)(m)
+                else:
+                    st.caption("➖ LINE OA: ยังไม่ใส่ token")
+                if fb_token and fb_page_id:
+                    ok, m = test_facebook_token(fb_token, fb_page_id)
+                    (st.success if ok else st.error)(m)
+                else:
+                    st.caption("➖ Facebook: ยังไม่ใส่ token/Page ID")
+                if fb_token and ig_business_id:
+                    ok, m = test_instagram_account(ig_business_id, fb_token)
+                    (st.success if ok else st.error)(m)
+                else:
+                    st.caption("➖ Instagram: ยังไม่ใส่ IG ID")
+                if GDRIVE_AVAILABLE and not needs_auth():
+                    st.success("Google Drive + YouTube: พร้อม")
+                else:
+                    st.error("Google Drive: ยังไม่ได้ authorize")
 
-    st.divider()
-    st.caption("Built with Streamlit + Claude AI")
+        st.divider()
+        st.caption("Built with Streamlit + Claude AI")
 
 
-# ── Page routing ────────────────────────────────────────────────────────────────
+# ── Affiliate mode routing ───────────────────────────────────────────────────────
+
+if mode == MODE_AFFILIATE:
+    if AFFILIATE_AVAILABLE:
+        affiliate_ui.render(page)
+    else:
+        st.error("โหลดโมดูลแอฟฟิลิเอตไม่ได้ (affiliate_ui.py) — ตรวจสอบไฟล์")
+    st.stop()
+
+
+# ── Page routing (shop owner mode) ───────────────────────────────────────────────
 
 if page == "📁 Upload Data":
     render_csv_upload_page(ai_mode, api_key)
