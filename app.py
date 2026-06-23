@@ -136,7 +136,7 @@ def _do_post(platform_key: str, content: str,
         elif not YOUTUBE_AVAILABLE:
             msg = "YouTube module ไม่ได้ติดตั้ง"
         else:
-            title = content.split("\n")[0][:100] or "AI Revenue Intelligence Post"
+            title = content.split("\n")[0][:100] or "REVENUE AI Post"
             with st.spinner("กำลังอัปโหลด YouTube (อาจใช้เวลา 1-3 นาที)..."):
                 ok, result = upload_youtube(video_bytes, title=title, description=content)
             msg = result
@@ -769,7 +769,7 @@ section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] label 
 
 
 st.set_page_config(
-    page_title="AI Revenue Intelligence",
+    page_title="REVENUE AI",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1214,7 +1214,7 @@ def generate_excel_report(df: pd.DataFrame) -> bytes:
 
 def render_connect_pos_page(lv_token: str, lv_days: int, ai_mode: str, api_key: str) -> None:
     st.title("🔌 Connect POS — Loyverse")
-    st.caption("ดึงข้อมูลยอดขายจริงจาก Loyverse POS เข้าสู่ AI Revenue Intelligence")
+    st.caption("ดึงข้อมูลยอดขายจริงจาก Loyverse POS เข้าสู่ REVENUE AI")
 
     with st.expander("วิธีรับ API Token จาก Loyverse", expanded=False):
         st.markdown("""
@@ -2251,11 +2251,10 @@ with st.sidebar:
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">
     <div style="width:34px;height:34px;background:linear-gradient(135deg,#B45309,#F59E0B);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;box-shadow:0 4px 14px rgba(245,158,11,0.28);">📊</div>
     <div>
-      <div style="font-weight:700;font-size:14.5px;color:{_txt_logo};letter-spacing:-0.02em;line-height:1.25;">F&amp;B Growth</div>
-      <div style="font-weight:700;font-size:14.5px;color:#F59E0B;letter-spacing:-0.02em;line-height:1.25;">Suite</div>
+      <div style="font-weight:800;font-size:17px;color:{_txt_logo};letter-spacing:0.02em;line-height:1.2;">REVENUE <span style="color:#F59E0B;">AI</span></div>
     </div>
   </div>
-  <div style="font-size:10px;color:{_txt_ver};font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding-left:44px;">ร้าน + แอฟฟิลิเอต · v3.0</div>
+  <div style="font-size:10px;color:{_txt_ver};font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding-left:44px;">Smart Business Suite</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -2555,7 +2554,7 @@ if page == "🧮 ROI Calculator":
 
 # ── Dashboard ───────────────────────────────────────────────────────────────────
 
-st.title("AI Revenue Intelligence Prototype")
+st.title("REVENUE AI")
 st.caption("Data → Insight → Action | สำหรับร้านอาหาร / คาเฟ่ / บาร์ / ยิม")
 
 if demo_profile == "ร้านเย็นตาโฟ (ข้อมูลจริง)":

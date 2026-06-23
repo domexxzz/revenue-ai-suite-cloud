@@ -1,4 +1,4 @@
-# 📊 F&B Growth Suite (AI Revenue Intelligence + Affiliate Autopilot)
+# 📊 REVENUE AI — Smart Business Suite (ร้าน + แอฟฟิลิเอต)
 
 ระบบ AI ครบวงจรสำหรับร้านอาหาร/คาเฟ่/ธุรกิจ F&B — **2 โหมดในแอปเดียว สลับได้จาก sidebar:**
 
