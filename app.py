@@ -698,12 +698,29 @@ section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] label 
   border-radius:12px !important;
   box-shadow:0 8px 32px rgba(0,0,0,{"0.4" if is_dark else "0.12"}) !important;
 }}
-[data-baseweb="option"] {{
+/* dropdown options — newer Streamlit renders them as <li role="option"> whose
+   text color comes from the hardcoded dark native theme (config.toml textColor
+   = near-white), making them invisible on the light popover. Force the active
+   theme's text color, covering nested text nodes too. */
+[data-baseweb="option"],
+[data-baseweb="popover"] li[role="option"],
+[role="listbox"] li[role="option"] {{
   background:{bg2} !important;
   color:{txt2} !important;
 }}
-[data-baseweb="option"]:hover {{
+[data-baseweb="popover"] li[role="option"] *,
+[role="listbox"] li[role="option"] * {{
+  color:{txt2} !important;
+}}
+[data-baseweb="option"]:hover,
+[data-baseweb="popover"] li[role="option"]:hover,
+[data-baseweb="popover"] li[role="option"][aria-selected="true"],
+[role="listbox"] li[role="option"]:hover {{
   background:{bg3} !important;
+  color:{txt1} !important;
+}}
+[data-baseweb="popover"] li[role="option"]:hover *,
+[data-baseweb="popover"] li[role="option"][aria-selected="true"] * {{
   color:{txt1} !important;
 }}
 
@@ -2255,24 +2272,29 @@ with st.sidebar:
     )
     st.divider()
 
-    # ── Theme toggle ───────────────────────────────────────────────────────
+    # ── Theme toggle — use on_click callbacks, NOT `if st.button(): st.rerun()`.
+    #    A mid-run st.rerun() aborts before the menu widgets below are rendered,
+    #    so Streamlit drops their keyed state and the app jumps back to the first
+    #    page/mode. A callback sets the theme before the natural rerun, keeping
+    #    the current mode + page sticky across theme changes. ──────────────────
+    def _set_theme(t: str) -> None:
+        st.session_state["theme"] = t
+
     tc1, tc2 = st.columns(2)
     with tc1:
-        if st.button(
+        st.button(
             "🌙 Dark" if _theme == "light" else "✓ Dark",
             use_container_width=True,
             type="secondary" if _theme == "light" else "primary",
-        ):
-            st.session_state["theme"] = "dark"
-            st.rerun()
+            on_click=_set_theme, args=("dark",),
+        )
     with tc2:
-        if st.button(
+        st.button(
             "✓ Light" if _theme == "light" else "☀️ Light",
             use_container_width=True,
             type="primary" if _theme == "light" else "secondary",
-        ):
-            st.session_state["theme"] = "light"
-            st.rerun()
+            on_click=_set_theme, args=("light",),
+        )
 
     st.divider()
 
