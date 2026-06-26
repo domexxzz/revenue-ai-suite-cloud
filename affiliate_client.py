@@ -13,7 +13,7 @@ import os
 
 import requests
 
-DEFAULT_BASE = "http://localhost:8088"
+DEFAULT_BASE = "https://busload-uncloak-rehydrate.ngrok-free.dev"
 
 
 def base_url() -> str:
