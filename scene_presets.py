@@ -86,6 +86,8 @@ PRESETS: dict[str, dict] = {
         "styling": "relaxed everyday items, a small mirror, simple and un-staged",
         "lighting": "bright soft daylight from a window, fresh and airy",
         "camera": "35mm lens, f/2.0, natural handheld-style eye-level framing",
+        "movement": "light handheld feel — gentle natural sway, small organic "
+                    "reframes. Loose and human rather than mechanically smooth",
         "cast": "a cheerful Thai teenager with healthy natural skin, minimal makeup, "
                 "genuine relaxed expression",
         "mood": "youthful, honest, upbeat",
@@ -102,6 +104,8 @@ PRESETS: dict[str, dict] = {
         "styling": "study notes, a coffee cup, backpack — lived-in but tidy",
         "lighting": "natural afternoon daylight, warm and soft",
         "camera": "35mm lens, f/2.2, candid documentary angle",
+        "movement": "observational documentary movement — slow drifts and small "
+                    "reframes as if following the moment, not choreographing it",
         "cast": "a Thai university student in casual clothes, natural skin, focused "
                 "then relaxed expression",
         "mood": "relatable, everyday, aspirational-but-real",
@@ -149,6 +153,8 @@ PRESETS: dict[str, dict] = {
         "styling": "casual shared items, drinks, a phone on the table",
         "lighting": "warm natural daylight, lively and inviting",
         "camera": "35mm lens, f/2.2, candid group framing",
+        "movement": "loose candid movement — the camera drifts between faces as the "
+                    "moment unfolds, unstaged and natural",
         "cast": "two or three Thai friends laughing together, natural skin, genuine "
                 "unposed interaction",
         "mood": "social, warm, word-of-mouth",
@@ -272,6 +278,9 @@ PRESETS: dict[str, dict] = {
                    "generous even spacing",
         "lighting": "even diffused overhead light, soft consistent shadows",
         "camera": "50mm lens, f/5.6, exact 90-degree top-down angle",
+        "movement": "camera stays exactly parallel to the surface at 90 degrees — "
+                    "only a slow vertical push-in or pull-out. Never tilts off "
+                    "top-down, never orbits",
         "cast": "",
         "mood": "organised, editorial, considered",
         "shots": [
@@ -288,6 +297,9 @@ PRESETS: dict[str, dict] = {
                    "result differs",
         "lighting": "flat even lighting, deliberately identical across both halves",
         "camera": "50mm lens, f/4, locked-off straight-on angle, zero camera movement",
+        "movement": "camera locked off on a tripod — absolutely no push-in, drift or "
+                    "handheld motion. The only movement in frame is the wipe "
+                    "transition between the two halves",
         "cast": "the same subject on both sides, natural realistic skin, no retouching",
         "mood": "honest, evidence-based, restrained",
         "shots": [
@@ -304,6 +316,9 @@ PRESETS: dict[str, dict] = {
         "lighting": "plain available indoor light, slightly uneven, unpolished",
         "camera": "front-facing phone camera look, slight handheld wobble, arm's-length "
                   "selfie distance",
+        "movement": "handheld phone held at arm's length — natural human wobble and "
+                    "small reframing adjustments throughout. Deliberately NOT smooth "
+                    "or stabilised; it should feel filmed by the person themselves",
         "cast": "an ordinary Thai person talking casually to camera, natural skin "
                 "including real texture, no professional makeup",
         "mood": "authentic, unpolished, trustworthy word-of-mouth",
@@ -322,6 +337,8 @@ PRESETS: dict[str, dict] = {
                    "swirls or shapes the material could not form",
         "lighting": "raking side light that exposes every ridge and sheen",
         "camera": "100mm macro lens, f/4, extreme close-up, razor-thin focal plane",
+        "movement": "macro slider — tiny precise moves only, plus slow focus racking. "
+                    "At this magnification any large camera move reads as a blur",
         "cast": "",
         "mood": "tactile, sensory, quality-proving",
         "shots": [

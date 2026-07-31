@@ -561,19 +561,22 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
 
     # The CTA is deliberately a silent-performance beat: generated lip-sync reads
     # as fake, so the closing line is narration over a warm look to camera.
+    # It builds on the scene's own final shot rather than replacing it — otherwise
+    # a before/after loses its side-by-side payoff and a flat lay never resolves.
+    closing = shots[2] if len(shots) > 2 else shots[-1]
     if preset.get("cast"):
         cta_visual = (
-            "The person looks straight into the lens and smiles warmly — genuine, "
-            "relaxed, closed mouth or a soft natural smile. They hold the product up "
-            "beside their face so the label faces camera. "
+            f"{closing} จบด้วย: the person looks straight into the lens and smiles "
+            "warmly — genuine, relaxed, closed mouth or a soft natural smile — "
+            "holding the product so its label faces camera. "
             "IMPORTANT: they are NOT speaking — lips stay still, no talking, no "
             "lip-sync. The voiceover plays over this shot as narration."
         )
     else:
         cta_visual = (
-            "Product held centred and steady, label facing camera, a slow gentle "
-            "push-in. Calm and unhurried, with clear space around it for the "
-            "call-to-action overlay. Voiceover plays over this shot as narration."
+            f"{closing} The product settles centred and steady with its label facing "
+            "camera and clear space around it for the call-to-action overlay. "
+            "No hands enter the frame. The voiceover plays over this shot as narration."
         )
 
     beats = [
@@ -625,10 +628,13 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
         "[PHYSICS & PLAUSIBILITY]",
         form["physics"] + ". "
         "น้ำและฟองไหลลงตามแรงโน้มถ่วงเสมอ ของทุกชิ้นวางอยู่บนพื้นผิวจริง ไม่ลอย "
-        "เงาและการสะท้อนตรงกับวัตถุและทิศแสง การเคลื่อนกล้องต่อเนื่องสมจริง "
-        f"วิธีจับ/ใช้สินค้า: {form['handling']}"
-        + (" มือมีห้านิ้ว ข้อต่อธรรมชาติ สัมผัสสินค้าด้วยแรงกดที่สมจริง"
-           if preset.get("cast") else ""), "",
+        "เงาและการสะท้อนตรงกับวัตถุและทิศแสง การเคลื่อนกล้องต่อเนื่องสมจริง"
+        # Handling notes only make sense when someone is there to do the handling —
+        # describing a grip in a product-only scene invites a stray hand into frame.
+        + (f" วิธีจับ/ใช้สินค้า: {form['handling']} "
+           "มือมีห้านิ้ว ข้อต่อธรรมชาติ สัมผัสสินค้าด้วยแรงกดที่สมจริง"
+           if preset.get("cast")
+           else " สินค้าตั้ง/วางอยู่ได้ด้วยตัวเอง ไม่มีมือมาจับหรือประคอง"), "",
         "[VOICEOVER DIRECTION]",
         f"{vo['voice']} — พากย์ภาษาไทยทั้งคลิป ออกเสียงชัด "
         "จังหวะพอดีกับความยาวแต่ละช่วง ไม่รีบจนฟังไม่ทัน",
@@ -641,8 +647,10 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
         f"CTA: {vo['cta']}",
         "(ซับไตเติลไทยตรงกับเสียงพากย์ วางล่างกลางเฟรม อ่านง่าย)", "",
         "[CAMERA MOVEMENT]",
-        f"{motion}; smooth controlled moves"
-        + ("" if "handheld" in preset.get("camera", "") else ", no handheld shake"), "",
+        # A scene that specifies its own movement wins — a locked-off before/after
+        # and a handheld UGC clip both contradict the tone's default drift.
+        preset.get("movement") or f"{motion}; smooth controlled moves, no handheld shake",
+        "",
         "[LIGHTING]", lighting, "",
         "[COLOUR & MOOD]", mood, "",
         "[AUDIO]",
