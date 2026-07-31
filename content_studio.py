@@ -428,6 +428,324 @@ _LOCAL_TEMPLATES: dict[str, dict[str, str]] = {
 }
 
 
+# ── Product / beauty templates ─────────────────────────────────────────────────
+# The pack above is written for restaurants ("เมนู", "รสชาติ", "#อาหารอร่อย").
+# Brands that sell a product rather than a meal need their own voice, so this
+# second pack keeps the same placeholders but speaks about products and results.
+# Deliberately claim-light: describe care and confidence, not medical outcomes.
+
+_PRODUCT_TEMPLATES: dict[str, dict[str, str]] = {
+    "hero_product": {
+        "line_oa": (
+            "⭐ ตัวช่วยที่หลายคนบอกต่อ\n\n"
+            "✨ {top_item}\n"
+            "สินค้าขายดีที่สุดของ {brand_name}\n\n"
+            "ดูแลผิวคุณอย่างเข้าใจ ใช้ได้ทุกวัน 💛\n\n"
+            "👉 {cta}"
+        ),
+        "facebook": (
+            "🌟 ยังไม่ได้ลอง {top_item} ใช่ไหม?\n\n"
+            "ทำไมลูกค้าถึงบอกต่อ:\n"
+            "✅ คัดส่วนผสมที่อ่อนโยนต่อผิว\n"
+            "✅ ใช้ง่าย เข้ากับกิจวัตรประจำวัน\n"
+            "✅ คุ้มค่า ดูแลได้ต่อเนื่อง\n\n"
+            "💬 แท็กเพื่อนที่กำลังมองหาตัวช่วยอยู่\n\n"
+            "#{brand_tag} #รีวิวของดี #ดูแลผิว"
+        ),
+        "instagram": (
+            "ตัวช่วยใหม่ที่ผิวคุณรอ ✨\n\n"
+            "{top_item} — จาก {brand_name}\n\n"
+            "อ่อนโยน ใช้ได้ทุกวัน 🤍\n"
+            "Double tap ถ้าอยากลอง!\n\n"
+            "#{brand_tag} #สกินแคร์ #ดูแลผิว #ของดีบอกต่อ #beauty"
+        ),
+        "tiktok": (
+            "[HOOK 0:00-0:03]\n"
+            "\"ทำไม {top_item} ถึงขายดีที่สุด?\"\n\n"
+            "[SHOW 0:03-0:15]\n"
+            "โชว์เนื้อสัมผัส close-up + วิธีใช้ทีละสเต็ป\n\n"
+            "[PROOF 0:15-0:25]\n"
+            "รีวิวจากผู้ใช้จริง / ภาพก่อน-หลัง\n\n"
+            "[CTA 0:25-0:30]\n"
+            "\"ลองเองได้ที่ {brand_name}\"\n\n"
+            "#{brand_tag} #สกินแคร์ #fyp #รีวิวสกินแคร์"
+        ),
+        "youtube": (
+            "Title: รีวิว {top_item} จาก {brand_name} — ดีจริงไหม? ✨\n\n"
+            "Description:\n"
+            "พาดูละเอียดว่า {top_item} คืออะไร เหมาะกับใคร และใช้ยังไงให้ได้ผล\n\n"
+            "00:00 - แนะนำสินค้า\n"
+            "01:00 - ส่วนผสมสำคัญ\n"
+            "02:00 - วิธีใช้\n"
+            "03:30 - รีวิวจากผู้ใช้จริง\n\n"
+            "Tags: {brand_name}, {top_item}, สกินแคร์, ดูแลผิว, รีวิว"
+        ),
+        "image_prompt": (
+            "Professional product photography of {top_item} by {brand_name}, "
+            "clean minimal background, soft studio lighting with gentle gradient, "
+            "water droplets and fresh botanical accents, shallow depth of field, "
+            "crisp detail on packaging, premium skincare advertising style, 4K, no text overlay"
+        ),
+    },
+    "flash_sale": {
+        "line_oa": (
+            "⚡ ดีลพิเศษวันนี้เท่านั้น!\n\n"
+            "🕐 {start_time} - {end_time} น.\n"
+            "💥 ลด {discount}% ทุกชิ้น\n\n"
+            "🔥 {top_item} ราคาพิเศษสุด!\n\n"
+            "⏰ จำนวนจำกัด — {cta}"
+        ),
+        "facebook": (
+            "⚡⚡ FLASH SALE เริ่มแล้ว! ⚡⚡\n\n"
+            "🕐 วันนี้ {start_time}-{end_time} น. เท่านั้น\n"
+            "💥 ลด {discount}% ทุกรายการ\n\n"
+            "🔥 ไฮไลต์: {top_item} — ราคาดีที่สุดของเดือน\n"
+            "✅ ส่งไว ของแท้ 100%\n\n"
+            "⚠️ ของมีจำนวนจำกัด หมดแล้วหมดเลย\n\n"
+            "#FlashSale #{brand_tag} #ลดราคา #วันนี้เท่านั้น"
+        ),
+        "instagram": (
+            "⚡ FLASH SALE ⚡\n\n"
+            "{start_time} - {end_time} วันนี้เท่านั้น\n"
+            "ลด {discount}% ทุกชิ้น 🔥\n\n"
+            "{top_item} รอคุณอยู่ 💨\n\n"
+            "#FlashSale #{brand_tag} #ลดราคา #สกินแคร์ #ของดีราคาดี"
+        ),
+        "tiktok": (
+            "[HOOK 0:00-0:02]\n"
+            "\"ลด {discount}% เหลืออีก {countdown} ชั่วโมง!\"\n\n"
+            "[SHOW 0:02-0:12]\n"
+            "โชว์สินค้า + ป้ายราคา countdown overlay\n\n"
+            "[CTA 0:12-0:15]\n"
+            "\"กดสั่งเลย ก่อนหมด!\"\n\n"
+            "#FlashSale #{brand_tag} #fyp #ลดราคา"
+        ),
+        "youtube": (
+            "Title: FLASH SALE ลด {discount}% วันนี้เท่านั้น | {brand_name}\n\n"
+            "Description:\n"
+            "🔥 ดีลด่วน {start_time}-{end_time} น. วันนี้เท่านั้น\n"
+            "{top_item} และทุกรายการ ลด {discount}%\n\n"
+            "Tags: flash sale, ลดราคา, {brand_name}, สกินแคร์"
+        ),
+        "image_prompt": (
+            "Bold promotional banner for a skincare flash sale, {discount}% off in large type, "
+            "{top_item} product bottle featured prominently, vibrant gradient background, "
+            "clean modern e-commerce design, high contrast, studio product lighting"
+        ),
+    },
+    "winback": {
+        "line_oa": (
+            "🙏 {brand_name} คิดถึงคุณนะ\n\n"
+            "ไม่ได้เจอกันสักพักเลย 🥺\n\n"
+            "✨ พิเศษสำหรับคุณ:\n"
+            "🎁 ส่วนลด {discount}% สำหรับออเดอร์ถัดไป\n"
+            "⏰ ใช้ได้ถึง {expiry}\n\n"
+            "👉 {cta}"
+        ),
+        "facebook": (
+            "💌 เราคิดถึงคุณนะ 🤍\n\n"
+            "ตั้งแต่ครั้งล่าสุดที่คุณแวะมา เรามีอะไรใหม่หลายอย่าง:\n"
+            "✅ {top_item} ที่ลูกค้าบอกต่อ\n"
+            "✅ รีวิวจากผู้ใช้จริงเพิ่มขึ้นเรื่อย ๆ\n"
+            "✅ และส่วนลดพิเศษรอคุณอยู่ 🎁\n\n"
+            "การดูแลผิวที่ดีคือความต่อเนื่อง — กลับมาเริ่มใหม่ด้วยกันนะ 💛\n\n"
+            "#{brand_tag} #ดูแลผิว #กลับมาหาเรา"
+        ),
+        "instagram": (
+            "We miss you 🤍\n\n"
+            "บางครั้งชีวิตยุ่งจนลืมดูแลตัวเอง —\n"
+            "แต่ผิวคุณยังรออยู่นะ 🌿\n\n"
+            "{top_item} + ส่วนลด {discount}% พิเศษสำหรับคุณ\n\n"
+            "#{brand_tag} #ดูแลผิว #สกินแคร์ #กลับมาดูแลตัวเอง"
+        ),
+        "tiktok": (
+            "[HOOK 0:00-0:03]\n"
+            "\"POV: แบรนด์โปรดทักมาหลังจากหายไป {days} วัน\"\n\n"
+            "[SHOW 0:03-0:15]\n"
+            "โชว์ {top_item} + ข้อความ 'เราคิดถึงคุณนะ 🥺'\n\n"
+            "[CTA 0:15-0:20]\n"
+            "\"ส่วนลด {discount}% รออยู่ — กดลิงก์เลย!\"\n\n"
+            "#{brand_tag} #สกินแคร์ #fyp"
+        ),
+        "youtube": (
+            "Title: เราคิดถึงคุณ — {brand_name} มีอะไรใหม่รออยู่ 🎁\n\n"
+            "Description:\n"
+            "อัปเดตสำคัญและส่วนลดพิเศษ {discount}% สำหรับลูกค้าที่ห่างหายไป\n\n"
+            "Tags: {brand_name}, สกินแคร์, โปรโมชั่น"
+        ),
+        "image_prompt": (
+            "Warm inviting skincare flat lay, {top_item} surrounded by soft towels and green botanicals, "
+            "morning natural light, calm self-care mood, muted warm tones, lifestyle photography, 4K"
+        ),
+    },
+    "vip_reward": {
+        "line_oa": (
+            "👑 ขอบคุณที่เป็นลูกค้าคนพิเศษ\n\n"
+            "คุณคือ Top Customer ของ {brand_name} 💛\n\n"
+            "🎁 สิทธิพิเศษเฉพาะคุณ:\n"
+            "✨ ส่วนลด {discount}% ทุกออเดอร์\n"
+            "🎀 ของแถมพิเศษเมื่อสั่งครั้งถัดไป\n"
+            "⏰ ถึง {expiry}\n\n"
+            "👉 {cta}"
+        ),
+        "facebook": (
+            "👑 TO OUR VIP CUSTOMERS 👑\n\n"
+            "ขอบคุณที่ให้ {brand_name} ดูแลผิวคุณเสมอมา\n"
+            "ความไว้วางใจของคุณมีค่ากับเราที่สุด 💛\n\n"
+            "สิทธิพิเศษที่เตรียมไว้:\n"
+            "🎁 ส่วนลด {discount}% สำหรับสมาชิก VIP\n"
+            "⭐ สิทธิ์สั่งก่อนใครทุกสินค้าใหม่\n"
+            "🎀 ของแถมพิเศษในเดือนเกิด\n\n"
+            "#VIPOnly #{brand_tag} #ขอบคุณลูกค้า"
+        ),
+        "instagram": (
+            "For our VIPs only 👑\n\n"
+            "ขอบคุณที่อยู่กับ {brand_name} เสมอมา\n"
+            "ส่วนลด {discount}% + ของแถมพิเศษ รอคุณอยู่\n\n"
+            "#VIP #{brand_tag} #ขอบคุณลูกค้า #สกินแคร์"
+        ),
+        "tiktok": (
+            "[HOOK 0:00-0:03]\n"
+            "\"แบรนด์นี้ดูแล VIP ยังไง? ดูนี่\"\n\n"
+            "[SHOW 0:03-0:15]\n"
+            "ไล่สิทธิพิเศษทีละข้อ พร้อม text overlay\n\n"
+            "[CTA 0:15-0:20]\n"
+            "\"อยากเป็น VIP? เริ่มจากออเดอร์แรกเลย!\"\n\n"
+            "#{brand_tag} #VIP #fyp"
+        ),
+        "youtube": (
+            "Title: ขอบคุณลูกค้า VIP — สิทธิพิเศษจาก {brand_name} 👑\n\n"
+            "Description:\n"
+            "รวมสิทธิพิเศษสำหรับลูกค้า VIP ส่วนลด {discount}% และของแถมพิเศษ\n\n"
+            "Tags: {brand_name}, VIP, สกินแคร์, loyalty"
+        ),
+        "image_prompt": (
+            "Luxury skincare gift set arrangement, gold and soft cream tones, elegant premium packaging, "
+            "{top_item} as centerpiece, silk fabric background, high-end beauty campaign lighting, 4K"
+        ),
+    },
+    "new_customer": {
+        "line_oa": (
+            "🌟 ยินดีต้อนรับสู่ครอบครัว {brand_name}!\n\n"
+            "ขอบคุณที่ให้เราได้ดูแลผิวคุณ 💛\n\n"
+            "🎁 ของขวัญต้อนรับ:\n"
+            "ส่วนลด {discount}% สำหรับออเดอร์ที่ 2\n"
+            "⏰ ใช้ได้ภายใน 7 วัน\n\n"
+            "เริ่มจาก {top_item} ได้เลย ⭐\n\n"
+            "👉 {cta}"
+        ),
+        "facebook": (
+            "🌟 ยินดีต้อนรับลูกค้าใหม่ทุกท่าน! 🌟\n\n"
+            "การดูแลผิวที่ดีคือความต่อเนื่อง —\n"
+            "ครั้งแรกอาจยังไม่เห็นผลเต็มที่ ให้เวลาผิวคุณสักหน่อยนะ\n\n"
+            "🎁 รับส่วนลด {discount}% สำหรับออเดอร์ที่ 2\n"
+            "⭐ เริ่มต้นง่าย ๆ กับ {top_item}\n\n"
+            "มีคำถามเรื่องผิว ทักมาถามได้เลย เรายินดีให้คำแนะนำ 💬\n\n"
+            "#Welcome #{brand_tag} #ลูกค้าใหม่ #ดูแลผิว"
+        ),
+        "instagram": (
+            "First time? Welcome! 🌟\n\n"
+            "เริ่มดูแลผิวกับ {brand_name} ง่าย ๆ ด้วย {top_item}\n"
+            "ออเดอร์ที่ 2 รับส่วนลด {discount}% เลย\n\n"
+            "#{brand_tag} #Welcome #สกินแคร์ #เริ่มดูแลผิว"
+        ),
+        "tiktok": (
+            "[HOOK 0:00-0:03]\n"
+            "\"มือใหม่ควรเริ่มจากอะไรดี? เดี๋ยวบอก\"\n\n"
+            "[SHOW 0:03-0:15]\n"
+            "แนะนำ {top_item} + วิธีใช้ทีละสเต็ป\n\n"
+            "[CTA 0:15-0:20]\n"
+            "\"ลูกค้าใหม่รับส่วนลดครั้งหน้า {discount}%!\"\n\n"
+            "#{brand_tag} #สกินแคร์มือใหม่ #fyp"
+        ),
+        "youtube": (
+            "Title: มือใหม่เริ่มยังไงดี? คู่มือ {brand_name} ฉบับเริ่มต้น 🌟\n\n"
+            "Description:\n"
+            "แนะนำสินค้าเริ่มต้น วิธีใช้ และโปรต้อนรับลูกค้าใหม่\n"
+            "00:00 - แนะนำแบรนด์\n"
+            "00:45 - เริ่มจาก {top_item}\n"
+            "01:30 - โปรลูกค้าใหม่ {discount}%\n\n"
+            "Tags: {brand_name}, สกินแคร์มือใหม่, รีวิว"
+        ),
+        "image_prompt": (
+            "Fresh clean skincare starter set on white marble, {top_item} in focus, "
+            "bright airy natural lighting, minimal Scandinavian styling, soft shadows, "
+            "welcoming friendly mood, product photography, 4K"
+        ),
+    },
+    "seasonal": {
+        "line_oa": (
+            "🎉 เทศกาลพิเศษที่ {brand_name}!\n\n"
+            "ฉลองด้วยกันกับดีลสุดพิเศษ\n\n"
+            "🎁 ส่วนลด {discount}% ทุกชิ้น\n"
+            "⭐ เซ็ตพิเศษเฉพาะเทศกาล: {top_item}\n"
+            "⏰ ถึง {expiry} เท่านั้น\n\n"
+            "👉 {cta}"
+        ),
+        "facebook": (
+            "🎉 เทศกาลแห่งความสุขมาถึงแล้ว! 🎉\n\n"
+            "{brand_name} ขอร่วมฉลองกับทุกคน\n\n"
+            "✨ ไฮไลต์เทศกาลนี้:\n"
+            "🎁 ส่วนลด {discount}% ทุกรายการ\n"
+            "⭐ เซ็ตของขวัญ {top_item} จำนวนจำกัด\n"
+            "📅 ถึง {expiry} เท่านั้น\n\n"
+            "ให้ของขวัญคนที่คุณรัก ด้วยการดูแลที่ดี 💛\n\n"
+            "#เทศกาล #{brand_tag} #ของขวัญ"
+        ),
+        "instagram": (
+            "'Tis the season! 🎉\n\n"
+            "เซ็ต {top_item} ฉบับเทศกาล limited edition\n"
+            "พร้อมส่วนลด {discount}% ถึง {expiry}\n\n"
+            "#{brand_tag} #Seasonal #LimitedEdition #ของขวัญ #สกินแคร์"
+        ),
+        "tiktok": (
+            "[HOOK 0:00-0:03]\n"
+            "\"เซ็ตนี้มีแค่ช่วงเทศกาล!\"\n\n"
+            "[SHOW 0:03-0:15]\n"
+            "แกะกล่องเซ็ต {top_item} + โชว์แพ็กเกจ\n\n"
+            "[CTA 0:15-0:20]\n"
+            "\"หมดเขต {expiry} — รีบเลย!\"\n\n"
+            "#{brand_tag} #เทศกาล #limited #fyp"
+        ),
+        "youtube": (
+            "Title: เซ็ตเทศกาล limited จาก {brand_name} 🎉\n\n"
+            "Description:\n"
+            "แกะกล่องเซ็ตพิเศษเฉพาะเทศกาล พร้อมโปร {discount}% ถึง {expiry}\n\n"
+            "Tags: {brand_name}, เทศกาล, ของขวัญ, สกินแคร์"
+        ),
+        "image_prompt": (
+            "Festive skincare gift box flat lay, {top_item} with seasonal ribbon and ornaments, "
+            "warm celebratory lighting, holiday colour palette, premium unboxing aesthetic, 4K"
+        ),
+    },
+}
+
+# Signals that a brand sells products (skincare/beauty/retail) rather than meals.
+_PRODUCT_SIGNALS = (
+    "สกินแคร์", "skincare", "ผิว", "เซรั่ม", "serum", "ครีม", "cream", "สบู่", "soap",
+    "เครื่องสำอาง", "cosmetic", "beauty", "บำรุง", "โทนเนอร์", "toner", "มาส์ก", "mask",
+    "แชมพู", "ยาสระผม", "อาหารเสริม", "วิตามิน", "เวชสำอาง", "สิว", "acne", "กันแดด",
+)
+_FNB_SIGNALS = (
+    "ร้านอาหาร", "คาเฟ่", "cafe", "restaurant", "เมนู", "หมูกระทะ", "ชาบู", "เย็นตาโฟ",
+    "ก๋วยเตี๋ยว", "กาแฟ", "เบเกอรี่", "บาร์", "อาหาร", "ครัว", "บุฟเฟ่ต์",
+)
+
+
+def detect_vertical(text: str, default: str = "fnb") -> str:
+    """Guess the business vertical from free text. Returns 'product' or 'fnb'.
+
+    `default` is returned when the text carries no signal either way, which lets
+    callers layer detection (the user's own words first, brand brief second).
+    """
+    low = (text or "").lower()
+    product_hits = sum(1 for s in _PRODUCT_SIGNALS if s in low)
+    fnb_hits = sum(1 for s in _FNB_SIGNALS if s in low)
+    if product_hits == fnb_hits == 0:
+        return default
+    return "product" if product_hits > fnb_hits else "fnb"
+
+
 # ── Content generation ──────────────────────────────────────────────────────────
 
 def _fill_template(template: str, context: dict) -> str:
@@ -438,34 +756,54 @@ def _fill_template(template: str, context: dict) -> str:
     return result
 
 
-def generate_local(campaign_type: str, context: dict) -> dict[str, str]:
-    """Generate content from local templates (no API needed)."""
-    templates = _LOCAL_TEMPLATES.get(campaign_type, _LOCAL_TEMPLATES["flash_sale"])
+def generate_local(campaign_type: str, context: dict, vertical: str = "fnb") -> dict[str, str]:
+    """Generate content from local templates (no API needed).
+
+    `vertical` picks the voice: 'product' for skincare/retail brands, 'fnb' for
+    restaurants. Falls back to the F&B pack for unknown values.
+    """
+    pack = _PRODUCT_TEMPLATES if vertical == "product" else _LOCAL_TEMPLATES
+    templates = pack.get(campaign_type) or pack.get("flash_sale") or _LOCAL_TEMPLATES["flash_sale"]
     return {platform: _fill_template(tmpl, context) for platform, tmpl in templates.items()}
 
 
-def generate_with_claude(
+def generate_with_ai(
     campaign_type: str,
     context: dict,
     api_key: str,
     tone: str = "friendly",
+    brand_context: str = "",
+    provider: str = "auto",
+    vertical: str = "fnb",
 ) -> dict[str, str]:
-    """Generate content using Claude API for higher quality and customisation."""
+    """Generate content with Claude or Gemini. Falls back to local templates."""
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
+        import ai_provider
+    except ImportError:
+        return generate_local(campaign_type, context, vertical)
 
-        campaign_meta = CAMPAIGN_TYPES.get(campaign_type, CAMPAIGN_TYPES["flash_sale"])
-        tone_desc = TONES.get(tone, TONES["friendly"])
+    campaign_meta = CAMPAIGN_TYPES.get(campaign_type, CAMPAIGN_TYPES["flash_sale"])
+    tone_desc = TONES.get(tone, TONES["friendly"])
 
-        system_prompt = (
-            "คุณเป็น Content Marketing Expert สำหรับธุรกิจ F&B ไทย มีประสบการณ์ "
-            "สร้างคอนเทนต์ที่ viral บนทุกแพลตฟอร์ม "
-            "เขียนคอนเทนต์ที่กระตุ้นการซื้อ สร้าง engagement สูง และตรงกับ target audience "
-            f"Tone: {tone_desc} | Campaign: {campaign_meta['label']} | Goal: {campaign_meta['goal']}"
+    system_prompt = (
+        "คุณเป็น Content Marketing Expert สำหรับแบรนด์ไทย มีประสบการณ์ "
+        "สร้างคอนเทนต์ที่ viral บนทุกแพลตฟอร์ม "
+        "เขียนคอนเทนต์ที่กระตุ้นการซื้อ สร้าง engagement สูง และตรงกับ target audience "
+        f"Tone: {tone_desc} | Campaign: {campaign_meta['label']} | Goal: {campaign_meta['goal']}"
+    )
+    if vertical == "product":
+        system_prompt += (
+            "\n\nสำคัญ: แบรนด์นี้ขายสินค้า ไม่ใช่ร้านอาหาร "
+            "ห้ามใช้คำที่เกี่ยวกับอาหารเด็ดขาด เช่น เมนู รสชาติ อร่อย สั่งอาหาร โต๊ะ สาขา "
+            "และห้ามใช้ hashtag แนวอาหาร เช่น #อาหารอร่อย #foodie #FoodPorn"
+        )
+    if brand_context:
+        system_prompt += (
+            "\n\nอิงบริบทแบรนด์ต่อไปนี้อย่างเคร่งครัด "
+            "ห้ามแต่งสรรพคุณหรือตัวเลขเกินจากที่ให้:\n" + brand_context
         )
 
-        user_prompt = f"""สร้าง content package สำหรับ campaign "{campaign_meta['label']}"
+    user_prompt = f"""สร้าง content package สำหรับ campaign "{campaign_meta['label']}"
 
 ข้อมูลธุรกิจ:
 {json.dumps(context, ensure_ascii=False, indent=2)}
@@ -477,7 +815,7 @@ def generate_with_claude(
   "instagram": "Caption IG + hashtag (max 2200 ตัวอักษร)",
   "tiktok": "Script วิดีโอ TikTok พร้อม hook + scene + CTA",
   "youtube": "Title + Description + Tags สำหรับ YouTube",
-  "image_prompt": "Prompt ภาษาอังกฤษสำหรับ AI image generation (DALL-E/Midjourney)"
+  "image_prompt": "Prompt ภาษาอังกฤษสำหรับสร้างภาพด้วย AI — ละเอียด ระบุ subject/แสง/มุมกล้อง/สไตล์"
 }}
 
 กฎสำคัญ:
@@ -486,29 +824,23 @@ def generate_with_claude(
 - Instagram: visual-focused สั้นกระชับ hashtag เยอะ
 - TikTok: hook 3 วินาทีแรกต้องดึงดูด มี scene direction
 - YouTube: SEO-friendly title, description ครบถ้วน
-- Image prompt: detailed, professional photography style
+- Image prompt: detailed, professional photography style, ภาษาอังกฤษเท่านั้น
 
 ตอบ JSON เท่านั้น ไม่มีข้อความอื่น"""
 
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=3000,
-            system=[{
-                "type": "text",
-                "text": system_prompt,
-                "cache_control": {"type": "ephemeral"},
-            }],
-            messages=[{"role": "user", "content": user_prompt}],
-        )
+    data = ai_provider.generate_json(
+        system_prompt, user_prompt, api_key, provider=provider, max_tokens=3000
+    )
+    if isinstance(data, dict) and data:
+        local = generate_local(campaign_type, context, vertical)
+        # Keep every platform populated even if the model skipped one.
+        return {k: (str(data.get(k) or local.get(k, "")).strip() or local.get(k, ""))
+                for k in local}
+    return generate_local(campaign_type, context, vertical)
 
-        text = message.content[0].text.strip()
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if match:
-            return json.loads(match.group())
-        return generate_local(campaign_type, context)
 
-    except Exception:
-        return generate_local(campaign_type, context)
+# Backwards-compatible alias — older call sites used the Claude-specific name.
+generate_with_claude = generate_with_ai
 
 
 def get_content_package(
@@ -516,11 +848,18 @@ def get_content_package(
     context: dict,
     tone: str = "friendly",
     api_key: str = "",
+    brand_context: str = "",
+    provider: str = "auto",
+    vertical: str = "",
 ) -> dict[str, str]:
-    """Main entry point — use Claude if key available, else local templates."""
-    if api_key.strip():
-        return generate_with_claude(campaign_type, context, api_key, tone)
-    return generate_local(campaign_type, context)
+    """Main entry point — use an AI provider if a key is available, else templates."""
+    # Infer the vertical from the brand brief when the caller didn't specify one.
+    if not vertical:
+        vertical = detect_vertical(f"{brand_context} {context.get('top_item', '')}")
+    if api_key and api_key.strip():
+        return generate_with_ai(campaign_type, context, api_key, tone,
+                                brand_context, provider, vertical)
+    return generate_local(campaign_type, context, vertical)
 
 
 # ── Content Calendar / Queue ────────────────────────────────────────────────────

@@ -1,0 +1,713 @@
+"""Content Copilot — natural-language chat → content brief → draft package.
+
+Turns a plain chat message such as
+    "อยากได้โพสต์ flash sale ลด 20% ลง IG + Facebook โทนพรีเมียม"
+into a structured brief, then generates a multi-platform content package by
+reusing content_studio.get_content_package().
+
+Works with OR without a Claude API key:
+  • with key   → Claude extracts a precise brief (campaign/platform/tone/…)
+  • without key → keyword heuristics (Thai + English) give a sensible brief
+
+The module is UI-agnostic: it returns plain dicts/strings. The Streamlit page
+(render_copilot_page in app.py) handles chat rendering, approval and posting.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+
+from content_studio import (
+    CAMPAIGN_TYPES,
+    TONES,
+    PLATFORMS,
+    get_content_package,
+)
+
+# Mirror the model used by content_studio so behaviour stays consistent across
+# the app. If Claude is unavailable or errors, callers fall back to local mode.
+MODEL = "claude-sonnet-4-6"
+
+_DEFAULT_PLATFORMS = ["facebook", "instagram", "line_oa"]
+_DEFAULT_CAMPAIGN = "hero_product"
+_DEFAULT_TONE = "friendly"
+
+# ── Keyword maps for local (no-API) intent parsing ──────────────────────────────
+
+_CAMPAIGN_KEYWORDS: dict[str, list[str]] = {
+    "flash_sale":  ["flash", "แฟลช", "ลดราคา", "ลดล้าง", "sale", "happy hour",
+                    "โปรวันนี้", "ลดกระหน่ำ", "ด่วนวันนี้", "ลดพิเศษ"],
+    "winback":     ["หายไป", "คิดถึง", "กลับมา", "winback", "win-back", "ลูกค้าเก่า",
+                    "ไม่ได้มา", "ไม่ได้แวะ", "ดึงลูกค้ากลับ"],
+    "vip_reward":  ["vip", "สมาชิก", "ลูกค้าประจำ", "champions", "reward", "รางวัล",
+                    "ขอบคุณลูกค้า", "ลูกค้าคนพิเศษ"],
+    "new_customer": ["ลูกค้าใหม่", "ต้อนรับ", "welcome", "ครั้งแรก", "มาใหม่", "สมาชิกใหม่"],
+    "seasonal":    ["เทศกาล", "สงกรานต์", "ปีใหม่", "คริสต์มาส", "ตรุษจีน", "วาเลนไทน์",
+                    "seasonal", "ฮาโลวีน", "ลอยกระทง", "แม่", "พ่อ"],
+    "hero_product": ["hero", "เมนูเด็ด", "สินค้าเด่น", "ตัวชูโรง", "signature", "แนะนำ",
+                     "ขายดี", "เปิดตัว", "ตัวใหม่", "สินค้าใหม่", "รีวิว", "โชว์สินค้า"],
+}
+
+_TONE_KEYWORDS: dict[str, list[str]] = {
+    "urgent":  ["ด่วน", "เร่ง", "รีบ", "วันนี้เท่านั้น", "urgent", "fomo", "เวลาจำกัด", "นับถอยหลัง"],
+    "premium": ["พรีเมียม", "หรู", "luxury", "premium", "exclusive", "หรูหรา", "ระดับพรีเมียม", "ลักชัวรี"],
+    "fun":     ["สนุก", "ขำ", "กวน", "fun", "ตลก", "playful", "อารมณ์ดี", "แซ่บ"],
+    "friendly": ["เป็นกันเอง", "อบอุ่น", "friendly", "น่ารัก", "อ่อนโยน"],
+}
+
+_PLATFORM_KEYWORDS: dict[str, list[str]] = {
+    "line_oa":   ["line oa", "line", "ไลน์", " oa"],
+    "facebook":  ["facebook", "fb", "เฟส", "เฟซ"],
+    "instagram": ["instagram", "ig", "ไอจี", "insta", "story", "สตอรี", "carousel", "คารูเซล"],
+    "tiktok":    ["tiktok", "ติ๊กต็อก", "ทิกทอก", "tik tok", "ติกต็อก"],
+    "youtube":   ["youtube", "yt", "ยูทูป", "ยูทูบ", "shorts", "ช็อต"],
+}
+
+# Product nouns worth surfacing as the "hero item" in local mode (skincare-leaning).
+_ITEM_KEYWORDS = [
+    "เซรั่ม", "ครีมกันแดด", "กันแดด", "ครีมบำรุง", "ครีม", "โฟมล้างหน้า", "โฟม",
+    "สบู่", "โทนเนอร์", "มาส์ก", "เอสเซนส์", "เอสเซ้นส์", "แชมพู", "ลิป",
+    "อาหารเสริม", "วิตามิน", "เมนู", "สินค้า",
+]
+
+
+# ── Local extraction helpers ────────────────────────────────────────────────────
+
+def _match_first(text: str, mapping: dict[str, list[str]], default: str) -> str:
+    for key, keywords in mapping.items():
+        if any(kw in text for kw in keywords):
+            return key
+    return default
+
+
+def _extract_discount(text: str) -> int:
+    m = re.search(r"(\d{1,3})\s*%", text)
+    if m:
+        return max(5, min(int(m.group(1)), 90))
+    m = re.search(r"ลด\s*(\d{1,3})", text)
+    if m:
+        return max(5, min(int(m.group(1)), 90))
+    return 20
+
+
+def _extract_item(text: str) -> str:
+    for kw in _ITEM_KEYWORDS:
+        if kw in text:
+            return kw
+    return "สินค้าเด่น"
+
+
+def _extract_brand(text: str, default_brand: str) -> str:
+    if re.search(r"\blemed\b", text, re.IGNORECASE):
+        return "LEMED"
+    return default_brand or "ร้านของคุณ"
+
+
+def _extract_platforms(text: str) -> list[str]:
+    found = [pid for pid, kws in _PLATFORM_KEYWORDS.items() if any(kw in text for kw in kws)]
+    return found or list(_DEFAULT_PLATFORMS)
+
+
+# ── Interpretation ──────────────────────────────────────────────────────────────
+
+def _interpret_local(prompt: str, default_brand: str) -> dict:
+    """Keyword-based intent parsing — no API key required."""
+    p = f" {prompt.lower()} "
+    campaign = _match_first(p, _CAMPAIGN_KEYWORDS, _DEFAULT_CAMPAIGN)
+    tone = _match_first(p, _TONE_KEYWORDS, _DEFAULT_TONE)
+    return {
+        "campaign": campaign,
+        "tone": tone,
+        "platforms": _extract_platforms(p),
+        "brand_name": _extract_brand(prompt, default_brand),
+        "top_item": _extract_item(prompt),
+        "discount": _extract_discount(prompt),
+        "summary": "",
+        "source": "local",
+    }
+
+
+def _interpret_ai(prompt: str, api_key: str, default_brand: str,
+                  brand_context: str = "", provider: str = "auto") -> dict | None:
+    """Ask an AI provider to extract a structured brief. None on any failure."""
+    try:
+        import ai_provider
+    except ImportError:
+        return None
+
+    system_prompt = (
+        "คุณเป็นผู้ช่วยวางแผนคอนเทนต์การตลาด แปลงคำสั่งภาษาคนให้เป็น JSON ที่ถูกต้อง "
+        f"ค่า campaign ต้องเป็นหนึ่งใน {list(CAMPAIGN_TYPES.keys())} "
+        f"ค่า tone ต้องเป็นหนึ่งใน {list(TONES.keys())} "
+        f"ค่า platforms ต้องเป็น subset ของ {list(PLATFORMS.keys())}"
+    )
+    if brand_context:
+        system_prompt += "\n\nบริบทแบรนด์ (ใช้เติมค่าที่ผู้ใช้ไม่ได้ระบุ):\n" + brand_context[:2000]
+
+    user_prompt = (
+        f'คำสั่งจากผู้ใช้: "{prompt}"\n\n'
+        "ตอบกลับเป็น JSON เท่านั้น รูปแบบ:\n"
+        "{\n"
+        '  "campaign": "<หนึ่งค่า>",\n'
+        '  "platforms": ["<platform>", ...],\n'
+        '  "tone": "<หนึ่งค่า>",\n'
+        '  "brand_name": "<ชื่อแบรนด์>",\n'
+        '  "top_item": "<สินค้า/เมนูหลัก>",\n'
+        '  "discount": <ตัวเลข % ถ้าไม่มีใส่ 20>,\n'
+        '  "summary": "<สรุปสั้นๆ ภาษาไทยว่าจะทำอะไร>"\n'
+        "}\n"
+        f'ถ้าไม่ระบุแบรนด์ ใช้ "{default_brand}". ถ้าไม่ระบุแพลตฟอร์ม เลือกที่เหมาะสมกับงาน'
+    )
+
+    data = ai_provider.generate_json(
+        system_prompt, user_prompt, api_key, provider=provider, max_tokens=600
+    )
+    if not isinstance(data, dict):
+        return None
+    return _sanitize_brief(data, default_brand)
+
+
+def _sanitize_brief(data: dict, default_brand: str) -> dict:
+    """Clamp Claude's output to valid enum values so downstream never breaks."""
+    campaign = data.get("campaign")
+    if campaign not in CAMPAIGN_TYPES:
+        campaign = _DEFAULT_CAMPAIGN
+    tone = data.get("tone")
+    if tone not in TONES:
+        tone = _DEFAULT_TONE
+    platforms = [p for p in (data.get("platforms") or []) if p in PLATFORMS]
+    if not platforms:
+        platforms = list(_DEFAULT_PLATFORMS)
+    try:
+        discount = max(5, min(int(data.get("discount") or 20), 90))
+    except (TypeError, ValueError):
+        discount = 20
+    return {
+        "campaign": campaign,
+        "tone": tone,
+        "platforms": platforms,
+        "brand_name": (data.get("brand_name") or default_brand or "ร้านของคุณ").strip(),
+        "top_item": (data.get("top_item") or "สินค้าเด่น").strip(),
+        "discount": discount,
+        "summary": (data.get("summary") or "").strip(),
+        "source": "claude",
+    }
+
+
+def load_brand_context() -> str:
+    """Pull the Mandala AI brand brief, if mandala-bot is available locally."""
+    try:
+        import mandala_client
+        return mandala_client.build_context_block(include_samples=1)
+    except Exception:  # noqa: BLE001 — context is a bonus, never a hard dependency
+        return ""
+
+
+def interpret(prompt: str, api_key: str = "", default_brand: str = "ร้านของคุณ",
+              brand_context: str = "", provider: str = "auto") -> dict:
+    """Turn a chat message into a validated content brief."""
+    if api_key and api_key.strip():
+        brief = _interpret_ai(prompt, api_key.strip(), default_brand, brand_context, provider)
+        if brief:
+            return brief
+    return _interpret_local(prompt, default_brand)
+
+
+# ── Brief → context → package ───────────────────────────────────────────────────
+
+def build_context(brief: dict) -> dict:
+    """Map a brief onto the context dict that content_studio templates expect."""
+    brand = (brief.get("brand_name") or "ร้านของคุณ").strip()
+    hero = (brief.get("top_item") or "สินค้าเด่น").strip()
+    discount = brief.get("discount", 20)
+    return {
+        "brand_name": brand,
+        "brand_tag": brand.replace(" ", "").replace("ร้าน", "") or "brand",
+        "top_item": hero,
+        "discount": discount,
+        "expiry": brief.get("expiry", "เร็ว ๆ นี้"),
+        "cta": brief.get("cta", "ทักแชทเพื่อรับสิทธิ์"),
+        "days": brief.get("days", 30),
+        "hours": "10:00-22:00",
+        "start_time": brief.get("start_time", "17:00"),
+        "end_time": brief.get("end_time", "20:00"),
+        "countdown": brief.get("countdown", 24),
+        # legacy-compatible keys used elsewhere in content_studio
+        "business_name": brand,
+        "hero_product": hero,
+        "target_segment": brief.get("target_segment", "ทุกกลุ่ม"),
+        "days_inactive": brief.get("days", 30),
+        "urgency_hours": brief.get("countdown", 24),
+    }
+
+
+# Local content_studio templates are F&B-flavoured ("food photography",
+# "hero dish"). That reads wrong for a skincare brand, so in local mode we build
+# a product-photography prompt from the brief instead.
+_FOOD_MARKERS = ("food photography", "hero dish", "appetizing", "restaurant quality")
+
+_TONE_LOOKS = {
+    "premium": "luxurious minimal styling, marble and soft shadow, elegant, high-end beauty campaign",
+    "urgent":  "bold vivid colours, high contrast, energetic promotional styling",
+    "fun":     "bright playful colours, cheerful props, lively composition",
+    "friendly": "warm natural light, soft pastel tones, approachable lifestyle styling",
+}
+
+
+def build_image_prompt(brief: dict) -> str:
+    """Short product-photography prompt (kept for compatibility / quick use)."""
+    brand = brief.get("brand_name") or "the brand"
+    item = brief.get("top_item") or "the product"
+    look = _TONE_LOOKS.get(brief.get("tone", ""), _TONE_LOOKS["friendly"])
+    return (
+        f"Professional product photography of {item} by {brand}, "
+        f"{look}, clean uncluttered background, studio lighting with soft gradient, "
+        "shallow depth of field, crisp detail on the packaging, "
+        "commercial advertising quality, 4K, no text overlay"
+    )
+
+
+# ── Master prompts ──────────────────────────────────────────────────────────────
+# Full production-grade prompts meant to be pasted straight into Google Flow,
+# Midjourney, or any image/video model — every lever spelled out rather than
+# left to the model's defaults.
+
+_TONE_GRADE = {
+    "premium": ("desaturated elegant palette, deep blacks, subtle warm highlights, "
+                "editorial luxury grade"),
+    "urgent":  ("high-saturation punchy palette, strong contrast, vivid accent colours, "
+                "energetic commercial grade"),
+    "fun":     ("bright cheerful palette, playful pastel accents, high-key airy grade"),
+    "friendly": ("soft natural palette, warm skin-friendly tones, gentle lifted shadows"),
+}
+
+_TONE_LIGHT = {
+    "premium": ("single large softbox at 45 degrees with a subtle rim light, "
+                "controlled falloff, deep soft shadows"),
+    "urgent":  ("bright even key light with a hard accent kick, crisp defined shadows"),
+    "fun":     ("bright diffused daylight, colourful bounce fill, minimal shadow"),
+    "friendly": ("soft window light from the side, white bounce fill, natural gentle shadow"),
+}
+
+_IMAGE_AVOID = ("no text, no logos, no watermark, no distorted packaging, no extra hands, "
+                "no clutter, no harsh blown-out highlights, no plastic-looking skin")
+
+_VIDEO_AVOID = ("no on-screen text, no watermark, no logo distortion, no jarring cuts, "
+                "no warped product geometry, no flickering")
+
+
+def _master_scene(brief: dict) -> tuple[str, str, str]:
+    """(subject, setting, styling) tuned to the vertical."""
+    brand = brief.get("brand_name") or "the brand"
+    item = brief.get("top_item") or "the product"
+    if brief.get("vertical") == "product":
+        return (
+            f"A single {item} bottle by {brand}, front-facing hero placement, "
+            "label crisp and fully legible",
+            "clean seamless studio surface in soft neutral tone, subtle reflection "
+            "beneath the product, uncluttered negative space around it",
+            "a few fresh botanical leaves and delicate water droplets as accents, "
+            "nothing overlapping the label",
+        )
+    return (
+        f"A freshly plated {item} from {brand}, hero angle, steam gently rising",
+        "warm rustic wooden table in an inviting dining setting, soft bokeh background",
+        "fresh ingredients and simple ceramic tableware arranged around the dish",
+    )
+
+
+# ── Thai voiceover / narrative beats ────────────────────────────────────────────
+# Every clip follows Hook → Decision → CTA. Lines stay claim-light on purpose:
+# the LEMED brief explicitly warns against over-claiming skincare results.
+
+_VO_LINES: dict[str, dict[str, str]] = {
+    "hero_product": {
+        "hook": "สิวขึ้นซ้ำ ๆ ทั้งที่ล้างหน้าสะอาดทุกวัน",
+        "decision": "{item} จาก {brand} คัดส่วนผสมที่อ่อนโยน ดูแลผิวโดยไม่ทิ้งความแห้งตึง",
+        "cta": "ลองดูแลผิวแบบเข้าใจ ทักแชทเราได้เลยวันนี้",
+    },
+    "flash_sale": {
+        "hook": "ลดแรงที่สุด เฉพาะวันนี้เท่านั้น",
+        "decision": "{item} ลด {discount} เปอร์เซ็นต์ ของมีจำนวนจำกัด",
+        "cta": "กดสั่งเลย ก่อนหมดเวลา",
+    },
+    "winback": {
+        "hook": "ไม่ได้เจอกันนาน ผิวคุณเป็นยังไงบ้าง",
+        "decision": "เรามีส่วนลด {discount} เปอร์เซ็นต์ รอให้คุณกลับมาดูแลตัวเองอีกครั้ง",
+        "cta": "กลับมาเริ่มใหม่วันนี้ ทักแชทรับสิทธิ์ได้เลย",
+    },
+    "vip_reward": {
+        "hook": "ขอบคุณที่ให้เราดูแลผิวคุณมาตลอด",
+        "decision": "ลูกค้าคนพิเศษรับส่วนลด {discount} เปอร์เซ็นต์ ก่อนใคร",
+        "cta": "รับสิทธิ์ของคุณได้เลยวันนี้",
+    },
+    "new_customer": {
+        "hook": "เพิ่งเริ่มดูแลผิว ไม่รู้จะเลือกอะไรดี",
+        "decision": "เริ่มจาก {item} อ่อนโยน ใช้ง่าย ทำได้ทุกวัน",
+        "cta": "ลูกค้าใหม่รับส่วนลด {discount} เปอร์เซ็นต์ ทักเลย",
+    },
+    "seasonal": {
+        "hook": "เทศกาลนี้ อยากให้ของขวัญที่คนสำคัญได้ใช้จริง",
+        "decision": "เซ็ต {item} พร้อมกล่องของขวัญ ลด {discount} เปอร์เซ็นต์",
+        "cta": "สั่งก่อน {expiry} กดลิงก์ได้เลย",
+    },
+}
+
+_VO_VOICE = {
+    "premium": "เสียงผู้หญิงไทย น้ำเสียงนุ่ม สุขุม พูดช้า ชัดถ้อยชัดคำ โทนพรีเมียม",
+    "urgent":  "เสียงไทย กระฉับกระเฉง เร่งเร้า จังหวะเร็ว เน้นคำสำคัญให้หนักแน่น",
+    "fun":     "เสียงไทย สดใส เป็นกันเอง มีพลัง ยิ้มขณะพูด",
+    "friendly": "เสียงผู้หญิงไทย อบอุ่น เป็นมิตร พูดเหมือนคุยกับเพื่อน",
+}
+
+
+def build_voiceover(brief: dict) -> dict:
+    """Thai voiceover script for the Hook → Decision → CTA arc."""
+    lines = _VO_LINES.get(brief.get("campaign", ""), _VO_LINES["hero_product"])
+    fields = {
+        "item": brief.get("top_item") or "สินค้าของเรา",
+        "brand": brief.get("brand_name") or "แบรนด์ของเรา",
+        "discount": brief.get("discount", 20),
+        "expiry": brief.get("expiry", "สิ้นเดือนนี้"),
+    }
+    return {
+        "hook": lines["hook"].format(**fields),
+        "decision": lines["decision"].format(**fields),
+        "cta": lines["cta"].format(**fields),
+        "voice": _VO_VOICE.get(brief.get("tone", ""), _VO_VOICE["friendly"]),
+    }
+
+
+def _scene_preset(scene: str) -> dict:
+    """Look up a scene preset; falls back to the studio default."""
+    try:
+        import scene_presets
+        return scene_presets.get(scene)
+    except Exception:  # noqa: BLE001 — scene library is optional
+        return {}
+
+
+def build_master_image_prompt(brief: dict, scene: str = "") -> str:
+    """Structured master prompt for image generation — ready to paste into Flow.
+
+    `scene` selects a preset from scene_presets (lab, student, UGC, …); without
+    one the prompt falls back to a clean studio treatment derived from the brief.
+    """
+    tone = brief.get("tone", "friendly")
+    subject, setting, styling = _master_scene(brief)
+    aspect = video_aspect_for(brief)
+    preset = _scene_preset(scene) if scene else {}
+
+    lighting = preset.get("lighting") or _TONE_LIGHT.get(tone, _TONE_LIGHT["friendly"])
+    camera = preset.get("camera") or (
+        "85mm macro lens, f/2.8, eye-level three-quarter angle, "
+        "shallow depth of field with the product tack-sharp")
+    mood = _TONE_GRADE.get(tone, _TONE_GRADE["friendly"])
+    if preset.get("mood"):
+        mood = f"{mood}; overall feeling {preset['mood']}"
+
+    lines = [
+        "[SUBJECT]", subject, "",
+        "[SCENE & SETTING]", preset.get("setting") or setting, "",
+        "[STYLING & PROPS]", preset.get("styling") or styling, "",
+    ]
+    if preset.get("cast"):
+        lines += ["[CAST]", preset["cast"], ""]
+    lines += [
+        "[LIGHTING]", lighting, "",
+        "[CAMERA & LENS]", camera, "",
+        "[COMPOSITION]",
+        f"hero composition with generous negative space for caption overlay, "
+        f"framed for {aspect}", "",
+        "[COLOUR & MOOD]", mood, "",
+        "[STYLE]",
+        "photorealistic commercial advertising photography, award-winning campaign quality, "
+        "clean modern aesthetic", "",
+        "[TECHNICAL]",
+        f"aspect ratio {aspect}, 4K resolution, sharp focus, natural texture detail", "",
+        "[AVOID]",
+        _IMAGE_AVOID + (", no extra fingers, no distorted faces, no uncanny expressions"
+                        if preset.get("cast") else ""),
+    ]
+    return "\n".join(lines)
+
+
+def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -> str:
+    """Master video prompt: Hook → Decision → CTA with a Thai voiceover script.
+
+    Defaults to a 10-second spot. Veo caps a single generation at 8 seconds, so
+    the 10s version is meant for Google Flow (which can extend); the in-app
+    generator passes seconds=8.
+    """
+    tone = brief.get("tone", "friendly")
+    subject, setting, styling = _master_scene(brief)
+    aspect = video_aspect_for(brief)
+    motion = _TONE_MOTION.get(tone, _TONE_MOTION["friendly"])
+    item = brief.get("top_item") or "the product"
+    preset = _scene_preset(scene) if scene else {}
+    vo = build_voiceover(brief)
+
+    shots = preset.get("shots") or [
+        f"Extreme close-up detail of the subject. {subject}.",
+        f"Wider hero shot showing the full scene: {setting}, with {styling}.",
+        "Final settle on the product centred in frame, held steady for a caption overlay.",
+    ]
+    lighting = preset.get("lighting") or _TONE_LIGHT.get(tone, _TONE_LIGHT["friendly"])
+    mood = _TONE_GRADE.get(tone, _TONE_GRADE["friendly"])
+    if preset.get("mood"):
+        mood = f"{mood}; overall feeling {preset['mood']}"
+
+    # Beat timings scale with the requested runtime (roughly 30% / 40% / 30%).
+    h_end = max(2, round(seconds * 0.3))
+    d_end = max(h_end + 1, round(seconds * 0.7))
+    beats = [
+        ("HOOK", f"0:00-0:0{h_end}" if h_end < 10 else f"0:00-0:{h_end}",
+         shots[0], vo["hook"],
+         "หยุดนิ้วคนดูให้ได้ใน 3 วินาทีแรก — ตั้งคำถามหรือชี้ปัญหาที่ตรงใจทันที"),
+        ("DECISION", f"0:0{h_end}-0:0{d_end}" if d_end < 10 else f"0:0{h_end}-0:{d_end}",
+         shots[1] if len(shots) > 1 else shots[0], vo["decision"],
+         "ให้เหตุผลว่าทำไมต้องเป็นสินค้านี้ — จุดขาย/ส่วนผสม/ข้อพิสูจน์"),
+        ("CTA", f"0:0{d_end}-0:{seconds}" if d_end < 10 else f"0:{d_end}-0:{seconds}",
+         shots[2] if len(shots) > 2 else shots[-1], vo["cta"],
+         "บอกให้ชัดว่าต้องทำอะไรต่อ พร้อมเว้นที่ว่างสำหรับปุ่ม/ข้อความ CTA"),
+    ]
+
+    lines = [
+        "[CONCEPT]",
+        f"A {seconds}-second vertical commercial spot for {item}, "
+        "structured as Hook → Decision → CTA, with a Thai voiceover.", "",
+        "[SUBJECT]", subject, "",
+    ]
+    if preset.get("setting"):
+        lines += ["[SCENE & SETTING]", preset["setting"], ""]
+    if preset.get("cast"):
+        lines += ["[CAST]", preset["cast"], ""]
+
+    for name, timing, visual, vo_line, purpose in beats:
+        lines += [
+            f"[{name} — {timing}]",
+            f"VISUAL: {visual}",
+            f"เสียงพากย์ (ไทย): “{vo_line}”",
+            f"จุดประสงค์: {purpose}",
+            "",
+        ]
+
+    lines += [
+        "[VOICEOVER DIRECTION]",
+        f"{vo['voice']} — พากย์ภาษาไทยทั้งคลิป ออกเสียงชัด "
+        "จังหวะพอดีกับความยาวแต่ละช่วง ไม่รีบจนฟังไม่ทัน", "",
+        "[ON-SCREEN TEXT (ไทย)]",
+        f"HOOK: {vo['hook']}",
+        f"DECISION: {vo['decision']}",
+        f"CTA: {vo['cta']}",
+        "(ซับไตเติลไทยตรงกับเสียงพากย์ วางล่างกลางเฟรม อ่านง่าย)", "",
+        "[CAMERA MOVEMENT]",
+        f"{motion}; smooth controlled moves"
+        + ("" if "handheld" in preset.get("camera", "") else ", no handheld shake"), "",
+        "[LIGHTING]", lighting, "",
+        "[COLOUR & MOOD]", mood, "",
+        "[AUDIO]",
+        "Thai voiceover as scripted above, mixed clearly on top; "
+        "soft ambient background music matching the mood at low level; "
+        "subtle foley (gentle liquid and fabric sounds)", "",
+        "[STYLE]",
+        "photorealistic, high production value commercial film, "
+        "shot on cinema camera, 24fps motion cadence", "",
+        "[TECHNICAL]",
+        f"aspect ratio {aspect}, {seconds} seconds total, 4K, continuous consistent "
+        "lighting and product design across all beats", "",
+        "[AVOID]",
+        _VIDEO_AVOID + (", no extra fingers, no distorted faces, no morphing between shots"
+                        if preset.get("cast") else "")
+        + ", ห้ามพากย์ภาษาอื่นนอกจากไทย, ห้ามเสียงหุ่นยนต์",
+    ]
+    return "\n".join(lines)
+
+
+# ── Carousel / poster set ───────────────────────────────────────────────────────
+
+_CAROUSEL_ROLES = [
+    ("HOOK", "🪝 สะดุดตา",
+     "ข้อความใหญ่เต็มเฟรม ตั้งคำถามหรือชี้ปัญหา ภาพเรียบ ไม่แย่งความสนใจจากตัวหนังสือ",
+     "bold minimal composition with a very large clear area for a single big headline, "
+     "product small or absent, high contrast background"),
+    ("PROBLEM", "😣 ปัญหาที่เจอ",
+     "ขยายความเจ็บปวดให้คนดูพยักหน้าตาม",
+     "relatable close-up illustrating the problem, muted desaturated grade, "
+     "space at the bottom for two lines of text"),
+    ("SOLUTION", "✨ ทางออก",
+     "แนะนำสินค้าเป็นคำตอบ",
+     "clean hero shot of the product taking centre stage, bright optimistic grade, "
+     "clear space beside the product for a short headline"),
+    ("PROOF", "🔬 ข้อพิสูจน์",
+     "ส่วนผสม/รีวิว/ผลลัพธ์ ที่ทำให้เชื่อ",
+     "detail shot showing ingredients or texture evidence, informative layout with "
+     "room for three short bullet labels"),
+    ("CTA", "🎯 ลงมือ",
+     "บอกสิ่งที่ต้องทำต่อ พร้อมข้อเสนอ",
+     "product with a bold offer banner area, strong colour block reserved for the "
+     "price and call-to-action button, centred and unmissable"),
+]
+
+
+def build_carousel(brief: dict, scene: str = "", slides: int = 5) -> list[dict]:
+    """Poster carousel: one master prompt + Thai on-slide copy per slide.
+
+    Follows the same Hook → Decision → CTA arc as the video, expanded across
+    slides so the set reads as one story.
+    """
+    vo = build_voiceover(brief)
+    preset = _scene_preset(scene) if scene else {}
+    tone = brief.get("tone", "friendly")
+    subject, setting, styling = _master_scene(brief)
+    brand = brief.get("brand_name") or "แบรนด์ของเรา"
+    item = brief.get("top_item") or "สินค้าของเรา"
+    discount = brief.get("discount", 20)
+    aspect = "4:5"  # the carousel ratio that performs best on IG/Facebook
+
+    copy_map = {
+        "HOOK": (vo["hook"], "เลื่อนดูต่อ →"),
+        "PROBLEM": ("ล้างหน้าสะอาดแล้ว แต่ปัญหายังอยู่",
+                    "เพราะการดูแลผิวไม่ได้จบแค่ความสะอาด"),
+        "SOLUTION": (f"{item}", vo["decision"]),
+        "PROOF": ("ทำไมลูกค้าถึงบอกต่อ",
+                  "• ส่วนผสมที่อ่อนโยน  • ใช้ได้ทุกวัน  • ไม่ทิ้งความแห้งตึง"),
+        "CTA": (f"ลด {discount}%", vo["cta"]),
+    }
+
+    out: list[dict] = []
+    for i, (role, th_label, purpose, comp) in enumerate(_CAROUSEL_ROLES[:slides], 1):
+        headline, sub = copy_map.get(role, ("", ""))
+        lines = [
+            "[SUBJECT]",
+            subject if role in ("SOLUTION", "PROOF", "CTA")
+            else f"Brand visual for {brand}, product not the focus of this slide", "",
+            "[SCENE & SETTING]", preset.get("setting") or setting, "",
+            "[STYLING & PROPS]", preset.get("styling") or styling, "",
+        ]
+        if preset.get("cast"):
+            lines += ["[CAST]", preset["cast"], ""]
+        lines += [
+            "[LIGHTING]",
+            preset.get("lighting") or _TONE_LIGHT.get(tone, _TONE_LIGHT["friendly"]), "",
+            "[CAMERA & LENS]",
+            preset.get("camera") or "50mm lens, f/4, straight-on angle", "",
+            "[COMPOSITION]", comp, "",
+            "[COLOUR & MOOD]", _TONE_GRADE.get(tone, _TONE_GRADE["friendly"]), "",
+            "[STYLE]",
+            "photorealistic commercial advertising photography, cohesive with the other "
+            "slides in this carousel — same lighting, palette and product styling", "",
+            "[TECHNICAL]",
+            f"aspect ratio {aspect}, 4K, slide {i} of {slides} in one carousel set", "",
+            "[AVOID]",
+            _IMAGE_AVOID + (", no extra fingers, no distorted faces" if preset.get("cast") else ""),
+        ]
+        out.append({
+            "n": i,
+            "role": role,
+            "label": th_label,
+            "purpose": purpose,
+            "headline_th": headline,
+            "sub_th": sub,
+            "prompt": "\n".join(lines),
+        })
+    return out
+
+
+_TONE_MOTION = {
+    "premium": "slow elegant camera push-in, shallow depth of field, calm luxurious mood",
+    "urgent":  "quick punchy cuts, dynamic camera moves, energetic promotional pace",
+    "fun":     "playful bouncy motion, bright lively pacing, upbeat feel",
+    "friendly": "gentle smooth camera drift, warm natural light, relaxed inviting pace",
+}
+
+# Vertical platforms want 9:16; everything else reads better as 16:9.
+_VERTICAL_PLATFORMS = {"tiktok", "instagram"}
+
+
+def video_aspect_for(brief: dict) -> str:
+    """Pick an aspect ratio that suits the target platforms."""
+    plats = set(brief.get("platforms") or [])
+    return "9:16" if plats & _VERTICAL_PLATFORMS else "16:9"
+
+
+def build_video_prompt(brief: dict) -> str:
+    """Short cinematic prompt for Veo, derived from the brief."""
+    brand = brief.get("brand_name") or "the brand"
+    item = brief.get("top_item") or "the product"
+    motion = _TONE_MOTION.get(brief.get("tone", ""), _TONE_MOTION["friendly"])
+    if brief.get("vertical") == "product":
+        scene = (
+            f"Cinematic product commercial for {item} by {brand}. "
+            "The product sits on a clean minimal surface with soft studio lighting, "
+            "delicate water droplets and fresh botanical accents around it"
+        )
+    else:
+        scene = (
+            f"Cinematic food commercial for {item} at {brand}. "
+            "Freshly served dish with steam rising, warm inviting restaurant lighting"
+        )
+    return (
+        f"{scene}. {motion}. Photorealistic, high production value, "
+        "crisp focus on the product, no text overlay, no watermark."
+    )
+
+
+def describe(brief: dict) -> str:
+    """One-line human summary of a brief (used when Claude gives no summary)."""
+    campaign_label = CAMPAIGN_TYPES.get(brief.get("campaign", ""), {}).get(
+        "label", brief.get("campaign", "")
+    )
+    plats = ", ".join(
+        PLATFORMS[p]["name"] for p in brief.get("platforms", []) if p in PLATFORMS
+    )
+    tone = brief.get("tone", "")
+    tone_label = f"โทน {tone}" if tone else ""
+    parts = [x for x in (campaign_label, tone_label, f"ลง {plats}" if plats else "") if x]
+    return " · ".join(parts)
+
+
+def generate(prompt: str, api_key: str = "", default_brand: str = "ร้านของคุณ",
+             use_brand_context: bool = True, provider: str = "auto",
+             vertical: str = "auto") -> tuple[dict, dict]:
+    """Full pipeline: chat message → (brief, content package).
+
+    Returns:
+        brief:   the interpreted intent (campaign/platforms/tone/…)
+        package: {platform: content_str, ..., "image_prompt": "..."}
+    """
+    brand_context = load_brand_context() if use_brand_context else ""
+    brief = interpret(prompt, api_key, default_brand, brand_context, provider)
+    brief["used_brand_context"] = bool(brand_context)
+    context = build_context(brief)
+
+    # Decide the vertical from everything we know — the user's own words count too,
+    # so this still works when mandala-bot (and its brand brief) isn't available.
+    # An explicit setting always wins, which covers prompts too vague to classify.
+    if vertical in ("auto", "", None):
+        from content_studio import detect_vertical
+        # What the user actually typed wins; the brand brief only breaks ties,
+        # otherwise a skincare brand brief would mislabel a one-off F&B request.
+        vertical = detect_vertical(prompt, default="") or detect_vertical(
+            f"{brand_context} {brief.get('top_item', '')}")
+    brief["vertical"] = vertical
+
+    package = get_content_package(
+        campaign_type=brief["campaign"],
+        context=context,
+        tone=brief["tone"],
+        api_key=api_key.strip() if api_key else "",
+        brand_context=brand_context,
+        provider=provider,
+        vertical=vertical,
+    )
+
+    # Master prompts are the deliverable the user pastes into Google Flow, so they
+    # always come from the structured builder — the model's own one-liner is kept
+    # only as a short alternative.
+    package["image_prompt_short"] = package.get("image_prompt") or build_image_prompt(brief)
+    package["image_prompt"] = build_master_image_prompt(brief)
+    package["video_prompt"] = build_master_video_prompt(brief)
+
+    return brief, package

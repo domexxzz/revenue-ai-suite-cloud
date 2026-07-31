@@ -47,6 +47,30 @@ try:
 except ImportError:
     AFFILIATE_AVAILABLE = False
 
+try:
+    import content_copilot
+    COPILOT_AVAILABLE = True
+except ImportError:
+    COPILOT_AVAILABLE = False
+
+try:
+    import brainstorm
+    BRAINSTORM_AVAILABLE = True
+except ImportError:
+    BRAINSTORM_AVAILABLE = False
+
+try:
+    import canva_client
+    CANVA_AVAILABLE = True
+except ImportError:
+    CANVA_AVAILABLE = False
+
+try:
+    import scene_presets
+    SCENES_AVAILABLE = True
+except ImportError:
+    SCENES_AVAILABLE = False
+
 # Top-level mode switch labels (shop owner vs affiliate marketing)
 MODE_SHOP = "🏪 ร้านของฉัน"
 MODE_AFFILIATE = "🚀 แอฟฟิลิเอต"
@@ -170,6 +194,19 @@ def _get_gdrive_folder_id() -> str:
 
 
 GDRIVE_FOLDER_ID = _get_gdrive_folder_id()
+
+
+def _get_queue_root_id() -> str:
+    """Root Drive folder that holds the per-platform queue subfolders
+    (Facebook Post / Facebook VDO / Instragram Post / ... / TikTok VDO)."""
+    try:
+        import streamlit as st
+        return st.secrets.get("google_drive", {}).get("queue_root_id", "") or "12sVv5PEq9KNk7JlPq0sKVUAfqvIf8Nzb"
+    except Exception:
+        return "12sVv5PEq9KNk7JlPq0sKVUAfqvIf8Nzb"
+
+
+QUEUE_ROOT_FOLDER_ID = _get_queue_root_id()
 
 try:
     from loyverse_connector import LoyverseConnector
@@ -2096,6 +2133,743 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
             st.rerun()
 
 
+# ── AI provider helpers ──────────────────────────────────────────────────────────
+
+def _resolve_ai(ai_mode: str, api_key: str) -> tuple[str, str, str]:
+    """Return (key, provider, label) for the selected AI mode.
+
+    key is "" whenever the mode/credentials aren't usable, which makes every
+    caller fall back to local templates automatically.
+    """
+    key = (api_key or "").strip()
+    if ai_mode == "Gemini API" and key:
+        return key, "gemini", "✨ Gemini"
+    if ai_mode == "Claude API" and key and ANTHROPIC_AVAILABLE:
+        return key, "claude", "🤖 Claude"
+    return "", "local", "⚡ Local AI"
+
+
+def _mandala_badge() -> None:
+    """Show whether the Mandala brand context is wired in."""
+    try:
+        import mandala_client
+        info = mandala_client.status()
+    except Exception:  # noqa: BLE001
+        return
+    if info.get("has_context"):
+        st.caption(
+            f"🔗 ใช้บริบทแบรนด์จาก Mandala AI ({info['context_chars']:,} ตัวอักษร"
+            f" · {info['runs']} รอบที่ผลิตไว้)"
+        )
+    elif info.get("found"):
+        st.caption("🔗 เจอ mandala-bot แต่ยังไม่มี context.txt")
+
+
+# ── Canva (Connect API) ──────────────────────────────────────────────────────────
+
+def _canva_token() -> str:
+    """Current Canva access token, refreshed if it's about to expire."""
+    tok = st.session_state.get("canva_token")
+    if not tok:
+        return ""
+    if canva_client.token_expired(tok) and tok.get("refresh_token"):
+        cid, secret, _ = canva_client.get_credentials()
+        new, _msg = canva_client.refresh_token(cid, secret, tok["refresh_token"])
+        if new:
+            st.session_state["canva_token"] = new
+            return new.get("access_token", "")
+    return tok.get("access_token", "")
+
+
+def _render_canva_connect() -> None:
+    """Manual OAuth: show the authorize link, take the redirected URL back."""
+    cid, secret, redirect_uri = canva_client.get_credentials()
+    if not cid or not secret:
+        st.warning("ยังไม่ได้ตั้งค่า Canva app")
+        st.markdown(
+            "**วิธีตั้งค่า** — สร้าง integration ที่ "
+            "[canva.com/developers](https://www.canva.com/developers/) แล้วใส่ค่าใน "
+            "`.streamlit/secrets.toml`:"
+        )
+        st.code(
+            '[canva]\n'
+            'client_id = "ใส่ Client ID"\n'
+            'client_secret = "ใส่ Client Secret"\n'
+            f'redirect_uri = "{redirect_uri}"',
+            language="toml",
+        )
+        st.caption(f"อย่าลืมตั้ง Redirect URL ใน Canva ให้ตรงกับ `{redirect_uri}`")
+        return
+
+    if "canva_pkce" not in st.session_state:
+        st.session_state["canva_pkce"] = canva_client.make_pkce()
+    verifier, challenge = st.session_state["canva_pkce"]
+    auth_url = canva_client.build_auth_url(cid, redirect_uri, challenge)
+
+    st.markdown(f"**1.** [🔗 กดที่นี่เพื่ออนุญาตให้แอปเข้าถึง Canva]({auth_url})")
+    st.caption("**2.** อนุญาตแล้ว Canva จะพาไปหน้าที่ URL มี `?code=...` — copy URL นั้นทั้งอัน")
+    pasted = st.text_input("**3.** วาง URL ที่ถูก redirect มาที่นี่", key="canva_redirect_url")
+    if st.button("เชื่อมต่อ Canva", type="primary", disabled=not pasted):
+        code = canva_client.extract_code(pasted)
+        if not code:
+            st.error("ไม่พบ `code=` ใน URL — ตรวจสอบว่า copy มาครบทั้ง URL")
+            return
+        with st.spinner("กำลังเชื่อมต่อ..."):
+            tok, msg = canva_client.exchange_code(cid, secret, code, verifier, redirect_uri)
+        if tok:
+            st.session_state["canva_token"] = tok
+            st.session_state.pop("canva_pkce", None)
+            st.success(msg)
+            st.rerun()
+        else:
+            st.error(msg)
+
+
+def _render_canva_autofill(token: str, caps: dict) -> None:
+    """Brand template → autofill → export. Enterprise-only."""
+    if not caps.get("brand_templates"):
+        st.warning(
+            "⚠️ บัญชี Canva นี้ใช้ **Autofill / Brand Template ไม่ได้** — "
+            "Canva กำหนดให้ต้องเป็นแพลน **Enterprise** เท่านั้น"
+        )
+        if caps.get("note"):
+            st.caption(caps["note"])
+        st.markdown(
+            "**ทางเลือกที่ใช้ได้เลยตอนนี้:** ส่งรูปที่ AI สร้างขึ้นไปเก็บใน Canva "
+            "แล้วเปิดแต่งต่อเองในเว็บ (ดูหัวข้อด้านล่าง)"
+        )
+        return
+
+    templates, err = canva_client.list_brand_templates(token)
+    if err:
+        st.error(err)
+        return
+    if not templates:
+        st.info("ยังไม่มี Brand Template ในบัญชีนี้ — สร้างในเว็บ Canva ก่อน")
+        return
+
+    tmap = {t["title"]: t["id"] for t in templates}
+    picked = st.selectbox("เลือก Brand Template", options=list(tmap.keys()))
+    tid = tmap[picked]
+
+    fields, derr = canva_client.get_template_dataset(token, tid)
+    if derr:
+        st.error(derr)
+        return
+    if not fields:
+        st.info("เทมเพลตนี้ไม่มีช่องที่เติมข้อมูลได้")
+        return
+
+    st.caption(f"เทมเพลตนี้มี {len(fields)} ช่อง")
+    values: dict = {}
+    for fname, meta in fields.items():
+        ftype = (meta or {}).get("type", "text")
+        if ftype == "image":
+            st.caption(f"🖼️ `{fname}` — ช่องรูป (ใช้รูปที่สร้างจากแชท)")
+            img = st.session_state.get("canva_pending_image")
+            if img:
+                st.image(img, width=120)
+                values[fname] = "__PENDING_IMAGE__"
+            else:
+                st.caption("ยังไม่มีรูป — สร้างรูปในหน้า Copilot แล้วกด 'ส่งไป Canva'")
+        else:
+            values[fname] = st.text_input(f"📝 {fname}", key=f"canva_f_{fname}")
+
+    title = st.text_input("ชื่อดีไซน์", value=f"LEMED {dt.datetime.now():%d/%m %H:%M}")
+
+    if st.button("🎨 สร้างดีไซน์จากเทมเพลต", type="primary", use_container_width=True):
+        with st.spinner("กำลังอัปโหลดรูป / สร้างดีไซน์..."):
+            # Any image field needs a Canva asset id, so upload first.
+            img = st.session_state.get("canva_pending_image")
+            for k, v in list(values.items()):
+                if v == "__PENDING_IMAGE__":
+                    if not img:
+                        values.pop(k)
+                        continue
+                    asset_id, amsg = canva_client.upload_asset(
+                        token, img, f"lemed_{dt.datetime.now():%Y%m%d_%H%M%S}.png")
+                    if not asset_id:
+                        st.error(amsg)
+                        return
+                    values[k] = asset_id
+
+            data = canva_client.build_autofill_data(fields, values)
+            design, msg = canva_client.autofill(token, tid, data, title)
+
+        if not design:
+            st.error(msg)
+            return
+        st.success(msg)
+        url = (design.get("urls") or {}).get("edit_url") or design.get("url", "")
+        if url:
+            st.markdown(f"[🔗 เปิดดีไซน์ใน Canva]({url})")
+
+        design_id = design.get("id", "")
+        if design_id:
+            with st.spinner("กำลัง export เป็นรูป..."):
+                urls, emsg = canva_client.export_design(token, design_id, "png")
+            if urls:
+                st.success(emsg)
+                for i, u in enumerate(urls, 1):
+                    data_bytes = canva_client.download(u)
+                    if data_bytes:
+                        st.image(data_bytes, caption=f"หน้า {i}", use_container_width=True)
+                        st.download_button(
+                            f"📥 ดาวน์โหลดหน้า {i}", data=data_bytes,
+                            file_name=f"canva_{design_id}_{i}.png", mime="image/png",
+                            key=f"canva_dl_{design_id}_{i}", use_container_width=True)
+            else:
+                st.warning(emsg)
+
+
+def render_canva_page() -> None:
+    st.title("🎨 Canva")
+    st.caption("เชื่อม Canva Connect API — เติมข้อมูลลง Brand Template แล้ว export เป็นโปสเตอร์/carousel")
+
+    if not CANVA_AVAILABLE:
+        st.error("ไม่พบ canva_client.py — ตรวจสอบไฟล์ในโฟลเดอร์โปรเจกต์")
+        return
+
+    token = _canva_token()
+    if not token:
+        _render_canva_connect()
+        return
+
+    with st.spinner("กำลังเช็คสิทธิ์บัญชี..."):
+        caps = st.session_state.get("canva_caps") or canva_client.capabilities(token)
+        st.session_state["canva_caps"] = caps
+
+    if not caps.get("connected"):
+        st.error(caps.get("note") or "token ใช้ไม่ได้")
+        if st.button("🔌 เชื่อมต่อใหม่"):
+            for k in ("canva_token", "canva_caps", "canva_pkce"):
+                st.session_state.pop(k, None)
+            st.rerun()
+        return
+
+    head, btn = st.columns([3, 1])
+    with head:
+        badge = "✅ Enterprise (ใช้ Autofill ได้)" if caps.get("brand_templates") \
+            else "⚠️ ไม่ใช่ Enterprise (Autofill ใช้ไม่ได้)"
+        st.success(f"เชื่อม Canva แล้ว — {badge}")
+    with btn:
+        if st.button("ตัดการเชื่อมต่อ", use_container_width=True):
+            for k in ("canva_token", "canva_caps", "canva_pkce"):
+                st.session_state.pop(k, None)
+            st.rerun()
+
+    st.divider()
+    st.subheader("🖼️ สร้างจาก Brand Template")
+    _render_canva_autofill(token, caps)
+
+    st.divider()
+    st.subheader("📤 ส่งรูปเข้าคลัง Canva")
+    st.caption("ใช้ได้ทุกแพลน — อัปรูปที่ AI สร้างเข้า Canva แล้วเปิดแต่งต่อในเว็บ")
+    img = st.session_state.get("canva_pending_image")
+    if img:
+        st.image(img, width=180, caption="รูปที่รอส่ง (จากหน้า Copilot)")
+        if st.button("📤 อัปโหลดเข้า Canva", use_container_width=True):
+            with st.spinner("กำลังอัปโหลด..."):
+                asset_id, msg = canva_client.upload_asset(
+                    token, img, f"lemed_{dt.datetime.now():%Y%m%d_%H%M%S}.png")
+            if asset_id:
+                st.success(f"{msg} — เปิด Canva แล้วหาในแท็บ Uploads ได้เลย")
+                st.markdown("[🔗 เปิด Canva](https://www.canva.com/)")
+            else:
+                st.error(msg)
+    else:
+        st.info("ยังไม่มีรูป — ไปหน้า 🗨️ Copilot สร้างรูปแล้วกด **ส่งไป Canva**")
+
+
+# ── Brain Storm (Business Model Canvas) ──────────────────────────────────────────
+
+def _send_idea_to_copilot(prompt: str) -> None:
+    """Hand an idea to the Chat Copilot and jump to that page."""
+    st.session_state["copilot_pending"] = prompt
+    st.session_state["shop_menu"] = "🗨️ Copilot"
+
+
+def render_brainstorm_page(ai_mode: str, api_key: str) -> None:
+    st.title("🧠 Brain Storm")
+    st.caption("อธิบายธุรกิจ → ร่าง Business Model Canvas → ได้ไอเดียคอนเทนต์ ส่งเข้า Copilot ได้เลย")
+
+    if not BRAINSTORM_AVAILABLE:
+        st.error("ไม่พบ brainstorm.py — ตรวจสอบไฟล์ในโฟลเดอร์โปรเจกต์")
+        return
+
+    _key, _provider, _label = _resolve_ai(ai_mode, api_key)
+    st.caption(_label)
+    _mandala_badge()
+    brand_ctx = brainstorm.load_brand_context()
+
+    desc = st.text_area(
+        "ธุรกิจของคุณ",
+        value=st.session_state.get("bs_desc", brainstorm.DEFAULT_BUSINESS),
+        height=100,
+        key="bs_desc",
+        help="ยิ่งอธิบายละเอียด (สินค้า/กลุ่มเป้าหมาย/จุดขาย) ผลลัพธ์ยิ่งตรง",
+    )
+
+    gen_col, clr_col = st.columns([3, 1])
+    with gen_col:
+        if st.button("🧠 ร่าง Business Model Canvas", type="primary", use_container_width=True):
+            with st.spinner("กำลังร่าง BMC..."):
+                st.session_state["bs_bmc"] = brainstorm.generate_bmc(
+                    desc, _key, brand_ctx, _provider)
+            st.session_state.pop("bs_ideas", None)
+            st.rerun()
+    with clr_col:
+        if "bs_bmc" in st.session_state and st.button("🗑️ ล้าง", use_container_width=True):
+            st.session_state.pop("bs_bmc", None)
+            st.session_state.pop("bs_ideas", None)
+            st.rerun()
+
+    bmc = st.session_state.get("bs_bmc")
+    if not bmc:
+        st.info("💡 กรอกข้อมูลธุรกิจแล้วกดปุ่มด้านบน เพื่อร่าง BMC 9 ช่อง")
+        return
+
+    st.divider()
+    st.subheader("📋 Business Model Canvas")
+    st.caption("แก้ไขได้ทุกช่อง — ไอเดียคอนเทนต์จะอิงจากที่แก้ล่าสุด")
+
+    cols = st.columns(3)
+    for i, (bkey, label, question) in enumerate(brainstorm.BMC_BLOCKS):
+        with cols[i % 3]:
+            with st.container(border=True):
+                st.markdown(f"**{label}**")
+                st.caption(question)
+                bmc[bkey] = st.text_area(
+                    label, value=bmc.get(bkey, ""), height=110,
+                    key=f"bs_block_{bkey}", label_visibility="collapsed",
+                )
+    st.session_state["bs_bmc"] = bmc
+
+    st.divider()
+    st.subheader("💡 ไอเดียคอนเทนต์")
+
+    n_ideas = st.slider("จำนวนไอเดีย", 2, 6, 4, key="bs_n")
+    if st.button("✨ เสนอไอเดียจาก BMC", use_container_width=True):
+        with st.spinner("กำลังคิดไอเดีย..."):
+            st.session_state["bs_ideas"] = brainstorm.generate_ideas(
+                bmc, desc, _key, n_ideas, brand_ctx, _provider)
+        st.rerun()
+
+    ideas = st.session_state.get("bs_ideas")
+    if not ideas:
+        st.info("กดปุ่มด้านบนเพื่อให้ AI เสนอไอเดียคอนเทนต์จาก BMC")
+        return
+
+    for idx, idea in enumerate(ideas):
+        with st.container(border=True):
+            st.markdown(f"**{idea['title']}**")
+            if idea.get("rationale"):
+                st.caption(idea["rationale"])
+            plats = " · ".join(
+                f"{PLATFORMS[p]['icon']} {PLATFORMS[p]['name']}"
+                for p in idea["platforms"] if p in PLATFORMS
+            )
+            st.markdown(f"<span style='font-size:12.5px;opacity:.75'>{plats} — โทน {idea['tone']}</span>",
+                        unsafe_allow_html=True)
+            st.code(idea["prompt"], language=None)
+            st.button(
+                "🗨️ ส่งเข้า Copilot เพื่อร่างคอนเทนต์",
+                key=f"bs_send_{idx}",
+                use_container_width=True,
+                on_click=_send_idea_to_copilot,
+                args=(idea["prompt"],),
+            )
+
+
+# ── Chat Copilot ─────────────────────────────────────────────────────────────────
+
+def _copilot_examples() -> list[str]:
+    return [
+        "ทำ flash sale ลด 20% ลง LINE พรุ่งนี้",
+        "เปิดตัวเซรั่มตัวใหม่ LEMED ลง IG + Facebook โทนพรีเมียม",
+        "เขียนแคปชัน TikTok เรื่องกันแดดสำหรับผิวมัน",
+        "ขอบคุณลูกค้า VIP แจกส่วนลด 15%",
+    ]
+
+
+def _copilot_send_to_queue(pid: str, content: str, brief: dict) -> None:
+    """Save an approved-pending draft to Google Drive, routed to the matching
+    per-platform subfolder (e.g. "Instragram Post", "TikTok VDO")."""
+    queue = st.session_state.setdefault("copilot_queue", [])
+    # Copilot drafts are captions/scripts. TikTok & YouTube live in VDO folders;
+    # the rest go to their Post folder.
+    is_video = pid in ("tiktok", "youtube")
+    entry = {
+        "เวลา": dt.datetime.now().strftime("%d/%m %H:%M"),
+        "แพลตฟอร์ม": PLATFORM_THAI_NAMES.get(pid, pid),
+        "campaign": CAMPAIGN_TYPES.get(brief.get("campaign", ""), {}).get("label", brief.get("campaign", "")),
+        "สถานะ": "🕓 รออนุมัติ",
+        "โฟลเดอร์": "—",
+    }
+    link = None
+    if GDRIVE_AVAILABLE and not needs_auth():
+        target_folder = QUEUE_ROOT_FOLDER_ID
+        routed = False
+        try:
+            from google_drive import resolve_platform_folder
+            sub = resolve_platform_folder(QUEUE_ROOT_FOLDER_ID, pid, is_video)
+            if sub:
+                target_folder = sub
+                routed = True
+        except Exception:
+            pass
+        fname = f"PENDING_{pid}_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        link = upload_text(content, fname, target_folder)
+        entry["โฟลเดอร์"] = ("ตรงแพลตฟอร์ม ✅" if routed else "โฟลเดอร์รวม (ยังไม่ route)")
+
+    if link:
+        entry["ลิงก์"] = link
+        if entry["โฟลเดอร์"].startswith("ตรง"):
+            st.toast(f"ส่งเข้าคิว → {PLATFORM_THAI_NAMES.get(pid, pid)} แล้ว 📁", icon="✅")
+        else:
+            st.toast("ส่งเข้าคิว (โฟลเดอร์รวม — re-authorize Drive เพื่อแยกโฟลเดอร์)", icon="📁")
+    else:
+        st.toast("บันทึกเข้าคิวในเซสชันนี้ (ยังไม่ได้ต่อ Google Drive)", icon="🗂️")
+    queue.append(entry)
+
+
+def _render_copilot_image(mi: int, image_prompt: str, gemini_key: str) -> bytes | None:
+    """Image block: show the prompt, and let Gemini actually render it.
+
+    Returns the generated image bytes (if any) so posting can attach them.
+    """
+    img_key = f"copilot_img_{mi}"
+    with st.expander("🖼️ ภาพประกอบ — Master Prompt", expanded=bool(st.session_state.get(img_key))):
+        st.caption("📋 คัดลอกไปวางใน Google Flow / Midjourney ได้เลย (กดไอคอนคัดลอกมุมขวาบน)")
+        st.code(image_prompt, language=None)
+
+        if gemini_key:
+            if st.button("✨ สร้างรูปด้วย Gemini", key=f"copilot_genimg_{mi}",
+                         use_container_width=True):
+                import ai_provider
+                with st.spinner("กำลังสร้างรูป... (10-30 วินาที)"):
+                    img_bytes, msg = ai_provider.generate_image(image_prompt, gemini_key)
+                if img_bytes:
+                    st.session_state[img_key] = img_bytes
+                    st.toast(msg, icon="✅")
+                    st.rerun()
+                else:
+                    st.error(msg)
+        else:
+            st.caption("💡 ใส่ **Gemini API key** ในแถบซ้าย แล้วจะสร้างรูปได้จากในแชทเลย")
+
+        img = st.session_state.get(img_key)
+        if img:
+            st.image(img, caption="ภาพที่สร้างด้วย Gemini", use_container_width=True)
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.download_button("📥 ดาวน์โหลด", data=img,
+                                   file_name=f"lemed_{mi}.png", mime="image/png",
+                                   key=f"copilot_dlimg_{mi}", use_container_width=True)
+            with c2:
+                if CANVA_AVAILABLE and st.button("🎨 ส่งไป Canva",
+                                                 key=f"copilot_canva_{mi}",
+                                                 use_container_width=True):
+                    st.session_state["canva_pending_image"] = img
+                    st.session_state["shop_menu"] = "🎨 Canva"
+                    st.rerun()
+            with c3:
+                if st.button("🗑️ ลบรูป", key=f"copilot_rmimg_{mi}", use_container_width=True):
+                    del st.session_state[img_key]
+                    st.rerun()
+        return img
+    return None
+
+
+def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
+                          gemini_key: str) -> bytes | None:
+    """Video block: prompt, cost estimate, generate with Veo, preview in chat."""
+    import ai_provider
+
+    vid_key = f"copilot_vid_{mi}"
+    with st.expander("🎬 วิดีโอ — Master Prompt", expanded=bool(st.session_state.get(vid_key))):
+        st.caption(f"📋 คัดลอกไปวางใน Google Flow ได้เลย · สัดส่วน {aspect} · "
+                   "10 วินาที · Hook → Decision → CTA · เสียงพากย์ไทย")
+        st.code(content_copilot.build_master_video_prompt(brief, scene, 10), language=None)
+
+        if gemini_key:
+            st.info("ℹ️ Veo สร้างได้สูงสุด **8 วินาที** ต่อคลิป — ตัว Master Prompt ด้านบน "
+                    "เป็นเวอร์ชัน 10 วินาทีสำหรับ Google Flow (ต่อคลิปได้)")
+            c1, c2 = st.columns(2)
+            with c1:
+                tier = st.selectbox(
+                    "คุณภาพ", options=["fast", "standard"],
+                    format_func=lambda t: {"fast": "⚡ Fast (ถูกกว่า)",
+                                           "standard": "💎 Standard (คมกว่า)"}[t],
+                    key=f"copilot_vtier_{mi}",
+                )
+            with c2:
+                secs = st.selectbox("ความยาว", options=[4, 6, 8], index=2,
+                                    format_func=lambda s: f"{s} วินาที",
+                                    key=f"copilot_vsec_{mi}")
+
+            cost = ai_provider.estimate_video_cost(secs, tier)
+            st.warning(f"💰 คลิปนี้มีค่าใช้จ่ายประมาณ **${cost:.2f}** "
+                       f"({secs} วิ · {tier}) — คิดเงินเฉพาะตอนสร้างสำเร็จ")
+
+            if st.button("🎬 สร้างวิดีโอด้วย Veo", key=f"copilot_genvid_{mi}",
+                         use_container_width=True):
+                status = st.empty()
+                with st.spinner("กำลังสร้างวิดีโอ... (ปกติ 1-3 นาที อย่าปิดหน้านี้)"):
+                    vid, msg = ai_provider.generate_video(
+                        content_copilot.build_master_video_prompt(brief, scene, secs),
+                        gemini_key, tier=tier, seconds=secs,
+                        aspect_ratio=aspect, on_progress=status.info,
+                    )
+                status.empty()
+                if vid:
+                    st.session_state[vid_key] = vid
+                    st.toast(msg, icon="✅")
+                    st.rerun()
+                else:
+                    st.error(msg)
+        else:
+            st.caption("💡 ใส่ **Gemini API key** ในแถบซ้าย แล้วจะสร้างวิดีโอได้จากในแชท")
+
+        vid = st.session_state.get(vid_key)
+        if vid:
+            st.video(vid)
+            st.caption(f"ขนาดไฟล์ {len(vid)/1024/1024:.1f} MB")
+            d1, d2 = st.columns(2)
+            with d1:
+                st.download_button("📥 ดาวน์โหลดวิดีโอ", data=vid,
+                                   file_name=f"lemed_{mi}.mp4", mime="video/mp4",
+                                   key=f"copilot_dlvid_{mi}", use_container_width=True)
+            with d2:
+                if st.button("🗑️ ลบวิดีโอ", key=f"copilot_rmvid_{mi}",
+                             use_container_width=True):
+                    del st.session_state[vid_key]
+                    st.rerun()
+        return vid
+    return None
+
+
+def _render_copilot_carousel(mi: int, brief: dict, scene: str, gemini_key: str) -> None:
+    """Poster carousel: per-slide Thai copy + master prompt, optional batch render."""
+    slides = content_copilot.build_carousel(brief, scene)
+    key_all = f"copilot_car_{mi}"
+
+    with st.expander(f"🖼️ โปสเตอร์ Carousel ({len(slides)} สไลด์) — Master Prompt"):
+        st.caption("เล่าเรื่องต่อกันเป็นชุด: Hook → ปัญหา → ทางออก → ข้อพิสูจน์ → CTA · สัดส่วน 4:5")
+
+        if gemini_key:
+            if st.button(f"✨ สร้างรูปทั้ง {len(slides)} สไลด์ด้วย Gemini",
+                         key=f"copilot_genall_{mi}", use_container_width=True):
+                import ai_provider
+                imgs, prog = {}, st.progress(0.0, text="เริ่มสร้าง...")
+                for idx, s in enumerate(slides):
+                    prog.progress(idx / len(slides),
+                                  text=f"สไลด์ {s['n']}/{len(slides)} — {s['label']}")
+                    img, msg = ai_provider.generate_image(s["prompt"], gemini_key)
+                    if img:
+                        imgs[s["n"]] = img
+                    else:
+                        st.warning(f"สไลด์ {s['n']}: {msg}")
+                prog.progress(1.0, text="เสร็จแล้ว")
+                st.session_state[key_all] = imgs
+                st.rerun()
+        else:
+            st.caption("💡 ใส่ Gemini API key เพื่อสร้างรูปทุกสไลด์รวดเดียว")
+
+        made = st.session_state.get(key_all, {})
+        for s in slides:
+            st.markdown(f"**สไลด์ {s['n']} · {s['label']}**")
+            st.caption(s["purpose"])
+            st.markdown(f"> **{s['headline_th']}**  \n> {s['sub_th']}")
+            img = made.get(s["n"])
+            if img:
+                st.image(img, use_container_width=True)
+                st.download_button(
+                    f"📥 ดาวน์โหลดสไลด์ {s['n']}", data=img,
+                    file_name=f"carousel_{mi}_{s['n']}.png", mime="image/png",
+                    key=f"copilot_cardl_{mi}_{s['n']}", use_container_width=True)
+            with st.popover(f"📋 ดู Master Prompt สไลด์ {s['n']}", use_container_width=True):
+                st.code(s["prompt"], language=None)
+            st.divider()
+
+
+def _render_copilot_draft(mi: int, brief: dict, package: dict,
+                          line_token: str, fb_token: str, fb_page_id: str,
+                          ig_business_id: str, gemini_key: str = "") -> None:
+    """Render one assistant draft: summary + editable content + approve/queue."""
+    campaign_label = CAMPAIGN_TYPES.get(brief.get("campaign", ""), {}).get(
+        "label", brief.get("campaign", "")
+    )
+    summary = brief.get("summary") or content_copilot.describe(brief)
+    st.markdown(f"ร่างให้แล้วค่ะ ✨ — **{campaign_label}**")
+    if summary:
+        st.caption(summary)
+
+    plats = [p for p in brief.get("platforms", []) if p in package and p in PLATFORMS]
+    if not plats:
+        st.warning("ยังไม่มีแพลตฟอร์มที่ร่างได้ — ลองพิมพ์ระบุแพลตฟอร์มเพิ่มดูนะ (เช่น IG, LINE)")
+        return
+
+    # Scene picker — one choice drives both the image and video master prompts so
+    # a campaign's stills and clip stay visually consistent.
+    scene = scene_presets.DEFAULT_SCENE
+    if SCENES_AVAILABLE:
+        choices = scene_presets.scene_choices()
+        sc_col, sc_info = st.columns([2, 1])
+        with sc_col:
+            scene = st.selectbox(
+                "🎯 หมวด / ฉากของภาพและวิดีโอ",
+                options=choices,
+                index=choices.index(scene_presets.DEFAULT_SCENE)
+                if scene_presets.DEFAULT_SCENE in choices else 0,
+                format_func=scene_presets.label_for,
+                key=f"copilot_scene_{mi}",
+            )
+        with sc_info:
+            st.caption(scene_presets.group_for(scene))
+            if scene_presets.has_people(scene):
+                st.caption("👤 มีคนในภาพ")
+
+    img_bytes = _render_copilot_image(
+        mi, content_copilot.build_master_image_prompt(brief, scene), gemini_key)
+
+    _render_copilot_carousel(mi, brief, scene, gemini_key)
+
+    vid_bytes = _render_copilot_video(
+        mi, brief, scene, content_copilot.video_aspect_for(brief), gemini_key)
+
+    if img_bytes or vid_bytes:
+        attached = " + ".join(x for x in [
+            "รูป" if img_bytes else "", "วิดีโอ" if vid_bytes else ""] if x)
+        st.caption(f"✅ {attached} จะถูกแนบไปกับโพสต์อัตโนมัติ")
+
+    tabs = st.tabs([f"{PLATFORMS[p]['icon']} {PLATFORMS[p]['name']}" for p in plats])
+    for tab, pid in zip(tabs, plats):
+        with tab:
+            edited = st.text_area(
+                "คอนเทนต์",
+                value=package.get(pid, ""),
+                height=180,
+                key=f"copilot_text_{mi}_{pid}",
+                label_visibility="collapsed",
+            )
+            act1, act2 = st.columns(2)
+            with act1:
+                if st.button("✅ อนุมัติ + โพสต์", key=f"copilot_post_{mi}_{pid}",
+                             type="primary", use_container_width=True):
+                    _do_post(pid, edited, line_token, fb_token, fb_page_id,
+                             ig_business_id=ig_business_id,
+                             image_bytes=img_bytes,
+                             image_name=f"lemed_{mi}.png",
+                             video_bytes=vid_bytes,
+                             video_name=f"lemed_{mi}.mp4")
+            with act2:
+                if st.button("📁 ส่งเข้าคิว (Drive)", key=f"copilot_queue_{mi}_{pid}",
+                             use_container_width=True):
+                    _copilot_send_to_queue(pid, edited, brief)
+
+    if st.button("🚀 อนุมัติ + โพสต์ทั้งหมด", key=f"copilot_postall_{mi}",
+                 use_container_width=True):
+        for pid in plats:
+            content_i = st.session_state.get(f"copilot_text_{mi}_{pid}") or package.get(pid, "")
+            _do_post(pid, content_i, line_token, fb_token, fb_page_id,
+                     ig_business_id=ig_business_id, quiet=True,
+                     image_bytes=img_bytes, image_name=f"lemed_{mi}.png",
+                     video_bytes=vid_bytes, video_name=f"lemed_{mi}.mp4")
+        st.success("ส่งคำสั่งโพสต์ครบทุกแพลตฟอร์มแล้ว — ดูผลได้ที่ toast มุมขวาบน")
+
+
+def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
+                        fb_token: str = "", fb_page_id: str = "",
+                        ig_business_id: str = "") -> None:
+    st.title("🗨️ Chat Copilot")
+    st.caption("พิมพ์บอกสิ่งที่อยากได้ — ระบบร่างให้ อนุมัติแล้วโพสต์ได้ในแชทเดียว")
+
+    if not COPILOT_AVAILABLE:
+        st.error("ไม่พบ content_copilot.py — ตรวจสอบไฟล์ในโฟลเดอร์โปรเจกต์")
+        return
+
+    _key, _provider, _label = _resolve_ai(ai_mode, api_key)
+    can_image = _provider == "gemini"
+
+    head_l, head_r = st.columns([3, 1])
+    with head_r:
+        st.caption(_label + (" · สร้างรูปได้" if can_image else ""))
+    _mandala_badge()
+    with st.expander("⚙️ ตั้งค่าแบรนด์เริ่มต้น (ไม่บังคับ)"):
+        st.text_input("ชื่อแบรนด์", value="LEMED", key="copilot_brand")
+        st.selectbox(
+            "ประเภทธุรกิจ",
+            options=["auto", "product", "fnb"],
+            format_func=lambda v: {
+                "auto": "🔎 ตรวจอัตโนมัติจากคำสั่ง + บริบทแบรนด์",
+                "product": "🧴 สินค้า / สกินแคร์ / ความงาม",
+                "fnb": "🍜 ร้านอาหาร / คาเฟ่",
+            }[v],
+            key="copilot_vertical",
+            help="กำหนดโทนคอนเทนต์ — ตั้งไว้ถ้าคำสั่งสั้นจนระบบเดาผิด",
+        )
+
+    msgs = st.session_state.setdefault("copilot_msgs", [])
+
+    if not msgs:
+        with st.chat_message("assistant", avatar="🧴"):
+            st.markdown(
+                "สวัสดีค่ะ! อยากได้คอนเทนต์แบบไหนดี? พิมพ์บอกได้เลย 😊 "
+                "หรือลองกดตัวอย่างด้านล่างนี้:"
+            )
+            ex_cols = st.columns(2)
+            for i, ex in enumerate(_copilot_examples()):
+                with ex_cols[i % 2]:
+                    if st.button(ex, key=f"copilot_ex_{i}", use_container_width=True):
+                        st.session_state["copilot_pending"] = ex
+                        st.rerun()
+
+    for mi, m in enumerate(msgs):
+        if m["role"] == "user":
+            with st.chat_message("user"):
+                st.markdown(m["text"])
+        else:
+            with st.chat_message("assistant", avatar="🧴"):
+                if m.get("error"):
+                    st.error(f"ร่างไม่สำเร็จ: {m['error']}")
+                else:
+                    _render_copilot_draft(mi, m["brief"], m["package"],
+                                          line_token, fb_token, fb_page_id, ig_business_id,
+                                          gemini_key=_key if can_image else "")
+
+    pending = st.session_state.pop("copilot_pending", None)
+    typed = st.chat_input("พิมพ์บอกสิ่งที่อยากได้…")
+    if typed:
+        pending = typed
+
+    if pending:
+        msgs.append({"role": "user", "text": pending})
+        with st.spinner("กำลังร่างให้..."):
+            try:
+                brief, package = content_copilot.generate(
+                    pending, _key, st.session_state.get("copilot_brand", "LEMED"),
+                    provider=_provider,
+                    vertical=st.session_state.get("copilot_vertical", "auto"),
+                )
+                msgs.append({"role": "assistant", "brief": brief, "package": package})
+            except Exception as e:  # noqa: BLE001 — surface any failure in-chat
+                msgs.append({"role": "assistant", "error": str(e)})
+        st.rerun()
+
+    queue = st.session_state.get("copilot_queue", [])
+    if queue:
+        with st.expander(f"📁 คิวที่รออนุมัติ ({len(queue)})", expanded=False):
+            st.dataframe(pd.DataFrame(reversed(queue)), use_container_width=True, hide_index=True)
+            if st.button("🗑️ ล้างคิว", key="copilot_clear_queue"):
+                st.session_state["copilot_queue"] = []
+                st.rerun()
+
+    if msgs and st.button("🗑️ เริ่มแชทใหม่", key="copilot_clear"):
+        st.session_state["copilot_msgs"] = []
+        st.rerun()
+
+
 # ── AI Chat Inbox ───────────────────────────────────────────────────────────────
 
 def render_ai_inbox_page(ai_mode: str, api_key: str, fb_token: str = "",
@@ -2310,8 +3084,9 @@ with st.sidebar:
     else:
         page = st.radio(
             "เมนู",
-            ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "📣 Content Studio", "💬 AI Inbox", "🧮 ROI Calculator"],
+            ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "🧠 Brain Storm", "🗨️ Copilot", "🎨 Canva", "📣 Content Studio", "💬 AI Inbox", "🧮 ROI Calculator"],
             label_visibility="collapsed",
+            key="shop_menu",
         )
 
     demo_profile = "General Business"
@@ -2343,12 +3118,19 @@ with st.sidebar:
 
         ai_mode = st.radio(
             "AI Insights Mode",
-            ["Local Smart", "Claude API"],
-            help="Local Smart ใช้ rule-based logic ทำงานได้ทันที | Claude API ต้องใส่ API key",
+            ["Local Smart", "Gemini API", "Claude API"],
+            help="Local Smart ใช้ rule-based logic ทำงานได้ทันที | "
+                 "Gemini สร้างรูปได้ด้วย | Claude เน้นคุณภาพงานเขียน",
         )
 
         api_key = ""
-        if ai_mode == "Claude API":
+        if ai_mode == "Gemini API":
+            api_key = st.text_input("Gemini API Key", type="password", placeholder="AIza...")
+            if api_key:
+                st.success("พร้อมใช้ Gemini — สร้างข้อความ + รูปได้")
+            else:
+                st.caption("ขอฟรีที่ [aistudio.google.com/apikey](https://aistudio.google.com/apikey)")
+        elif ai_mode == "Claude API":
             if not ANTHROPIC_AVAILABLE:
                 st.warning("ติดตั้ง anthropic ก่อน:\n`pip install anthropic`")
             api_key = st.text_input("Anthropic API Key", type="password", placeholder="sk-ant-...")
@@ -2538,6 +3320,18 @@ if page == "📁 Upload Data":
 
 if page == "🔌 Connect POS":
     render_connect_pos_page(lv_token, lv_days, ai_mode, api_key)
+    st.stop()
+
+if page == "🧠 Brain Storm":
+    render_brainstorm_page(ai_mode, api_key)
+    st.stop()
+
+if page == "🗨️ Copilot":
+    render_copilot_page(ai_mode, api_key, line_token=line_token, fb_token=fb_token, fb_page_id=fb_page_id, ig_business_id=ig_business_id)
+    st.stop()
+
+if page == "🎨 Canva":
+    render_canva_page()
     st.stop()
 
 if page == "📣 Content Studio":
