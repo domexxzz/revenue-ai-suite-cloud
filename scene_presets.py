@@ -65,13 +65,16 @@ PRESETS: dict[str, dict] = {
         "styling": "minimal clinical props, a folded clean towel, no medical clutter",
         "lighting": "soft even clinical lighting, flattering and shadow-free",
         "camera": "35mm lens, f/2.8, natural eye-level documentary framing",
-        "cast": "a friendly skincare professional in a clean white coat, hands only or "
-                "shoulder-down framing, no identifiable face",
+        "cast": "a friendly Thai skincare professional in a clean white coat, "
+                "fully visible in frame with a calm reassuring expression, "
+                "natural healthy skin",
         "mood": "reassuring, expert, calm",
         "shots": [
-            "Professional's hands presenting the product to camera",
-            "Close-up of the product being placed on the consultation counter",
-            "Product resting alone on the counter, clinic softly blurred behind",
+            "The professional presents the product to camera, face and hands both "
+            "clearly in frame",
+            "Close-up of the product being placed on the consultation counter, "
+            "the professional still visible behind it",
+            "Product resting on the counter with the professional softly blurred behind",
         ],
     },
 
@@ -164,12 +167,17 @@ PRESETS: dict[str, dict] = {
         "styling": "a few elegant everyday skincare items, folded towel, small vase",
         "lighting": "soft warm vanity bulbs plus gentle daylight fill",
         "camera": "50mm lens, f/2.8, slight three-quarter angle",
-        "cast": "",
+        "cast": "a Thai woman doing her evening skincare routine, fully visible in "
+                "frame and reflected in the mirror, natural bare skin, calm unhurried "
+                "expression",
         "mood": "intimate, routine, self-care",
         "shots": [
-            "Slow pan across the vanity counter toward the product",
-            "Close-up of a hand placing the product down on the marble",
-            "Product settled in front of the softly lit mirror",
+            "She reaches across the vanity counter toward the product, "
+            "face and hands both in frame",
+            "Close-up as she places the product down on the marble, "
+            "her reflection visible in the mirror behind",
+            "She looks at her reflection calmly, the product settled in front of "
+            "the softly lit mirror",
         ],
     },
     "morning": {
@@ -215,7 +223,7 @@ PRESETS: dict[str, dict] = {
         "shots": [
             "Sunlight and leaf shadows moving across the product",
             "Close-up with lens flare grazing the edge of the frame",
-            "Product held up against bright open sky",
+            "Product resting on a sunlit stone ledge against bright open sky",
         ],
     },
     "gym": {
@@ -225,12 +233,17 @@ PRESETS: dict[str, dict] = {
         "styling": "a rolled towel, a stainless steel flask, gym bag",
         "lighting": "punchy directional light with strong contrast",
         "camera": "35mm lens, f/2.0, dynamic slightly-tilted angle",
-        "cast": "",
+        "cast": "a fit Thai person in gym clothes after a workout, fully visible in "
+                "frame, natural skin with a light sheen of sweat, relaxed and "
+                "energised expression",
         "mood": "active, sweat-proof, high-energy",
         "shots": [
-            "Product pulled from a gym bag, quick energetic motion",
-            "Close-up with condensation and water droplets",
-            "Product standing on the bench, accent light behind",
+            "The person pulls the product from their gym bag, whole upper body in "
+            "frame, quick energetic motion",
+            "Close-up of the product in their hand, condensation and water droplets "
+            "on the surface",
+            "The person sets the product on the bench and looks to camera, "
+            "accent light behind them",
         ],
     },
 
@@ -333,7 +346,8 @@ PRESETS: dict[str, dict] = {
         "shots": [
             "Product dropping onto the podium with a bounce",
             "Quick push-in as accents burst around it",
-            "Product held centred with clear space for the price overlay",
+            "Product standing centred on the podium with clear space for the "
+            "price overlay",
         ],
     },
     "gift": {
@@ -343,12 +357,13 @@ PRESETS: dict[str, dict] = {
         "styling": "satin ribbon, tissue paper, seasonal ornaments kept tasteful",
         "lighting": "warm celebratory light with soft sparkle highlights and gentle bokeh",
         "camera": "50mm lens, f/2.0, slightly overhead gifting angle",
-        "cast": "",
+        "cast": "a Thai person opening the gift, fully visible in frame with a "
+                "delighted natural expression, seated at the table",
         "mood": "generous, celebratory, giftable",
         "shots": [
-            "Hands untying the ribbon on the gift box",
-            "Box opening to reveal the product nestled inside",
-            "Finished gift set presented, sparkle bokeh behind",
+            "They untie the ribbon on the gift box, face and hands both in frame",
+            "The box opens to reveal the product nestled inside, their reaction visible",
+            "They hold the finished gift set up and smile, sparkle bokeh behind",
         ],
     },
 }

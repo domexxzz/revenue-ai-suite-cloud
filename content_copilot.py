@@ -290,6 +290,12 @@ _TONE_LIGHT = {
     "friendly": ("soft window light from the side, white bounce fill, natural gentle shadow"),
 }
 
+# Product-only scenes must say so out loud. If the cast is simply omitted, models
+# happily invent a hand reaching in from off-frame with no body attached.
+_NO_CAST = ("ไม่มีคนในเฟรม — product-only shot. No people, no hands, no fingers, "
+            "no arms, no reflections of people, no body parts of any kind visible. "
+            "The product stands or rests on its own.")
+
 _IMAGE_AVOID = ("no text, no logos, no watermark, no distorted packaging, no extra hands, "
                 "no clutter, no harsh blown-out highlights, no plastic-looking skin")
 
@@ -493,8 +499,9 @@ def build_master_image_prompt(brief: dict, scene: str = "") -> str:
         "[SCENE & SETTING]", preset.get("setting") or setting, "",
         "[STYLING & PROPS]", preset.get("styling") or styling, "",
     ]
-    if preset.get("cast"):
-        lines += ["[CAST]", preset["cast"], ""]
+    # State the cast either way. Leaving it unsaid is how a disembodied hand ends
+    # up reaching in from off-frame with nobody attached to it.
+    lines += ["[CAST]", preset.get("cast") or _NO_CAST, ""]
     form = detect_product_form(brief.get("top_item", ""), brief.get("brand_context", ""))
     lines += [
         "[LIGHTING]", lighting, "",
@@ -590,8 +597,7 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
     ]
     if preset.get("setting"):
         lines += ["[SCENE & SETTING]", preset["setting"], ""]
-    if preset.get("cast"):
-        lines += ["[CAST]", preset["cast"], ""]
+    lines += ["[CAST]", preset.get("cast") or _NO_CAST, ""]
 
     for name, timing, visual, vo_line, purpose in beats:
         lines += [
@@ -724,8 +730,7 @@ def build_carousel(brief: dict, scene: str = "", slides: int = 5) -> list[dict]:
             "[SCENE & SETTING]", preset.get("setting") or setting, "",
             "[STYLING & PROPS]", preset.get("styling") or styling, "",
         ]
-        if preset.get("cast"):
-            lines += ["[CAST]", preset["cast"], ""]
+        lines += ["[CAST]", preset.get("cast") or _NO_CAST, ""]
         lines += [
             "[LIGHTING]",
             preset.get("lighting") or _TONE_LIGHT.get(tone, _TONE_LIGHT["friendly"]), "",
