@@ -461,6 +461,24 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
     # Beat timings scale with the requested runtime (roughly 30% / 40% / 30%).
     h_end = max(2, round(seconds * 0.3))
     d_end = max(h_end + 1, round(seconds * 0.7))
+
+    # The CTA is deliberately a silent-performance beat: generated lip-sync reads
+    # as fake, so the closing line is narration over a warm look to camera.
+    if preset.get("cast"):
+        cta_visual = (
+            "The person looks straight into the lens and smiles warmly — genuine, "
+            "relaxed, closed mouth or a soft natural smile. They hold the product up "
+            "beside their face so the label faces camera. "
+            "IMPORTANT: they are NOT speaking — lips stay still, no talking, no "
+            "lip-sync. The voiceover plays over this shot as narration."
+        )
+    else:
+        cta_visual = (
+            "Product held centred and steady, label facing camera, a slow gentle "
+            "push-in. Calm and unhurried, with clear space around it for the "
+            "call-to-action overlay. Voiceover plays over this shot as narration."
+        )
+
     beats = [
         ("HOOK", f"0:00-0:0{h_end}" if h_end < 10 else f"0:00-0:{h_end}",
          shots[0], vo["hook"],
@@ -469,8 +487,9 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
          shots[1] if len(shots) > 1 else shots[0], vo["decision"],
          "ให้เหตุผลว่าทำไมต้องเป็นสินค้านี้ — จุดขาย/ส่วนผสม/ข้อพิสูจน์"),
         ("CTA", f"0:0{d_end}-0:{seconds}" if d_end < 10 else f"0:{d_end}-0:{seconds}",
-         shots[2] if len(shots) > 2 else shots[-1], vo["cta"],
-         "บอกให้ชัดว่าต้องทำอะไรต่อ พร้อมเว้นที่ว่างสำหรับปุ่ม/ข้อความ CTA"),
+         cta_visual, vo["cta"],
+         "ปิดจบแบบธรรมชาติ — ไม่ขยับปากพูด ใช้เสียงพากย์ทับ ยิ้มให้กล้อง โชว์สินค้าให้ชัด "
+         "เว้นที่ว่างสำหรับปุ่ม/ข้อความ CTA"),
     ]
 
     lines = [
@@ -496,7 +515,10 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
     lines += [
         "[VOICEOVER DIRECTION]",
         f"{vo['voice']} — พากย์ภาษาไทยทั้งคลิป ออกเสียงชัด "
-        "จังหวะพอดีกับความยาวแต่ละช่วง ไม่รีบจนฟังไม่ทัน", "",
+        "จังหวะพอดีกับความยาวแต่ละช่วง ไม่รีบจนฟังไม่ทัน",
+        "เสียงพากย์เป็น narration ทับภาพ ไม่ใช่บทพูดของตัวแสดง — "
+        "ตัวแสดงในคลิปไม่ต้องขยับปากพูดตามเสียง โดยเฉพาะช่วง CTA "
+        "(voiceover narration over B-roll, no on-camera dialogue, no lip-sync)", "",
         "[ON-SCREEN TEXT (ไทย)]",
         f"HOOK: {vo['hook']}",
         f"DECISION: {vo['decision']}",
@@ -520,6 +542,8 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
         "[AVOID]",
         _VIDEO_AVOID + (", no extra fingers, no distorted faces, no morphing between shots"
                         if preset.get("cast") else "")
+        + ", no lip-sync, no talking-head dialogue, no mouth movement matching the "
+          "voiceover, no forced or exaggerated smile"
         + ", ห้ามพากย์ภาษาอื่นนอกจากไทย, ห้ามเสียงหุ่นยนต์",
     ]
     return "\n".join(lines)

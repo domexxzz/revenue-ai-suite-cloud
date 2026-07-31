@@ -18,7 +18,11 @@ except ImportError:
     ANTHROPIC_AVAILABLE = False
 
 try:
-    from google_drive import upload_file, upload_text, upload_excel, needs_auth, run_first_time_auth
+    from google_drive import (
+        upload_file, upload_text, upload_excel, needs_auth, run_first_time_auth,
+        list_child_folders, list_files_in_folder, download_file,
+        ensure_subfolder, move_file,
+    )
     GDRIVE_AVAILABLE = True
 except ImportError:
     GDRIVE_AVAILABLE = False
@@ -70,6 +74,12 @@ try:
     SCENES_AVAILABLE = True
 except ImportError:
     SCENES_AVAILABLE = False
+
+try:
+    import tiktok_poster
+    TIKTOK_AVAILABLE = True
+except ImportError:
+    TIKTOK_AVAILABLE = False
 
 # Top-level mode switch labels (shop owner vs affiliate marketing)
 MODE_SHOP = "🏪 ร้านของฉัน"
@@ -169,13 +179,21 @@ def _do_post(platform_key: str, content: str,
                 st.markdown(f"[🔗 เปิดวิดีโอ]({result})")
 
     elif platform_key == "tiktok":
-        if video_bytes:
+        tt_token = st.session_state.get("tiktok_token", "")
+        if not video_bytes:
+            msg = "TikTok ต้องมีวิดีโอ"
+        elif not TIKTOK_AVAILABLE or not tt_token:
+            # No token configured — fall back to the manual hand-off.
             ok, msg = True, "วิดีโอพร้อม — ดาวน์โหลดแล้วอัปโหลดในแอป TikTok"
             if not quiet:
-                st.info("📥 TikTok: ดาวน์โหลดวิดีโอ + caption ด้านล่าง แล้วเปิดแอป TikTok อัปโหลด")
+                st.info("📥 TikTok: ใส่ Access Token ในแถบซ้ายเพื่อโพสต์อัตโนมัติ "
+                        "หรือดาวน์โหลดวิดีโอไปอัปเองในแอป")
             st.session_state["tiktok_video_ready"] = True
         else:
-            msg = "TikTok ต้องมีวิดีโอ"
+            privacy = st.session_state.get("tiktok_privacy", "SELF_ONLY")
+            with st.spinner("กำลังอัปโหลดไป TikTok (อาจใช้เวลาหลายนาที)..."):
+                ok, msg = tiktok_poster.post_video(
+                    video_bytes, content, tt_token, privacy=privacy)
     else:
         ok, msg = True, "บันทึกคอนเทนต์แล้ว"
 
@@ -2165,6 +2183,177 @@ def _mandala_badge() -> None:
         st.caption("🔗 เจอ mandala-bot แต่ยังไม่มี context.txt")
 
 
+# ── Approval queue (reads back from Google Drive) ────────────────────────────────
+
+# Folder name fragment → platform key, so a file's location decides where it posts.
+_FOLDER_PLATFORM_HINTS = [
+    (("facebook", "fb"), "facebook"),
+    (("instagram", "instragram", "ig"), "instagram"),
+    (("tiktok", "tik tok"), "tiktok"),
+    (("youtube", "yt"), "youtube"),
+    (("line",), "line_oa"),
+]
+
+
+def _platform_from_folder(name: str) -> str:
+    low = (name or "").lower()
+    for fragments, key in _FOLDER_PLATFORM_HINTS:
+        if any(f in low for f in fragments):
+            return key
+    return ""
+
+
+def _queue_caption_for(file: dict) -> str:
+    """Text files in the queue are captions — read them for preview/posting."""
+    if not (file.get("mimeType") or "").startswith("text/"):
+        return ""
+    data = download_file(file["id"])
+    if not data:
+        return ""
+    try:
+        return data.decode("utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _render_queue_file(folder_name: str, platform: str, file: dict,
+                       line_token: str, fb_token: str, fb_page_id: str,
+                       ig_business_id: str) -> None:
+    """One queued item: preview, then approve-and-post or reject."""
+    mime = file.get("mimeType", "")
+    fid = file["id"]
+    size_mb = int(file.get("size") or 0) / 1024 / 1024
+
+    with st.container(border=True):
+        top, act = st.columns([3, 1])
+        with top:
+            st.markdown(f"**{file['name']}**")
+            st.caption(f"{PLATFORM_THAI_NAMES.get(platform, folder_name)} · "
+                       f"{mime.split('/')[-1]} · {size_mb:.1f} MB · "
+                       f"{file.get('createdTime', '')[:16].replace('T', ' ')}")
+        with act:
+            if file.get("webViewLink"):
+                st.markdown(f"[🔗 เปิดใน Drive]({file['webViewLink']})")
+
+        media_bytes = None
+        caption = ""
+
+        if mime.startswith("image/"):
+            if st.button("👁️ ดูรูป", key=f"q_prev_{fid}", use_container_width=True):
+                st.session_state[f"q_data_{fid}"] = download_file(fid)
+            media_bytes = st.session_state.get(f"q_data_{fid}")
+            if media_bytes:
+                st.image(media_bytes, use_container_width=True)
+        elif mime.startswith("video/"):
+            st.caption("วิดีโอไฟล์ใหญ่ — กดโหลดเมื่อต้องการดู")
+            if st.button("▶️ โหลดวิดีโอมาดู", key=f"q_prev_{fid}", use_container_width=True):
+                st.session_state[f"q_data_{fid}"] = download_file(fid)
+            media_bytes = st.session_state.get(f"q_data_{fid}")
+            if media_bytes:
+                st.video(media_bytes)
+        else:
+            caption = _queue_caption_for(file)
+            if caption:
+                st.text_area("แคปชัน", value=caption, height=140, key=f"q_cap_{fid}")
+
+        text_to_post = st.session_state.get(f"q_cap_{fid}", caption)
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅ อนุมัติ + โพสต์", key=f"q_ok_{fid}",
+                         type="primary", use_container_width=True):
+                if not platform:
+                    st.error("ไม่รู้ว่าไฟล์นี้ควรลงแพลตฟอร์มไหน — "
+                             "ตั้งชื่อโฟลเดอร์ให้มีชื่อแพลตฟอร์ม")
+                    return
+                data = media_bytes or (download_file(fid)
+                                       if mime.startswith(("image/", "video/")) else None)
+                ok, msg = _do_post(
+                    platform, text_to_post or file["name"],
+                    line_token, fb_token, fb_page_id,
+                    ig_business_id=ig_business_id,
+                    image_bytes=data if mime.startswith("image/") else None,
+                    image_name=file["name"],
+                    video_bytes=data if mime.startswith("video/") else None,
+                    video_name=file["name"],
+                )
+                if ok:
+                    dest = ensure_subfolder(QUEUE_ROOT_FOLDER_ID, "POSTED")
+                    if dest and move_file(fid, dest):
+                        st.success(f"{msg} — ย้ายไฟล์ไปโฟลเดอร์ POSTED แล้ว")
+                    else:
+                        st.warning(f"{msg} — แต่ย้ายไฟล์ไม่สำเร็จ")
+                    st.rerun()
+                else:
+                    st.error(msg)
+        with c2:
+            if st.button("❌ ไม่อนุมัติ", key=f"q_no_{fid}", use_container_width=True):
+                dest = ensure_subfolder(QUEUE_ROOT_FOLDER_ID, "REJECTED")
+                if dest and move_file(fid, dest):
+                    st.info("ย้ายไปโฟลเดอร์ REJECTED แล้ว")
+                    st.rerun()
+                else:
+                    st.error("ย้ายไฟล์ไม่สำเร็จ")
+
+
+def render_queue_page(line_token: str = "", fb_token: str = "",
+                      fb_page_id: str = "", ig_business_id: str = "") -> None:
+    st.title("📁 คิวอนุมัติ")
+    st.caption("อ่านไฟล์จาก Google Drive (รวมงานที่สร้างใน Google Flow) → ตรวจ → อนุมัติ → โพสต์")
+
+    if not GDRIVE_AVAILABLE:
+        st.error("ไม่พบ google_drive.py")
+        return
+    if needs_auth():
+        st.warning("ยังไม่ได้ authorize Google Drive")
+        if st.button("🔐 Authorize Google Drive", type="primary"):
+            with st.spinner("กำลังเปิด browser..."):
+                run_first_time_auth()
+            st.rerun()
+        return
+
+    folders = list_child_folders(QUEUE_ROOT_FOLDER_ID)
+    if not folders:
+        st.warning(
+            "มองไม่เห็นโฟลเดอร์ย่อยเลย — น่าจะเป็นเพราะ **OAuth scope เดิม** "
+            "(`drive.file` เห็นเฉพาะไฟล์ที่แอปสร้างเอง)"
+        )
+        st.markdown(
+            "**วิธีแก้:** ลบไฟล์ `token.json` ในโฟลเดอร์โปรเจกต์ แล้วกด Authorize ใหม่ "
+            "เพื่อให้สิทธิ์แบบเต็ม (`drive`)"
+        )
+        return
+
+    skip = {"POSTED", "REJECTED"}
+    review = {n: i for n, i in folders.items() if n.upper() not in skip}
+    st.caption(f"เจอ {len(review)} โฟลเดอร์: " + " · ".join(sorted(review)))
+
+    pick = st.multiselect("เลือกโฟลเดอร์ที่จะตรวจ", options=sorted(review),
+                          default=sorted(review))
+    if st.button("🔄 โหลดใหม่"):
+        for k in list(st.session_state):
+            if k.startswith("q_data_"):
+                del st.session_state[k]
+        st.rerun()
+
+    total = 0
+    for folder_name in pick:
+        files = list_files_in_folder(review[folder_name])
+        if not files:
+            continue
+        platform = _platform_from_folder(folder_name)
+        st.divider()
+        st.subheader(f"{PLATFORM_THAI_NAMES.get(platform, '📂')} {folder_name} ({len(files)})")
+        if not platform:
+            st.caption("⚠️ เดาแพลตฟอร์มจากชื่อโฟลเดอร์ไม่ได้ — อนุมัติแล้วจะโพสต์ไม่ได้")
+        for f in files:
+            total += 1
+            _render_queue_file(folder_name, platform, f,
+                               line_token, fb_token, fb_page_id, ig_business_id)
+
+    if total == 0:
+        st.success("🎉 ไม่มีงานค้างรออนุมัติ")
+
+
 # ── Canva (Connect API) ──────────────────────────────────────────────────────────
 
 def _canva_token() -> str:
@@ -3084,7 +3273,7 @@ with st.sidebar:
     else:
         page = st.radio(
             "เมนู",
-            ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "🧠 Brain Storm", "🗨️ Copilot", "🎨 Canva", "📣 Content Studio", "💬 AI Inbox", "🧮 ROI Calculator"],
+            ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "🧠 Brain Storm", "🗨️ Copilot", "🎨 Canva", "✋ คิวอนุมัติ", "📣 Content Studio", "💬 AI Inbox", "🧮 ROI Calculator"],
             label_visibility="collapsed",
             key="shop_menu",
         )
@@ -3231,6 +3420,31 @@ with st.sidebar:
 ⚠️ Instagram ต้องเป็น Business/Creator Account
 """)
 
+        # ── TikTok ───────────────────────────────────────────────────────────────
+        if TIKTOK_AVAILABLE:
+            st.text_input(
+                "TikTok Access Token",
+                type="password",
+                placeholder="act....",
+                key="tiktok_token",
+                help="ต้องมี scope video.publish — token อายุสั้น (~24 ชม.)",
+            )
+            if st.session_state.get("tiktok_token"):
+                st.selectbox(
+                    "การมองเห็นโพสต์ TikTok",
+                    options=list(tiktok_poster.PRIVACY_LEVELS.keys()),
+                    format_func=lambda v: tiktok_poster.PRIVACY_LEVELS[v],
+                    key="tiktok_privacy",
+                )
+                if st.button("ทดสอบ TikTok", use_container_width=True):
+                    info, m = tiktok_poster.creator_info(st.session_state["tiktok_token"])
+                    (st.success if info else st.error)(m)
+                    if info and info.get("creator_nickname"):
+                        st.caption(f"บัญชี: {info['creator_nickname']}")
+            with st.expander("⚠️ ข้อจำกัด TikTok API"):
+                st.markdown(tiktok_poster.describe_limits())
+                st.caption("ขอ token ที่ [developers.tiktok.com](https://developers.tiktok.com/)")
+
         with st.expander("📖 วิธีขอ Facebook Page Token"):
             st.markdown("""
 ##### ขั้นตอน
@@ -3332,6 +3546,11 @@ if page == "🗨️ Copilot":
 
 if page == "🎨 Canva":
     render_canva_page()
+    st.stop()
+
+if page == "✋ คิวอนุมัติ":
+    render_queue_page(line_token=line_token, fb_token=fb_token,
+                      fb_page_id=fb_page_id, ig_business_id=ig_business_id)
     st.stop()
 
 if page == "📣 Content Studio":

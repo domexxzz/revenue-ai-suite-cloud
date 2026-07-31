@@ -225,6 +225,101 @@ def list_child_folders(parent_id: str) -> dict:
         return {}
 
 
+def list_files_in_folder(folder_id: str, page_size: int = 100) -> list[dict]:
+    """Files directly inside a folder, newest first.
+
+    Returns dicts with id, name, mimeType, size, createdTime, webViewLink.
+    Folders are excluded — this is for reviewing content, not navigating.
+    """
+    try:
+        service = _build_service()
+        if service is None:
+            return []
+        query = (
+            f"'{folder_id}' in parents "
+            "and mimeType != 'application/vnd.google-apps.folder' "
+            "and trashed=false"
+        )
+        resp = (
+            service.files()
+            .list(
+                q=query,
+                fields="files(id,name,mimeType,size,createdTime,webViewLink)",
+                orderBy="createdTime desc",
+                pageSize=page_size,
+                includeItemsFromAllDrives=True,
+                supportsAllDrives=True,
+            )
+            .execute()
+        )
+        return resp.get("files", [])
+    except Exception as e:
+        logger.warning("Google Drive list_files_in_folder failed: %s", e)
+        return []
+
+
+def download_file(file_id: str) -> Optional[bytes]:
+    """Download a Drive file's contents."""
+    try:
+        service = _build_service()
+        if service is None:
+            return None
+        return service.files().get_media(fileId=file_id, supportsAllDrives=True).execute()
+    except Exception as e:
+        logger.error("Google Drive download failed: %s", e)
+        return None
+
+
+def ensure_subfolder(parent_id: str, name: str) -> Optional[str]:
+    """Return the id of a subfolder by name, creating it if missing."""
+    existing = list_child_folders(parent_id)
+    if name in existing:
+        return existing[name]
+    try:
+        service = _build_service()
+        if service is None:
+            return None
+        created = (
+            service.files()
+            .create(
+                body={
+                    "name": name,
+                    "mimeType": "application/vnd.google-apps.folder",
+                    "parents": [parent_id],
+                },
+                fields="id",
+                supportsAllDrives=True,
+            )
+            .execute()
+        )
+        return created.get("id")
+    except Exception as e:
+        logger.error("Google Drive ensure_subfolder failed: %s", e)
+        return None
+
+
+def move_file(file_id: str, to_folder_id: str) -> bool:
+    """Move a file into another folder (detaching it from its current parents)."""
+    try:
+        service = _build_service()
+        if service is None:
+            return False
+        meta = service.files().get(
+            fileId=file_id, fields="parents", supportsAllDrives=True).execute()
+        previous = ",".join(meta.get("parents", []))
+        service.files().update(
+            fileId=file_id,
+            addParents=to_folder_id,
+            removeParents=previous,
+            fields="id,parents",
+            supportsAllDrives=True,
+        ).execute()
+        return True
+    except Exception as e:
+        logger.error("Google Drive move_file failed: %s", e)
+        return False
+
+
 def resolve_platform_folder(parent_id: str, platform_key: str, is_video: bool = False) -> Optional[str]:
     """Find the subfolder that matches a platform + Post/VDO type.
 
