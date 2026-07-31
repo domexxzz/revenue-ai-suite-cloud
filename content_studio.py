@@ -529,7 +529,7 @@ _PRODUCT_TEMPLATES: dict[str, dict[str, str]] = {
         ),
         "image_prompt": (
             "Bold promotional banner for a skincare flash sale, {discount}% off in large type, "
-            "{top_item} product bottle featured prominently, vibrant gradient background, "
+            "{top_item} featured prominently as the hero product, vibrant gradient background, "
             "clean modern e-commerce design, high contrast, studio product lighting"
         ),
     },

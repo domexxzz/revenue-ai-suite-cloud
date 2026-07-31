@@ -222,7 +222,7 @@ PRESETS: dict[str, dict] = {
         "label": "🏋️ ยิม / ออกกำลังกาย",
         "group": "🏠 สถานที่ / บรรยากาศ",
         "setting": "a modern gym locker area or training floor, dark tones with accent light",
-        "styling": "a rolled towel, water bottle, gym bag",
+        "styling": "a rolled towel, a stainless steel flask, gym bag",
         "lighting": "punchy directional light with strong contrast",
         "camera": "35mm lens, f/2.0, dynamic slightly-tilted angle",
         "cast": "",
@@ -303,16 +303,19 @@ PRESETS: dict[str, dict] = {
     "macro": {
         "label": "🔬 Macro เนื้อสัมผัส",
         "group": "📸 สไตล์ภาพ",
-        "setting": "an extreme close-up of the formula's texture filling the whole frame",
-        "styling": "a swatch or swirl of the product, peaks and glossy highlights visible",
+        "setting": "an extreme close-up of the product's own surface texture filling "
+                   "the whole frame",
+        "styling": "the product's natural texture as it actually behaves — no invented "
+                   "swirls or shapes the material could not form",
         "lighting": "raking side light that exposes every ridge and sheen",
         "camera": "100mm macro lens, f/4, extreme close-up, razor-thin focal plane",
         "cast": "",
         "mood": "tactile, sensory, quality-proving",
         "shots": [
-            "Texture swirling slowly, catching the light",
-            "A droplet falling into the swatch in slow motion",
-            "Pull back slightly to reveal the product beside the swatch",
+            "The product's surface in extreme detail, catching the light as it turns",
+            "A single water droplet meeting the surface in slow motion, "
+            "beading and running off downward",
+            "Pull back slightly to reveal the whole product in frame",
         ],
     },
 

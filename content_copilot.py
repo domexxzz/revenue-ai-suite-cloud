@@ -297,14 +297,95 @@ _VIDEO_AVOID = ("no on-screen text, no watermark, no logo distortion, no jarring
                 "no warped product geometry, no flickering")
 
 
+# ── Product form ────────────────────────────────────────────────────────────────
+# A soap bar cannot pour and a bottle cannot lather. Getting the physical form
+# wrong is the single biggest source of implausible generations, so the form is
+# detected from the item name and drives both the subject line and the physics
+# notes the model is held to.
+
+_PRODUCT_FORMS: dict[str, dict] = {
+    "bar": {
+        "keywords": ["สบู่", "soap", "ก้อน", "bar"],
+        "desc": "a solid soap bar with softly rounded edges and a matte surface, "
+                "resting flat and stable",
+        "physics": "a solid bar never pours, drips or squeezes. It lathers only when "
+                   "wet and rubbed — foam builds gradually into small irregular "
+                   "bubbles. Water beads on the surface and runs off downward with "
+                   "gravity. The bar keeps its exact shape and size throughout",
+        "texture": "rich white lather and fine irregular bubbles on a wet bar surface",
+        "handling": "held flat in an open palm or between both hands — never tipped, "
+                    "squeezed or poured",
+    },
+    "bottle": {
+        "keywords": ["เซรั่ม", "serum", "โทนเนอร์", "toner", "แชมพู", "shampoo",
+                     "เอสเซนส์", "เอสเซ้นส์", "essence", "ขวด", "bottle", "น้ำตบ"],
+        "desc": "a slim glass bottle with a dropper or pump, label facing camera, "
+                "standing upright and stable",
+        "physics": "liquid inside settles level and stays level. A drop forms, hangs, "
+                   "then falls straight down under gravity and spreads on contact. "
+                   "The bottle stands upright unless a hand tips it, and glass shows "
+                   "consistent refraction and reflection",
+        "texture": "a clear viscous droplet catching light as it falls",
+        "handling": "gripped around the body, dropper squeezed from the top",
+    },
+    "tube": {
+        "keywords": ["ครีม", "cream", "โฟม", "foam", "เจล", "gel", "หลอด", "tube",
+                     "กันแดด", "sunscreen"],
+        "desc": "a soft squeeze tube with a flip cap, label facing camera, "
+                "standing or lying flat",
+        "physics": "product only appears when the tube is squeezed — it extrudes in a "
+                   "continuous ribbon that holds its shape briefly then slowly settles. "
+                   "The tube body deforms where fingers press and does not refill itself",
+        "texture": "a smooth extruded ribbon with soft peaks holding their shape",
+        "handling": "squeezed from the base with the cap open",
+    },
+    "jar": {
+        "keywords": ["มาส์ก", "mask", "กระปุก", "jar", "บาล์ม", "balm", "สครับ", "scrub"],
+        "desc": "a wide round jar with the lid set beside it, contents visible, "
+                "sitting level",
+        "physics": "the thick contents hold a scooped indentation once disturbed and do "
+                   "not flow back level. The lid rests where it was placed. Nothing "
+                   "pours from a jar",
+        "texture": "a thick creamy surface with a clean scoop mark and soft peaks",
+        "handling": "scooped with a fingertip or small spatula",
+    },
+}
+
+_DEFAULT_FORM = {
+    "desc": "the product with its label facing camera, resting stable and level",
+    "physics": "the product keeps a consistent shape, size and label across every "
+               "frame, rests stably on the surface, and obeys gravity",
+    "texture": "the product's surface texture in fine detail",
+    "handling": "held naturally and securely",
+}
+
+
+def detect_product_form(item: str, brand_context: str = "") -> dict:
+    """Infer the physical form of the product so prompts stay plausible.
+
+    The item the user named wins; the brand brief is only consulted when the item
+    itself gives no signal. Otherwise a soap-focused brand brief would describe a
+    serum as a bar of soap.
+    """
+    for source in (item, brand_context):
+        low = (source or "").lower()
+        if not low:
+            continue
+        for form in _PRODUCT_FORMS.values():
+            if any(kw in low for kw in form["keywords"]):
+                return form
+    return _DEFAULT_FORM
+
+
 def _master_scene(brief: dict) -> tuple[str, str, str]:
-    """(subject, setting, styling) tuned to the vertical."""
+    """(subject, setting, styling) tuned to the vertical and product form."""
     brand = brief.get("brand_name") or "the brand"
     item = brief.get("top_item") or "the product"
     if brief.get("vertical") == "product":
+        form = detect_product_form(item, brief.get("brand_context", ""))
         return (
-            f"A single {item} bottle by {brand}, front-facing hero placement, "
-            "label crisp and fully legible",
+            f"A single {item} by {brand} — {form['desc']}, front-facing hero "
+            "placement, label crisp and fully legible",
             "clean seamless studio surface in soft neutral tone, subtle reflection "
             "beneath the product, uncluttered negative space around it",
             "a few fresh botanical leaves and delicate water droplets as accents, "
@@ -414,6 +495,7 @@ def build_master_image_prompt(brief: dict, scene: str = "") -> str:
     ]
     if preset.get("cast"):
         lines += ["[CAST]", preset["cast"], ""]
+    form = detect_product_form(brief.get("top_item", ""), brief.get("brand_context", ""))
     lines += [
         "[LIGHTING]", lighting, "",
         "[CAMERA & LENS]", camera, "",
@@ -421,14 +503,22 @@ def build_master_image_prompt(brief: dict, scene: str = "") -> str:
         f"hero composition with generous negative space for caption overlay, "
         f"framed for {aspect}", "",
         "[COLOUR & MOOD]", mood, "",
+        "[PHYSICS & PLAUSIBILITY]",
+        form["physics"] + ". Shadows fall away from the light source and match the "
+        "objects casting them; reflections match the surface material; every item "
+        "rests on the surface with its full weight — nothing floats or hovers"
+        + (". Hands grip the product plausibly with five fingers, natural joints and "
+           "realistic contact pressure" if preset.get("cast") else ""), "",
         "[STYLE]",
         "photorealistic commercial advertising photography, award-winning campaign quality, "
         "clean modern aesthetic", "",
         "[TECHNICAL]",
         f"aspect ratio {aspect}, 4K resolution, sharp focus, natural texture detail", "",
         "[AVOID]",
-        _IMAGE_AVOID + (", no extra fingers, no distorted faces, no uncanny expressions"
-                        if preset.get("cast") else ""),
+        _IMAGE_AVOID + ", no floating objects, no impossible shadows, no melted or "
+        "warped product shape"
+        + (", no extra fingers, no distorted faces, no uncanny expressions"
+           if preset.get("cast") else ""),
     ]
     return "\n".join(lines)
 
@@ -512,7 +602,27 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
             "",
         ]
 
+    form = detect_product_form(brief.get("top_item", ""), brief.get("brand_context", ""))
+    continuity = [
+        "ทั้ง 3 ช่วงคือฉากเดียวกันต่อเนื่อง ไม่ใช่ 3 คลิปแยก:",
+        "• สินค้าชิ้นเดิม รูปทรง สี ฉลาก และขนาดเท่ากันทุกเฟรม",
+        "• ทิศทางแสงและอุณหภูมิสีเดิมตลอด เงาทอดไปทางเดียวกัน",
+        "• ฉากหลัง พื้นผิว และพร็อพอยู่ตำแหน่งเดิม ไม่สลับที่เอง",
+        "• การเคลื่อนไหวต่อเนื่องตามเวลาจริง ไม่กระโดดข้ามหรือย้อนกลับ",
+    ]
+    if preset.get("cast"):
+        continuity.insert(4, "• ตัวแสดงคนเดิม ทรงผม เสื้อผ้า เครื่องประดับเหมือนเดิมทุกช่วง")
+
     lines += [
+        "[STORYBOARD CONTINUITY]",
+        *continuity, "",
+        "[PHYSICS & PLAUSIBILITY]",
+        form["physics"] + ". "
+        "น้ำและฟองไหลลงตามแรงโน้มถ่วงเสมอ ของทุกชิ้นวางอยู่บนพื้นผิวจริง ไม่ลอย "
+        "เงาและการสะท้อนตรงกับวัตถุและทิศแสง การเคลื่อนกล้องต่อเนื่องสมจริง "
+        f"วิธีจับ/ใช้สินค้า: {form['handling']}"
+        + (" มือมีห้านิ้ว ข้อต่อธรรมชาติ สัมผัสสินค้าด้วยแรงกดที่สมจริง"
+           if preset.get("cast") else ""), "",
         "[VOICEOVER DIRECTION]",
         f"{vo['voice']} — พากย์ภาษาไทยทั้งคลิป ออกเสียงชัด "
         "จังหวะพอดีกับความยาวแต่ละช่วง ไม่รีบจนฟังไม่ทัน",
@@ -544,6 +654,10 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
                         if preset.get("cast") else "")
         + ", no lip-sync, no talking-head dialogue, no mouth movement matching the "
           "voiceover, no forced or exaggerated smile"
+        + ", no floating or hovering objects, no impossible shadows, no product "
+          "changing shape size or label between shots, no liquid flowing upward, "
+          "no objects teleporting or appearing from nowhere, no background swapping "
+          "mid-clip"
         + ", ห้ามพากย์ภาษาอื่นนอกจากไทย, ห้ามเสียงหุ่นยนต์",
     ]
     return "\n".join(lines)
@@ -716,6 +830,9 @@ def generate(prompt: str, api_key: str = "", default_brand: str = "ร้าน�
         vertical = detect_vertical(prompt, default="") or detect_vertical(
             f"{brand_context} {brief.get('top_item', '')}")
     brief["vertical"] = vertical
+    # Keep the brief around so prompt builders can infer the physical product form
+    # (a soap bar cannot pour; a bottle cannot lather).
+    brief["brand_context"] = brand_context[:1500]
 
     package = get_content_package(
         campaign_type=brief["campaign"],
