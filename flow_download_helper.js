@@ -26,8 +26,8 @@
 
   // ข้อความบนเมนู — Flow เป็น Labs ปรับ UI บ่อย ถ้าหาไม่เจอให้แก้ตรงนี้
   const DOWNLOAD_LABELS = ['ดาวน์โหลด', 'Download'];
-  // Material ใช้ ligature เป็นข้อความในปุ่มไอคอน จึงจับได้ทั้ง more_vert (⋮) และ
-  // more_horiz (⋯) ส่วน overflow/menu ใช้จับ data-testid ที่มักตั้งชื่อแบบนั้น
+  // บนหน้าจริง ปุ่มเมนูมี textContent ว่า "more_vertเพิ่มเติม" — Material วางชื่อ
+  // ligature ของไอคอนไว้ติดกับป้ายกำกับโดยไม่มีตัวคั่น จึงจับด้วย startsWith ได้
   const MENU_LABELS = ['more_vert', 'more_horiz', 'ตัวเลือกเพิ่มเติม', 'More options',
                        'เพิ่มเติม', 'ตัวเลือก', 'Options', 'overflow'];
 
@@ -164,33 +164,74 @@
     await sleep(200);
   }
 
-  // ปุ่มเปิดเมนูของการ์ด — ต้องมั่นใจเท่านั้น ห้ามเดา
+  // ปุ่มเปิดเมนูของการ์ด — ต้องหานอกการ์ด ไม่ใช่ในการ์ด
   //
-  // เวอร์ชันก่อนมี fallback ว่า "ถ้าหาไม่เจอ ให้เอาปุ่มสุดท้ายในการ์ด" ซึ่งบนหน้า Flow
-  // จริงคือปุ่ม ▶️ เล่นคลิป กดแล้วเด้งเข้าหน้า /edit/ ของคลิปนั้น ผลคือดาวน์โหลด 0
-  // ข้าม 7 แล้วหน้าเปลี่ยนไปเลย — เดาผิดแพงกว่าข้ามไป จึงคืน null แทน
-  function findMenuButton(tile) {
-    const byText = findByText(tile, MENU_LABELS);
-    if (byText) return byText;
-    const btns = [...tile.querySelectorAll('button, [role="button"]')];
-    return btns.find((b) => MENU_LABELS.some((l) => {
+  // ตรวจหน้าจริงแล้วพบว่าในการ์ดมีของกดได้แค่สองชิ้น: <a> ที่ลิงก์ไป /edit/ กับปุ่ม
+  // play_circle — ไม่มี ⋮ อยู่เลยสักชั้นใน 8 ชั้นเหนือรูป แถบ ❤️ ↩️ ⋮ ถูกเรนเดอร์
+  // แยกออกไปแล้ววางทับการ์ดด้วย CSS การค้นในการ์ดจึงไม่มีวันเจอ และนั่นคือเหตุผลที่
+  // fallback เดิมไปกดโดน <a> จนเด้งเข้าหน้าคลิป
+  //
+  // แต่จะค้นทั้งหน้าเฉย ๆ ก็ไม่ได้ เพราะแถบหัวเว็บมีปุ่ม more_vert ของตัวเองอยู่ด้วย
+  // จึงต้องใช้สองสัญญาณประกอบกัน: เพิ่งโผล่มาหลัง hover และอยู่ทับกรอบการ์ดใบนี้
+  function isMenuButton(b) {
+    const t = (b.textContent || '').trim();
+    return MENU_LABELS.some((l) => {
       const needle = l.toLowerCase();
-      return (b.getAttribute('aria-label') || '').toLowerCase().includes(needle)
-          || (b.getAttribute('title') || '').toLowerCase().includes(needle)
-          || (b.getAttribute('data-testid') || '').toLowerCase().includes(needle);
-    })) || null;
+      return t.startsWith(l) || t.includes(l)
+        || (b.getAttribute('aria-label') || '').toLowerCase().includes(needle)
+        || (b.getAttribute('title') || '').toLowerCase().includes(needle)
+        || (b.getAttribute('data-testid') || '').toLowerCase().includes(needle);
+    });
   }
 
-  // บอกว่าในการ์ดมีปุ่มอะไรบ้าง เอาไว้แก้ MENU_LABELS ตอน Flow เปลี่ยน UI
+  // ระยะห่างจากปุ่มถึงกรอบการ์ด — 0 คือซ้อนทับกัน
+  //
+  // เกณฑ์แรกคือ "จุดกึ่งกลางปุ่มต้องอยู่ในกรอบการ์ด" ซึ่งเข้มเกินไป แถบควบคุมที่วาง
+  // ทับการ์ดมักล้นขอบออกมาเล็กน้อย พอล้นแล้วก็หาไม่เจอทั้งที่เห็นอยู่ตรงนั้น
+  // วัดระยะแทนแล้วยอมให้คลาดได้นิดหน่อย ซึ่งยังห่างจากปุ่ม ⋮ บนหัวเว็บอยู่มาก
+  const NEAR_PX = 48;
+
+  function distanceTo(b, tileRect) {
+    const r = b.getBoundingClientRect();
+    if (!r.width || !r.height) return Infinity;
+    const dx = Math.max(tileRect.left - r.right, r.left - tileRect.right, 0);
+    const dy = Math.max(tileRect.top - r.bottom, r.top - tileRect.bottom, 0);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  const overlaps = (b, tileRect) => distanceTo(b, tileRect) <= NEAR_PX;
+
+  function findMenuButton(tile, seenBefore) {
+    const tileRect = tile.getBoundingClientRect();
+    const all = [...document.querySelectorAll('button, [role="button"]')]
+      .filter(isMenuButton);
+    const near = (list) => list
+      .map((b) => ({ b, d: distanceTo(b, tileRect) }))
+      .filter((x) => x.d <= NEAR_PX)
+      .sort((x, y) => x.d - y.d);
+
+    // ที่เพิ่งโผล่มาหลัง hover คือแถบของการ์ดใบนี้แน่นอน จึงเอามาก่อน
+    const fresh = seenBefore ? all.filter((b) => !seenBefore.has(b)) : all;
+    const hit = near(fresh)[0] || near(all)[0];
+    return hit ? hit.b : null;
+  }
+
+  // รายงานตอนหาไม่เจอ — ต้องเป็นระดับหน้า ไม่ใช่ระดับการ์ด เพราะแถบควบคุมอยู่นอกการ์ด
+  // ใส่พิกัดมาด้วย จะได้รู้ว่าที่ไม่เข้าเกณฑ์เพราะไม่ทับกรอบ หรือเพราะไม่มีปุ่มเลย
   function describeButtons(tile) {
-    return [...tile.querySelectorAll('button, [role="button"]')].map((b) => ({
-      tag: b.tagName,
-      text: (b.textContent || '').trim().slice(0, 30),
-      aria: b.getAttribute('aria-label'),
-      title: b.getAttribute('title'),
-      testid: b.getAttribute('data-testid'),
-      cls: (b.className || '').toString().slice(0, 40),
-    }));
+    const tr = tile.getBoundingClientRect();
+    const box = (r) => `${Math.round(r.left)},${Math.round(r.top)} `
+                     + `${Math.round(r.width)}x${Math.round(r.height)}`;
+    return {
+      กรอบการ์ด: box(tr),
+      ปุ่มที่เข้าข่ายเมนูทั้งหน้า: [...document.querySelectorAll('button, [role="button"]')]
+        .filter(isMenuButton).map((b) => ({
+          text: (b.textContent || '').trim().slice(0, 30),
+          cls: (b.className || '').toString().slice(0, 40),
+          ที่: box(b.getBoundingClientRect()),
+          ทับการ์ด: overlaps(b, tr),
+        })),
+    };
   }
 
   // ปิดเมนูที่ค้างอยู่ ไม่งั้นรอบถัดไปจะนับเมนูเดิมเป็นเมนูใหม่
@@ -243,10 +284,13 @@
 
     tile.scrollIntoView({ block: 'center', behavior: 'smooth' });
     await sleep(600);
+
+    // จดปุ่มทั้งหน้าไว้ก่อน hover เพื่อแยกแถบของการ์ดใบนี้ออกจากปุ่ม ⋮ ของหัวเว็บ
+    const btnsBefore = new Set(document.querySelectorAll('button, [role="button"]'));
     await hover(tile);
 
-    // เปิดเมนู ⋮ ของไทล์นี้ — ปุ่มโผล่ตอน hover เท่านั้น จึงต้องรอ ไม่ใช่เช็คครั้งเดียว
-    let menuBtn = await waitFor(() => findMenuButton(tile), 2000);
+    // เปิดเมนู ⋮ ของไทล์นี้ — แถบโผล่ตอน hover เท่านั้น จึงต้องรอ ไม่ใช่เช็คครั้งเดียว
+    let menuBtn = await waitFor(() => findMenuButton(tile, btnsBefore), 2000);
     if (!menuBtn) {
       why.noMenuButton++;
       fail++;
