@@ -81,6 +81,12 @@ try:
 except ImportError:
     TIKTOK_AVAILABLE = False
 
+try:
+    import flow_sync
+    FLOW_SYNC_AVAILABLE = True
+except ImportError:
+    FLOW_SYNC_AVAILABLE = False
+
 # Top-level mode switch labels (shop owner vs affiliate marketing)
 MODE_SHOP = "🏪 ร้านของฉัน"
 MODE_AFFILIATE = "🚀 แอฟฟิลิเอต"
@@ -2295,6 +2301,93 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
                     st.error("ย้ายไฟล์ไม่สำเร็จ")
 
 
+def _render_flow_sync(authed: bool = True) -> None:
+    """Pull freshly downloaded Google Flow exports into the right Drive folders."""
+    if not FLOW_SYNC_AVAILABLE:
+        return
+
+    with st.expander("⬇️ ซิงก์ไฟล์จาก Google Flow", expanded=not authed):
+        st.caption(
+            "Flow ไม่มี API ให้ดึงไฟล์ออกโดยตรง — ให้กดดาวน์โหลดจาก Flow ตามปกติ "
+            "แล้วระบบจะหยิบไฟล์ใหม่ในโฟลเดอร์นี้ไปเข้า Drive ให้เอง"
+        )
+        default_dir = str(flow_sync.default_watch_dir())
+        watch = st.text_input("โฟลเดอร์ที่ไฟล์ดาวน์โหลดลง", value=default_dir,
+                              key="flow_watch_dir")
+        c1, c2 = st.columns(2)
+        with c1:
+            hours = st.selectbox(
+                "ดูเฉพาะไฟล์ใหม่ภายใน", options=[6, 24, 72, 0], index=1,
+                format_func=lambda h: "ทั้งหมด" if h == 0 else f"{h} ชั่วโมง",
+                key="flow_watch_hours",
+            )
+        with c2:
+            st.caption("ไฟล์ที่ซิงก์แล้วจะถูกย้ายไปโฟลเดอร์ย่อย `_synced` "
+                       "เพื่อไม่ให้อัปซ้ำ")
+
+        pending = flow_sync.find_new_files(Path(watch), hours) if watch else []
+        overrides: dict[str, str] = {}
+        if pending:
+            st.info(f"เจอไฟล์ใหม่ {len(pending)} ไฟล์ — เลือกปลายทางของแต่ละไฟล์")
+            st.caption("Flow ตั้งชื่อไฟล์โดยไม่บอกแพลตฟอร์ม จึงต้องเลือกเอง "
+                       "(หรือตั้งชื่อไฟล์ให้มี `ig` / `fb` / `tiktok` / `yt` แล้วเลือก อัตโนมัติ)")
+            dest_options = ["auto", "facebook", "instagram", "tiktok", "youtube",
+                            "line_oa", "skip"]
+            for p in pending[:20]:
+                kind = flow_sync.classify(p)
+                guessed = flow_sync.guess_platform(p.name)
+                fc, dc = st.columns([2, 1])
+                with fc:
+                    st.markdown(f"{'🖼️' if kind == 'image' else '🎬'} `{p.name[:52]}`")
+                with dc:
+                    overrides[p.name] = st.selectbox(
+                        "ปลายทาง",
+                        options=dest_options,
+                        index=dest_options.index(guessed) if guessed in dest_options else 0,
+                        format_func=lambda v: {
+                            "auto": "🔎 อัตโนมัติ",
+                            "skip": "⏭️ ข้ามไฟล์นี้",
+                        }.get(v, PLATFORM_THAI_NAMES.get(v, v)),
+                        key=f"flow_dest_{p.name}",
+                        label_visibility="collapsed",
+                    )
+            # "auto" means "no override" as far as the sync layer is concerned.
+            overrides = {k: ("" if v == "auto" else v) for k, v in overrides.items()}
+        else:
+            st.caption("ยังไม่เจอไฟล์ใหม่ในโฟลเดอร์นี้")
+
+        if not authed:
+            st.caption("🔐 ต้อง authorize Google Drive ก่อนถึงจะซิงก์ได้ (ปุ่มอยู่ด้านล่าง)")
+
+        if st.button("⬇️ ซิงก์เข้า Drive", type="primary",
+                     disabled=not pending or not authed, use_container_width=True):
+            prog = st.progress(0.0, text="เริ่มซิงก์...")
+
+            def _tick(i: int, total: int, name: str) -> None:
+                prog.progress((i - 1) / max(total, 1), text=f"{i}/{total} — {name}")
+
+            results = flow_sync.sync_folder(watch, QUEUE_ROOT_FOLDER_ID,
+                                            max_age_hours=hours, on_progress=_tick,
+                                            overrides=overrides)
+            prog.progress(1.0, text="เสร็จแล้ว")
+            ok = sum(1 for r in results if r["ok"])
+            (st.success if ok == len(results) else st.warning)(
+                f"ซิงก์สำเร็จ {ok}/{len(results)} ไฟล์")
+            for r in results:
+                st.markdown(f"{'✅' if r['ok'] else '❌'} **{r['name']}** — "
+                            f"{r['folder'] if r['ok'] else r['error']}")
+            st.rerun()
+
+        st.divider()
+        st.caption("**ให้ทำงานอัตโนมัติทุก 5 นาที** — รันคำสั่งนี้ครั้งเดียวใน PowerShell:")
+        st.code(
+            'schtasks /create /tn "FlowSync" /tr '
+            f'"{Path.cwd() / ".venv/Scripts/python.exe"} {Path.cwd() / "flow_sync.py"}" '
+            '/sc minute /mo 5',
+            language="powershell",
+        )
+
+
 def render_queue_page(line_token: str = "", fb_token: str = "",
                       fb_page_id: str = "", ig_business_id: str = "") -> None:
     st.title("📁 คิวอนุมัติ")
@@ -2303,7 +2396,12 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
     if not GDRIVE_AVAILABLE:
         st.error("ไม่พบ google_drive.py")
         return
-    if needs_auth():
+    authed = not needs_auth()
+    # Show the sync panel even before authorization so the folder and schedule can
+    # be set up first; only the upload itself needs Drive access.
+    _render_flow_sync(authed)
+
+    if not authed:
         st.warning("ยังไม่ได้ authorize Google Drive")
         if st.button("🔐 Authorize Google Drive", type="primary"):
             with st.spinner("กำลังเปิด browser..."):
