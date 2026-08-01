@@ -232,6 +232,27 @@ def _get_queue_root_id() -> str:
 
 QUEUE_ROOT_FOLDER_ID = _get_queue_root_id()
 
+
+def _get_shortcut(key: str, fallback: str) -> str:
+    """Quick-link URL from secrets, falling back to the team's own workspace."""
+    try:
+        import streamlit as st
+        return st.secrets.get("shortcuts", {}).get(key, "") or fallback
+    except Exception:
+        return fallback
+
+
+# Where the team actually works — surfaced as one-click links so nobody has to
+# hunt for the tab. Override per deployment via [shortcuts] in secrets.toml.
+FLOW_PROJECT_URL = _get_shortcut(
+    "flow_project",
+    "https://labs.google/fx/th/tools/flow/project/c9bfbfd9-88ea-4c56-b6b5-7711df26d9b8",
+)
+DRIVE_FOLDER_URL = _get_shortcut(
+    "drive_folder",
+    f"https://drive.google.com/drive/folders/{QUEUE_ROOT_FOLDER_ID}",
+)
+
 try:
     from loyverse_connector import LoyverseConnector
     LOYVERSE_AVAILABLE = True
@@ -2311,6 +2332,8 @@ def _render_flow_sync(authed: bool = True) -> None:
             "Flow ไม่มี API ให้ดึงไฟล์ออกโดยตรง — ให้กดดาวน์โหลดจาก Flow ตามปกติ "
             "แล้วระบบจะหยิบไฟล์ใหม่ในโฟลเดอร์นี้ไปเข้า Drive ให้เอง"
         )
+        st.link_button("🎬 ไปดาวน์โหลดจาก Google Flow", FLOW_PROJECT_URL,
+                       use_container_width=True)
         default_dir = str(flow_sync.default_watch_dir())
         watch = st.text_input("โฟลเดอร์ที่ไฟล์ดาวน์โหลดลง", value=default_dir,
                               key="flow_watch_dir")
@@ -2392,6 +2415,12 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
                       fb_page_id: str = "", ig_business_id: str = "") -> None:
     st.title("📁 คิวอนุมัติ")
     st.caption("อ่านไฟล์จาก Google Drive (รวมงานที่สร้างใน Google Flow) → ตรวจ → อนุมัติ → โพสต์")
+
+    lk1, lk2 = st.columns(2)
+    with lk1:
+        st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL, use_container_width=True)
+    with lk2:
+        st.link_button("📁 เปิดโฟลเดอร์ Drive", DRIVE_FOLDER_URL, use_container_width=True)
 
     if not GDRIVE_AVAILABLE:
         st.error("ไม่พบ google_drive.py")
@@ -2829,6 +2858,8 @@ def _render_copilot_image(mi: int, image_prompt: str, gemini_key: str) -> bytes 
     with st.expander("🖼️ ภาพประกอบ — Master Prompt", expanded=bool(st.session_state.get(img_key))):
         st.caption("📋 คัดลอกไปวางใน Google Flow / Midjourney ได้เลย (กดไอคอนคัดลอกมุมขวาบน)")
         st.code(image_prompt, language=None)
+        st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้", FLOW_PROJECT_URL,
+                       use_container_width=True)
 
         if gemini_key:
             if st.button("✨ สร้างรูปด้วย Gemini", key=f"copilot_genimg_{mi}",
@@ -2878,6 +2909,8 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
         st.caption(f"📋 คัดลอกไปวางใน Google Flow ได้เลย · สัดส่วน {aspect} · "
                    "10 วินาที · Hook → Decision → CTA · เสียงพากย์ไทย")
         st.code(content_copilot.build_master_video_prompt(brief, scene, 10), language=None)
+        st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้", FLOW_PROJECT_URL,
+                       use_container_width=True)
 
         if gemini_key:
             st.info("ℹ️ Veo สร้างได้สูงสุด **8 วินาที** ต่อคลิป — ตัว Master Prompt ด้านบน "
@@ -2977,6 +3010,8 @@ def _render_copilot_carousel(mi: int, brief: dict, scene: str, gemini_key: str) 
                     key=f"copilot_cardl_{mi}_{s['n']}", use_container_width=True)
             with st.popover(f"📋 ดู Master Prompt สไลด์ {s['n']}", use_container_width=True):
                 st.code(s["prompt"], language=None)
+                st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL,
+                               use_container_width=True)
             st.divider()
 
 
@@ -3400,6 +3435,11 @@ with st.sidebar:
     line_token = fb_token = fb_page_id = ig_business_id = ""
 
     if mode == MODE_SHOP:
+        st.divider()
+        st.markdown("**🔗 ทางลัด**")
+        st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL, use_container_width=True)
+        st.link_button("📁 เปิดโฟลเดอร์ Drive", DRIVE_FOLDER_URL, use_container_width=True)
+
         st.divider()
         st.markdown("**⚙️ Settings**")
 
