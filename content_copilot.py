@@ -717,27 +717,34 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
     lines += [
         "[STORYBOARD CONTINUITY]",
         *continuity, "",
+        # English throughout: this block is read by the model, and mixing scripts
+        # is what turned "สบู่" into a bowl of soup.
         "[PHYSICS & PLAUSIBILITY]",
         form["physics"] + ". "
-        "น้ำและฟองไหลลงตามแรงโน้มถ่วงเสมอ ของทุกชิ้นวางอยู่บนพื้นผิวจริง ไม่ลอย "
-        "เงาและการสะท้อนตรงกับวัตถุและทิศแสง การเคลื่อนกล้องต่อเนื่องสมจริง"
+        "Water and foam always run downward under gravity. Everything rests on a "
+        "real surface — nothing floats. Shadows and reflections match the objects "
+        "and the light direction. Camera motion stays continuous and physical."
         # Handling notes only make sense when someone is there to do the handling —
         # describing a grip in a product-only scene invites a stray hand into frame.
-        + (f" วิธีจับ/ใช้สินค้า: {form['handling']} "
-           "มือมีห้านิ้ว ข้อต่อธรรมชาติ สัมผัสสินค้าด้วยแรงกดที่สมจริง"
+        + (f" Handling: {form['handling']}. Hands have five fingers, natural "
+           "joints, and realistic contact pressure on the product."
            if preset.get("cast")
-           else " สินค้าตั้ง/วางอยู่ได้ด้วยตัวเอง ไม่มีมือมาจับหรือประคอง"), "",
+           else " The product stands or rests on its own — no hands enter the "
+                "frame to hold or steady it."), "",
         "[VOICEOVER DIRECTION]",
         f"{vo['voice']} — พากย์ภาษาไทยทั้งคลิป ออกเสียงชัด "
         "จังหวะพอดีกับความยาวแต่ละช่วง ไม่รีบจนฟังไม่ทัน",
         "เสียงพากย์เป็น narration ทับภาพ ไม่ใช่บทพูดของตัวแสดง — "
         "ตัวแสดงในคลิปไม่ต้องขยับปากพูดตามเสียง โดยเฉพาะช่วง CTA "
         "(voiceover narration over B-roll, no on-camera dialogue, no lip-sync)", "",
-        "[ON-SCREEN TEXT (ไทย)]",
+        # Labelled as post-production so it does not fight the "no on-screen
+        # text" rule below. Generated Thai lettering comes out malformed, so the
+        # model must render none — subtitles get added in the edit.
+        "[SUBTITLES — ใส่ตอนตัดต่อ ไม่ต้องเรนเดอร์ในคลิป / do NOT render this text]",
         f"HOOK: {vo['hook']}",
         f"DECISION: {vo['decision']}",
         f"CTA: {vo['cta']}",
-        "(ซับไตเติลไทยตรงกับเสียงพากย์ วางล่างกลางเฟรม อ่านง่าย)", "",
+        "(ซับไตเติลไทยตรงกับเสียงพากย์ วางล่างกลางเฟรม — เป็นงานขั้นตัดต่อ)", "",
         "[CAMERA MOVEMENT]",
         # A scene that specifies its own movement wins — a locked-off before/after
         # and a handheld UGC clip both contradict the tone's default drift.
