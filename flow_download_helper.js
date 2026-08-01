@@ -276,10 +276,38 @@
     return `${Math.round(r.left)},${Math.round(r.top)}`;
   };
 
-  // เมนูที่เพิ่งโผล่ใต้ body — ใช้ diff แทนการค้นทั้งหน้า จะได้ไม่ไปเจอเมนูค้าง
-  const bodyKids = () => new Set(document.body.children);
-  const newMenu = (before) => [...document.body.children].find(
-    (n) => !before.has(n) && (n.textContent || '').trim());
+  // ── ตรวจว่าเมนูเปิดหรือยัง ───────────────────────────────────────────────
+  //
+  // เดิมดูแค่ "มีลูกใหม่ใต้ body ไหม" ซึ่งพลาดตอน Flow แทรกเมนูเข้าไปในคอนเทนเนอร์
+  // ที่มีอยู่แล้ว — ไม่มีลูกใหม่ให้เห็น สคริปต์เลยสรุปว่าเมนูไม่เปิด ทั้งที่เมนูเต็ม
+  // กางอยู่ตรงหน้าพร้อมคำว่า "ดาวน์โหลด" (เห็นจากภาพหน้าจอของผู้ใช้)
+  //
+  // จึงจำทั้งลูกของ body และ element ที่มี role เมนู แล้วดูว่ามีอะไรใหม่ทางไหนก็ได้
+  const visible = (n) => {
+    const r = n.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  const menuRoles = () =>
+    document.querySelectorAll('[role="menu"], [role="menuitem"], [role="listbox"], [role="option"]');
+
+  const bodyKids = () => ({
+    kids: new Set(document.body.children),
+    roles: new Set(menuRoles()),
+  });
+
+  const newMenu = (before) => {
+    // เมนูที่มาเป็นลูกใหม่ของ body
+    const kid = [...document.body.children].find(
+      (n) => !before.kids.has(n) && (n.textContent || '').trim() && visible(n));
+    if (kid) return kid;
+    // เมนูที่แทรกอยู่ในคอนเทนเนอร์เดิม — จับจาก role ที่เพิ่งโผล่แทน
+    const fresh = [...menuRoles()].filter((n) => !before.roles.has(n) && visible(n));
+    if (fresh.length) {
+      return fresh[0].closest('[role="menu"], [role="listbox"]')
+          || fresh[0].parentElement || fresh[0];
+    }
+    return null;
+  };
 
   // กดดาวน์โหลดในเมนูที่เปิดอยู่ แล้วเลือกความละเอียด
   // คืน true เมื่อกดสำเร็จ · คืนข้อความเหตุผลเมื่อไม่สำเร็จ

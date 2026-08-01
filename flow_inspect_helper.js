@@ -160,11 +160,19 @@
         ? { x: r.right - 8, y: r.bottom - 8 }
         : { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 
+    // เมนูอาจไม่ได้มาเป็นลูกใหม่ของ body — Flow แทรกเข้าคอนเทนเนอร์ที่มีอยู่แล้วก็ได้
+    // รายงานรอบก่อนจึงบอกว่า "เมนูเปิด: false" ทุกมุม ทั้งที่เมนูเต็มกางอยู่จริง
+    const vis = (n) => { const r = n.getBoundingClientRect();
+                         return r.width > 0 && r.height > 0; };
+    const roles = () => document.querySelectorAll(
+      '[role="menu"], [role="menuitem"], [role="listbox"], [role="option"]');
+
     report.ลองคลิกขวา = [];
     for (const t of targets) {
       if (!t.el) continue;
       say(`ลองคลิกขวา: ${t.ชื่อ} (${t.มุม})…`);
       const kids = new Set(document.body.children);
+      const roleSnap = new Set(roles());
       const r = t.el.getBoundingClientRect();
       const p = pointIn(r, t.มุม);
       const at = { bubbles: true, cancelable: true, button: 2, buttons: 2,
@@ -175,8 +183,15 @@
       t.el.dispatchEvent(new MouseEvent('mouseup', at));
       await sleep(800);
 
-      const menu = [...document.body.children].find(
-        (n) => !kids.has(n) && (n.innerText || '').trim());
+      let menu = [...document.body.children].find(
+        (n) => !kids.has(n) && (n.innerText || '').trim() && vis(n));
+      if (!menu) {
+        const fresh = [...roles()].filter((n) => !roleSnap.has(n) && vis(n));
+        if (fresh.length) {
+          menu = fresh[0].closest('[role="menu"], [role="listbox"]')
+              || fresh[0].parentElement || fresh[0];
+        }
+      }
       const items = menu
         ? (menu.innerText || '').split('\n').map((s) => s.trim()).filter(Boolean)
         : [];
