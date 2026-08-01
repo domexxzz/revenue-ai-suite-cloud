@@ -322,27 +322,36 @@ def move_file(file_id: str, to_folder_id: str) -> bool:
         return False
 
 
-def resolve_platform_folder(parent_id: str, platform_key: str, is_video: bool = False) -> Optional[str]:
-    """Find the subfolder that matches a platform + Post/VDO type.
+def match_platform_folder_name(names, platform_key: str,
+                               is_video: bool = False) -> Optional[str]:
+    """Pick the folder name that matches a platform + Post/VDO type.
 
-    Returns the folder id, or None if no match / routing unavailable.
+    Works on plain names so the same rule serves both Drive folders and local
+    Drive-for-Desktop directories — routing must not drift between the two.
     Matching is case-insensitive and tolerant of spelling (e.g. "Instragram").
     """
-    children = list_child_folders(parent_id)
-    if not children:
-        return None
-
     aliases = _PLATFORM_ALIASES.get(platform_key, [platform_key])
     type_keywords = ["vdo", "video"] if is_video else ["post"]
 
     # 1) best match: platform alias AND the right Post/VDO type
-    for name, fid in children.items():
+    for name in names:
         low = name.lower()
         if any(a in low for a in aliases) and any(t in low for t in type_keywords):
-            return fid
+            return name
     # 2) looser match: platform alias only (any type)
-    for name, fid in children.items():
-        low = name.lower()
-        if any(a in low for a in aliases):
-            return fid
+    for name in names:
+        if any(a in name.lower() for a in aliases):
+            return name
     return None
+
+
+def resolve_platform_folder(parent_id: str, platform_key: str, is_video: bool = False) -> Optional[str]:
+    """Find the Drive subfolder that matches a platform + Post/VDO type.
+
+    Returns the folder id, or None if no match / routing unavailable.
+    """
+    children = list_child_folders(parent_id)
+    if not children:
+        return None
+    name = match_platform_folder_name(children.keys(), platform_key, is_video)
+    return children.get(name) if name else None

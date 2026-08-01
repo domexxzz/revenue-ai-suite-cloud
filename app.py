@@ -2334,6 +2334,14 @@ def _render_flow_sync(authed: bool = True) -> None:
         )
         st.link_button("🎬 ไปดาวน์โหลดจาก Google Flow", FLOW_PROJECT_URL,
                        use_container_width=True)
+
+        local_root = flow_sync.default_local_root()
+        if local_root:
+            st.success(f"⚡ โหมดย้ายไฟล์ในเครื่อง — `{local_root}` "
+                       "(เร็วกว่า ไม่กินโควตา API และ Drive ซิงก์ขึ้นคลาวด์ให้เอง)")
+        else:
+            st.caption("โหมดอัปโหลดผ่าน Drive API — ถ้าติดตั้ง Google Drive for Desktop "
+                       "ระบบจะเปลี่ยนไปย้ายไฟล์ในเครื่องให้อัตโนมัติ (เร็วกว่ามาก)")
         default_dir = str(flow_sync.default_watch_dir())
         watch = st.text_input("โฟลเดอร์ที่ไฟล์ดาวน์โหลดลง", value=default_dir,
                               key="flow_watch_dir")
@@ -2379,11 +2387,13 @@ def _render_flow_sync(authed: bool = True) -> None:
         else:
             st.caption("ยังไม่เจอไฟล์ใหม่ในโฟลเดอร์นี้")
 
-        if not authed:
+        # Moving into the Drive-for-Desktop mirror needs no API access at all.
+        can_sync = authed or local_root is not None
+        if not can_sync:
             st.caption("🔐 ต้อง authorize Google Drive ก่อนถึงจะซิงก์ได้ (ปุ่มอยู่ด้านล่าง)")
 
         if st.button("⬇️ ซิงก์เข้า Drive", type="primary",
-                     disabled=not pending or not authed, use_container_width=True):
+                     disabled=not pending or not can_sync, use_container_width=True):
             prog = st.progress(0.0, text="เริ่มซิงก์...")
 
             def _tick(i: int, total: int, name: str) -> None:
@@ -2391,7 +2401,7 @@ def _render_flow_sync(authed: bool = True) -> None:
 
             results = flow_sync.sync_folder(watch, QUEUE_ROOT_FOLDER_ID,
                                             max_age_hours=hours, on_progress=_tick,
-                                            overrides=overrides)
+                                            overrides=overrides, local_root=local_root)
             prog.progress(1.0, text="เสร็จแล้ว")
             ok = sum(1 for r in results if r["ok"])
             (st.success if ok == len(results) else st.warning)(
