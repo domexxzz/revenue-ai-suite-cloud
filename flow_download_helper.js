@@ -99,6 +99,13 @@
     }
   }
 
+  // บอกว่ากำลังจะกดอะไร — เวลาพัง จะได้รู้ว่าจับผิดตัวหรือกดถูกตัวแต่ไม่มีผล
+  function describeClick(what, el) {
+    console.log(`[flow-helper] ${what}: <${el.tagName.toLowerCase()}`
+      + `${el.getAttribute('role') ? ` role=${el.getAttribute('role')}` : ''}> `
+      + `"${(el.textContent || '').trim().slice(0, 40)}"`);
+  }
+
   // กดได้ก็ต่อเมื่อไม่เข้าข่ายทำลาย — ถ้าเข้าข่าย ไม่กดและบอกออกมา
   function safeClick(el, what) {
     const target = clickTarget(el);
@@ -124,8 +131,16 @@
     'padding:14px 16px', 'border-radius:12px', 'width:300px',
     'box-shadow:0 8px 30px rgba(0,0,0,.45)', 'border:1px solid #2b3a36',
   ].join(';');
+  // เลขรุ่น — ต้องเห็นได้จาก HUD ว่ากำลังรันตัวไหน
+  //
+  // บุ๊กมาร์กเก็บโค้ดไว้ในตัวเอง แก้ไฟล์แล้วไม่ลากใหม่ก็ยังรันของเก่า และไม่มีทางรู้
+  // จากภายนอกเลยว่าที่รันอยู่คือรุ่นไหน เสียเวลาไปหนึ่งรอบเต็มเพราะแยกไม่ออกว่า
+  // "แก้แล้วไม่ได้ผล" หรือ "ยังไม่ได้ลากใหม่" — ขึ้นเลขไว้ ปัญหานี้จบ
+  const BUILD = 'v7';
+
   hud.innerHTML =
-    '<b style="color:#2dd4bf">⬇️ Flow Download Helper</b>' +
+    `<b style="color:#2dd4bf">⬇️ Flow Download Helper</b>` +
+    `<span style="color:#5f7a74;font-size:11px;margin-left:6px">${BUILD}</span>` +
     '<div id="fdh-msg" style="margin-top:8px">กำลังเริ่ม…</div>' +
     '<button id="fdh-stop" style="margin-top:10px;width:100%;padding:6px;' +
     'border-radius:8px;border:1px solid #3d4f4a;background:#1b2724;' +
@@ -363,11 +378,22 @@
     if (quality) {
       await hover(quality);
       await sleep(200);
+      const target = clickTarget(quality);
+      describeClick('ตัวเลือกความละเอียด', target);
       if (!safeClick(quality, 'เลือกความละเอียด')) {
         return 'ตัวเลือกความละเอียดเข้าข่ายลบ — ไม่กด';
       }
+      // เมนูปิด = คลิกไปถึงตัวที่ทำงานจริง · เมนูยังอยู่ = กดไม่ติด
+      //
+      // นี่คือสัญญาณเดียวที่สคริปต์ในหน้าเว็บพิสูจน์ได้เอง เพราะมันมองไม่เห็นไฟล์
+      // ในเครื่อง ก่อนหน้านี้ตอบ true ทันทีหลังกด จึงรายงานว่าสำเร็จ 15 ครั้งทั้งที่
+      // Chrome ไม่เคยถูกสั่งโหลดเลยสักครั้ง
+      const closed = await waitFor(() => !document.body.contains(target)
+        || !visible(target), 2000);
+      if (!closed) return 'กดตัวเลือกความละเอียดแล้วเมนูไม่ปิด — คลิกไม่ติด';
     } else {
       // เผื่อ UI รุ่นที่กดแล้วโหลดตรง ไม่มีเมนูย่อย
+      describeClick('รายการดาวน์โหลด', clickTarget(item));
       if (!safeClick(item, 'กดดาวน์โหลด')) return 'รายการที่จับได้เข้าข่ายลบ — ไม่กด';
     }
     return true;
