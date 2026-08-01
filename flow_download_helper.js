@@ -69,14 +69,46 @@
     return DESTRUCTIVE_LABELS.some((l) => t.includes(l.toLowerCase()));
   };
 
+  // ตัวที่กดได้จริง อาจไม่ใช่ตัวที่ข้อความตรง
+  //
+  // รายการเมนูมักเป็นแถวที่มีข้อความซ้อนข้างใน เช่น แถวเลือกความละเอียดมีทั้ง
+  // "720p" กับ "ขนาดตั้งเดิม" เป็นคนละ span การหาแบบ "ข้อความสั้นสุดชนะ" จึงไปได้
+  // span ตัวใน ซึ่งไม่มี handler อะไรผูกอยู่ — กดแล้วเงียบ
+  //
+  // ประวัติดาวน์โหลดของ Chrome ยืนยัน: ทั้งรอบ 15 ไฟล์และรอบ 3 ไฟล์ Chrome ไม่เคย
+  // ถูกสั่งให้โหลดเลย (มีรายการเดียวจากรอบแรก) แปลว่าคลิกไม่ได้ไปถึงตัวที่ทำงาน
+  const CLICK_HOSTS = '[role="menuitem"], [role="option"], button, [role="button"], li, a';
+
+  function clickTarget(el) {
+    if (el.matches && el.matches(CLICK_HOSTS)) return el;
+    return (el.closest && el.closest(CLICK_HOSTS)) || el;
+  }
+
+  // กดแบบครบลำดับ ไม่ใช่ .click() เฉย ๆ — UI หลายตัวทำงานตอน pointerdown/mouseup
+  // ไม่ใช่ตอน click และบางตัวไม่สนใจ click ที่ไม่มี pointer นำมาก่อนเลย
+  function realClick(el) {
+    const r = el.getBoundingClientRect();
+    const at = { bubbles: true, cancelable: true, view: window,
+                 clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    for (const type of ['pointerover', 'pointerenter', 'pointermove', 'mouseover',
+                        'mousemove', 'pointerdown', 'mousedown', 'pointerup',
+                        'mouseup', 'click']) {
+      const Ctor = type.startsWith('pointer') && window.PointerEvent
+        ? PointerEvent : MouseEvent;
+      el.dispatchEvent(new Ctor(type, at));
+    }
+  }
+
   // กดได้ก็ต่อเมื่อไม่เข้าข่ายทำลาย — ถ้าเข้าข่าย ไม่กดและบอกออกมา
   function safeClick(el, what) {
-    if (isDestructive(el)) {
-      console.warn(`[flow-helper] ไม่กด "${(el.textContent || '').trim().slice(0, 40)}" `
+    const target = clickTarget(el);
+    // เช็คทั้งตัวที่เจอและตัวที่จะกดจริง เผื่อไต่ขึ้นไปโดนแถว "ลบ"
+    if (isDestructive(el) || isDestructive(target)) {
+      console.warn(`[flow-helper] ไม่กด "${(target.textContent || '').trim().slice(0, 40)}" `
                  + `ตอน${what} เพราะเข้าข่ายลบ/ทิ้ง`);
       return false;
     }
-    el.click();
+    realClick(target);
     return true;
   }
 
