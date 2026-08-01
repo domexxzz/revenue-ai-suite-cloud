@@ -136,7 +136,7 @@
   // บุ๊กมาร์กเก็บโค้ดไว้ในตัวเอง แก้ไฟล์แล้วไม่ลากใหม่ก็ยังรันของเก่า และไม่มีทางรู้
   // จากภายนอกเลยว่าที่รันอยู่คือรุ่นไหน เสียเวลาไปหนึ่งรอบเต็มเพราะแยกไม่ออกว่า
   // "แก้แล้วไม่ได้ผล" หรือ "ยังไม่ได้ลากใหม่" — ขึ้นเลขไว้ ปัญหานี้จบ
-  const BUILD = 'v10';
+  const BUILD = 'v11';
 
   // ── โหลดจาก URL ตรง ๆ ────────────────────────────────────────────────────
   //
@@ -178,10 +178,19 @@
     const add = (u, hint) => {
       if (!u || u.startsWith('data:') || u.startsWith('blob:')) return;
       if (out.has(u)) return;
+      // URL ของ Flow เป็น .../media.getMediaUrlRedirect?name=<uuid> ซึ่งไม่มีนามสกุล
+      // และ path เหมือนกันทุกคลิป ต้องใช้ uuid ใน query มาตั้งชื่อ ไม่งั้นได้ชื่อซ้ำกันหมด
       let base = '';
-      try { base = new URL(u, location.href).pathname.split('/').pop() || ''; }
-      catch (e) { /* URL เพี้ยนก็ปล่อยชื่อว่างไว้ */ }
-      if (!/\.\w{2,5}$/.test(base)) base = `${hint}_${out.size + 1}.mp4`;
+      try {
+        const parsed = new URL(u, location.href);
+        base = parsed.pathname.split('/').pop() || '';
+        if (!/\.\w{2,5}$/.test(base)) {
+          const id = (parsed.searchParams.get('name') || '').slice(0, 8);
+          base = `flow_${id || out.size + 1}.mp4`;
+        }
+      } catch (e) {
+        base = `${hint}_${out.size + 1}.mp4`;
+      }
       out.set(u, base);
     };
     for (const v of document.querySelectorAll('video')) add(v.currentSrc || v.src, 'flow');
@@ -318,14 +327,20 @@
   //
   // เหลือ 3 มุมพอ — วัดบนหน้าจริงแล้วว่าไม่มีมุมไหนเปิดเมนูได้เลย การไล่ 8 มุมจึงเป็น
   // การเสียเวลา 13 วินาทีทุกครั้งก่อนจะไปโหมดที่ใช้ได้จริง
+  // วัดบนหน้าจริงแล้ว และผลกลับหัวกับที่เดาไว้:
+  //   ตัวรูป/วิดีโอ → เมนูเต็ม 22 รายการ มี "ดาวน์โหลด"
+  //   ลิงก์ <a>     → เมนูเต็มเหมือนกัน
+  //   ไทล์ขึ้นไป     → เมนูสองรายการ มีแต่ "ลบ"
+  // เดิมเรียงไทล์ไว้อันดับแรกและตัวรูปไว้ท้ายสุด จึงเปิดเมนูลบก่อนทุกครั้งโดยไม่จำเป็น
+  // ตอนนี้เอาตัวที่ให้เมนูเต็มขึ้นก่อน และไม่แตะไทล์เลย — เมนูที่มีแต่ "ลบ" ไม่มีอะไร
+  // ให้เราอยู่แล้ว การเปิดมันคือความเสี่ยงเปล่า ๆ
   function menuTargets(tile) {
-    const out = [{ el: tile, corner: 'กลาง', ชื่อ: 'ไทล์ กลาง' }];
-    if (tile.parentElement && tile.parentElement !== document.body) {
-      out.push({ el: tile.parentElement, corner: 'กลาง', ชื่อ: 'ชั้นเหนือไทล์' });
-    }
+    const out = [];
     const media = tile.querySelector('img, video');
-    if (media) out.push({ el: media, corner: 'กลาง', ชื่อ: 'ตัวรูป' });
-    return out;
+    if (media) out.push({ el: media, corner: 'กลาง', ชื่อ: 'ตัวรูป/วิดีโอ' });
+    const link = tile.closest('a') || tile.querySelector('a');
+    if (link) out.push({ el: link, corner: 'กลาง', ชื่อ: 'ลิงก์ <a>' });
+    return out.length ? out : [{ el: tile, corner: 'กลาง', ชื่อ: 'ไทล์' }];
   }
 
   // เปิดเมนูของการ์ดใบนี้ให้ได้เมนูที่มี "ดาวน์โหลด" — คืน {menuRoot, ชื่อมุม}
