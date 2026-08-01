@@ -161,15 +161,33 @@
     await sleep(200);
   }
 
-  // ปุ่มเปิดเมนูของการ์ด — ดูจากข้อความ ไอคอน แล้วค่อยดู aria-label
+  // ปุ่มเปิดเมนูของการ์ด — ต้องมั่นใจเท่านั้น ห้ามเดา
+  //
+  // เวอร์ชันก่อนมี fallback ว่า "ถ้าหาไม่เจอ ให้เอาปุ่มสุดท้ายในการ์ด" ซึ่งบนหน้า Flow
+  // จริงคือปุ่ม ▶️ เล่นคลิป กดแล้วเด้งเข้าหน้า /edit/ ของคลิปนั้น ผลคือดาวน์โหลด 0
+  // ข้าม 7 แล้วหน้าเปลี่ยนไปเลย — เดาผิดแพงกว่าข้ามไป จึงคืน null แทน
   function findMenuButton(tile) {
     const byText = findByText(tile, MENU_LABELS);
     if (byText) return byText;
     const btns = [...tile.querySelectorAll('button, [role="button"]')];
-    const byLabel = btns.find((b) => MENU_LABELS.some((l) =>
-      (b.getAttribute('aria-label') || '').toLowerCase().includes(l.toLowerCase())));
-    // ตัวสุดท้ายคือเดาสุดท้าย — บนการ์ดมักเป็นปุ่มขวาบน
-    return byLabel || (btns.length ? btns[btns.length - 1] : null);
+    return btns.find((b) => MENU_LABELS.some((l) => {
+      const needle = l.toLowerCase();
+      return (b.getAttribute('aria-label') || '').toLowerCase().includes(needle)
+          || (b.getAttribute('title') || '').toLowerCase().includes(needle)
+          || (b.getAttribute('data-testid') || '').toLowerCase().includes(needle);
+    })) || null;
+  }
+
+  // บอกว่าในการ์ดมีปุ่มอะไรบ้าง เอาไว้แก้ MENU_LABELS ตอน Flow เปลี่ยน UI
+  function describeButtons(tile) {
+    return [...tile.querySelectorAll('button, [role="button"]')].map((b) => ({
+      tag: b.tagName,
+      text: (b.textContent || '').trim().slice(0, 30),
+      aria: b.getAttribute('aria-label'),
+      title: b.getAttribute('title'),
+      testid: b.getAttribute('data-testid'),
+      cls: (b.className || '').toString().slice(0, 40),
+    }));
   }
 
   // ปิดเมนูที่ค้างอยู่ ไม่งั้นรอบถัดไปจะนับเมนูเดิมเป็นเมนูใหม่
@@ -205,8 +223,18 @@
   let ok = 0;
   let fail = 0;
   const why = { noMenuButton: 0, menuDidNotOpen: 0, noDownloadItem: 0 };
+  const buttonReport = [];
+
+  // ถ้าหน้าเปลี่ยน แปลว่ามีคลิกไปโดนอะไรที่พาเข้าไปในคลิป ไทล์ที่จำไว้ก็ไม่อยู่ใน DOM
+  // แล้ว การไล่กดต่อมีแต่จะกดมั่วไปเรื่อย — หยุดทันทีและบอกว่าเกิดอะไรขึ้น
+  const startUrl = location.href;
+  const navigatedAway = () => location.href !== startUrl;
 
   for (let i = 0; i < tiles.length && ok < MAX_PER_RUN && !stopped; i++) {
+    if (navigatedAway()) {
+      say('หน้าเปลี่ยนไประหว่างทาง — หยุดไว้ก่อน');
+      break;
+    }
     const tile = tiles[i];
     say(`[${i + 1}/${tiles.length}] สำเร็จ ${ok} · พลาด ${fail}`);
 
@@ -219,6 +247,7 @@
     if (!menuBtn) {
       why.noMenuButton++;
       fail++;
+      if (buttonReport.length < 3) buttonReport.push(describeButtons(tile));
       continue;
     }
 
@@ -256,11 +285,32 @@
     await humanDelay();   // หน่วงแบบคน — กันยิงถี่
   }
 
+  // สรุปสาเหตุลง HUD ไม่ใช่แค่ Console — คนที่ใช้งานเห็น HUD อย่างเดียว เลข "ข้าม 7"
+  // เฉย ๆ ไม่บอกอะไรเลยว่าจะแก้ตรงไหน
+  const REASON_TH = {
+    noMenuButton: 'หาปุ่ม ⋮ ไม่เจอ',
+    menuDidNotOpen: 'กด ⋮ แล้วเมนูไม่เปิด',
+    noDownloadItem: 'เมนูเปิดแต่ไม่มี "ดาวน์โหลด"',
+  };
+  const reasons = Object.entries(why).filter(([, n]) => n)
+    .map(([k, n]) => `${REASON_TH[k]} ${n}`);
+
   if (fail) {
     console.warn('[flow-helper] สาเหตุที่พลาด:', why);
+    if (buttonReport.length) {
+      console.warn('[flow-helper] ปุ่มที่มีในการ์ด (ส่งอันนี้มาให้ดูได้เลย):',
+                   JSON.stringify(buttonReport, null, 1));
+    }
   }
 
-  say(`เสร็จ — ดาวน์โหลด ${ok} ชิ้น${fail ? ` · ข้าม ${fail}` : ''}`);
+  hud.querySelector('#fdh-msg').innerHTML =
+    `<b>เสร็จ — ดาวน์โหลด ${ok} ชิ้น${fail ? ` · ข้าม ${fail}` : ''}</b>`
+    + (reasons.length ? `<br><span style="color:#fbbf24">${reasons.join('<br>')}</span>` : '')
+    + (navigatedAway() ? '<br><span style="color:#fbbf24">หน้าเปลี่ยนระหว่างทาง — '
+                       + 'กด Back แล้วลองใหม่</span>' : '')
+    + (fail ? '<br><span style="color:#9aa5a2">รายละเอียดอยู่ใน Console (F12)</span>' : '');
+  hud.querySelector('#fdh-stop').textContent = 'ปิด';
+  hud.querySelector('#fdh-stop').onclick = () => hud.remove();
   console.log('[flow-helper] เสร็จแล้ว ไฟล์จะไปอยู่ในโฟลเดอร์ดาวน์โหลดของ Chrome');
-  setTimeout(() => hud.remove(), 12000);
+  if (!fail) setTimeout(() => hud.remove(), 12000);
 })();
