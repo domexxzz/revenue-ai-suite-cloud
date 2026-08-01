@@ -136,24 +136,19 @@
   // บุ๊กมาร์กเก็บโค้ดไว้ในตัวเอง แก้ไฟล์แล้วไม่ลากใหม่ก็ยังรันของเก่า และไม่มีทางรู้
   // จากภายนอกเลยว่าที่รันอยู่คือรุ่นไหน เสียเวลาไปหนึ่งรอบเต็มเพราะแยกไม่ออกว่า
   // "แก้แล้วไม่ได้ผล" หรือ "ยังไม่ได้ลากใหม่" — ขึ้นเลขไว้ ปัญหานี้จบ
-  const BUILD = 'v12';
+  const BUILD = 'v14';
 
   // ── โหลดจาก URL ตรง ๆ ────────────────────────────────────────────────────
   //
-  // ทางที่ไม่ต้องแตะ UI ของ Flow เลย ซึ่งแปลว่าไม่ติดกำแพงเดิม — :hover ปลอมไม่ได้
-  // และการเลือกในเมนูไม่ทำให้ไฟล์ออก แต่การกด <a download> ด้วยสคริปต์เป็นสิ่งที่
+  // ทางที่ไม่ต้องแตะ UI ของ Flow เลย จึงไม่ติดกำแพงที่วัดมาแล้ว — :hover ปลอมไม่ได้
+  // และการเลือกในเมนูไม่ทำให้ไฟล์ออก แต่การกด <a download> บน blob เป็นสิ่งที่
   // เบราว์เซอร์ยอมรับมาตลอด (ปุ่ม Export CSV ทุกเว็บทำแบบนี้)
   //
-  // ลอง fetch เป็น blob ก่อน เพราะข้าม origin ได้ถ้าเซิร์ฟเวอร์เปิด CORS และได้ชื่อ
-  // ไฟล์ตามที่เราตั้ง ถ้า fetch ไม่ผ่านค่อยชี้ href ตรง ๆ ซึ่งได้ผลเมื่อ same-origin
-  // ห้าม fallback ไปชี้ href ตรง ๆ เด็ดขาด
+  // ห้าม fallback ไปชี้ href ที่ URL ต้นทางเด็ดขาด — ไฟล์จริงอยู่ที่
+  // flow-content.google คนละ origin กับ labs.google พอข้าม origin เบราว์เซอร์จะเมิน
+  // แอตทริบิวต์ download แล้ว "เปิด" ไฟล์แทน ผลคือหน้า Flow ถูกพาออกไปหน้าวิดีโอ
+  // งานที่เหลือหยุดหมด (เจอมาแล้ว) ถ้า fetch ไม่ผ่านก็ส่ง URL ให้ฝั่ง Python โหลดแทน
   //
-  // ไฟล์จริงอยู่ที่ flow-content.google ซึ่งคนละ origin กับ labs.google พอข้าม origin
-  // เบราว์เซอร์จะเมินแอตทริบิวต์ download แล้ว "เปิด" ไฟล์แทนที่จะโหลด — ผลคือหน้า
-  // Flow ถูกพาออกไปหน้าวิดีโอ งานที่เหลือหยุดหมด (เจอมาแล้ว)
-  //
-  // ถ้า fetch ไม่ผ่านก็ยอมรับว่าโหลดจากในหน้าไม่ได้ แล้วส่ง URL ออกไปให้ฝั่ง Python
-  // โหลดแทน — URL ที่ CDN เซ็นมาใช้ได้โดยไม่ต้องมีคุกกี้
   // credentials ต้องเป็นค่าเริ่มต้น (same-origin) ห้ามใส่ 'include'
   //
   // ลิงก์ไฟล์จริงตอบ Access-Control-Allow-Origin: * และเบราว์เซอร์ปฏิเสธคำขอที่แนบ
@@ -181,30 +176,91 @@
     }
   }
 
+  // ── ชื่อไฟล์จาก prompt บนการ์ด ───────────────────────────────────────────
+  //
+  // Flow ตั้งชื่อไฟล์ที่มันโหลดเองตาม prompt ซึ่งพาหมวดฉากติดมาด้วย คิวอนุมัติจึง
+  // อ่านออกว่าคลิปนี้ถ่ายมาเพื่ออะไรและให้คะแนน Mandala ได้ พอเราโหลดตรงจาก URL
+  // ชื่อกลายเป็น flow_<uuid> ข้อมูลนั้นหายไปหมด — ดึงข้อความจากการ์ดมาแทน
+  //
+  // ไล่จากที่แน่นอนที่สุดไปหาที่คลุมเครือที่สุด แล้วหยุดที่อันแรกที่ใช้ได้
+  const ICON_WORD = /^[a-z_]{3,24}$/;          // more_vert, play_circle ฯลฯ ไม่ใช่ prompt
+
+  function promptTextFor(media) {
+    const attrs = ['alt', 'title', 'aria-label'];
+    let el = media;
+    for (let up = 0; up <= 5 && el; up++) {
+      for (const a of attrs) {
+        const v = (el.getAttribute && el.getAttribute(a) || '').trim();
+        if (v.length >= 8 && !ICON_WORD.test(v)) return v;
+      }
+      el = el.parentElement;
+    }
+    // ไม่มี attribute ก็ลองข้อความในการ์ด แต่ต้องยาวพอจะเป็นประโยค ไม่ใช่ชื่อไอคอน
+    //
+    // หยุดไต่เมื่อเจอ element ที่หุ้มสื่อมากกว่าชิ้นเดียว — นั่นคือกริดไม่ใช่การ์ด
+    // และข้ามตัวที่หุ้ม HUD ของเราเอง ไม่งั้นพอไต่ถึง body จะได้ชื่อไฟล์เป็น
+    // "Flow_Download_Helperv12" ซึ่งเป็นข้อความของสคริปต์เอง (เจอมาแล้วตอนเทสต์)
+    el = media.parentElement;
+    for (let up = 0; up < 5 && el; up++) {
+      if (el.querySelectorAll('img, video').length > 1) break;
+      if (!el.contains(hud)) {
+        const t = (el.innerText || '').split('\n')
+          .map((s) => s.trim())
+          .filter((s) => s.length >= 12 && !ICON_WORD.test(s))[0];
+        if (t) return t;
+      }
+      el = el.parentElement;
+    }
+    return '';
+  }
+
+  // ทำให้เป็นชื่อไฟล์ที่ Windows รับได้ และสั้นพอจะอ่านออก
+  function safeName(text, id) {
+    const cleaned = (text || '')
+      // เก็บเฉพาะตัวอักษร ตัวเลข ขีด และเว้นวรรค แทนการไล่แบนอักขระต้องห้าม
+      //
+      // เขียนแบบแบนต้องใส่เครื่องหมายคำพูดลงใน regex literal ซึ่งตัวตัดคอมเมนต์ตอน
+      // สร้างบุ๊กมาร์กอ่านว่าเป็นจุดเริ่มสตริง แล้วเลิกตัดคอมเมนต์ไปทั้งช่วง โค้ดโต
+      // จาก 19k เป็น 27k โดยไม่มีอาการบอก — วิธีนี้ไม่ต้องมีเครื่องหมายคำพูดเลย
+      // ต้องมี \p{M} ด้วย ไม่ใช่แค่ \p{L} — สระและวรรณยุกต์ไทยเป็น mark ไม่ใช่ letter
+      // ถ้าไม่ใส่ "สบู่" จะเหลือ "สบ" (เจอมาแล้วตอนเทสต์)
+      .replace(/[^\p{L}\p{M}\p{N}_\- ]/gu, ' ')
+      .replace(/\s+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 60);
+    // ใส่ id ต่อท้ายเสมอ — prompt เดียวกันสร้างได้หลายคลิป ถ้าไม่มีจะชนกัน
+    return cleaned ? `${cleaned}_${id}.mp4` : `flow_${id}.mp4`;
+  }
+
   // เก็บ URL ของสื่อจากทุกที่ที่พอจะหาได้ในหน้า
   function mediaUrls() {
     const out = new Map();          // url -> ชื่อไฟล์ที่จะตั้ง
-    const add = (u, hint) => {
+    const add = (u, prompt) => {
       if (!u || u.startsWith('data:') || u.startsWith('blob:')) return;
       if (out.has(u)) return;
       // URL ของ Flow เป็น .../media.getMediaUrlRedirect?name=<uuid> ซึ่งไม่มีนามสกุล
-      // และ path เหมือนกันทุกคลิป ต้องใช้ uuid ใน query มาตั้งชื่อ ไม่งั้นได้ชื่อซ้ำกันหมด
+      // และ path เหมือนกันทุกคลิป ต้องใช้ uuid มาตั้งชื่อ ไม่งั้นได้ชื่อซ้ำกันหมด
       let base = '';
       try {
         const parsed = new URL(u, location.href);
-        base = parsed.pathname.split('/').pop() || '';
-        if (!/\.\w{2,5}$/.test(base)) {
+        const last = parsed.pathname.split('/').pop() || '';
+        if (/\.\w{2,5}$/.test(last)) {
+          base = last;
+        } else {
           // id อยู่ได้สองที่: ?name=<uuid> ในลิงก์ redirect ของ labs.google
           // หรือท้าย path /video/<uuid> ในลิงก์ที่ CDN เซ็นมา — เอาอันที่มี
-          const id = (parsed.searchParams.get('name') || base || '').slice(0, 8);
-          base = `flow_${id || out.size + 1}.mp4`;
+          const id = (parsed.searchParams.get('name') || last || '').slice(0, 8)
+                     || String(out.size + 1);
+          base = safeName(prompt, id);
         }
       } catch (e) {
-        base = `${hint}_${out.size + 1}.mp4`;
+        base = safeName(prompt, out.size + 1);
       }
       out.set(u, base);
     };
-    for (const v of document.querySelectorAll('video')) add(v.currentSrc || v.src, 'flow');
+    for (const v of document.querySelectorAll('video')) {
+      add(v.currentSrc || v.src, promptTextFor(v));
+    }
     try {
       for (const e of performance.getEntriesByType('resource')) {
         // ไฟล์จริงของ Flow ไม่มีนามสกุล — เป็น flow-content.google/video/<uuid>?Signature=…
@@ -212,7 +268,8 @@
         // ใช้ indexOf ไม่ใช่ regex — ตัวตัดคอมเมนต์ตอนสร้างบุ๊กมาร์กไม่รู้จัก regex
         // literal พอเจอ \// ท้ายรูปแบบก็อ่านเป็นคอมเมนต์แล้วกินโค้ดที่เหลือทั้งบรรทัด
         if (/\.(mp4|webm|mov)(\?|$)/i.test(e.name) || e.name.indexOf('/video/') >= 0) {
-          add(e.name, 'flow');
+          // มาจาก resource timing ไม่มีการ์ดให้ดู จึงไม่มี prompt — ได้ชื่อ flow_<id>
+          add(e.name, '');
         }
       }
     } catch (e) { /* ไม่มีก็ข้าม */ }

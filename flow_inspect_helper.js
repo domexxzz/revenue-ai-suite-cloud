@@ -160,6 +160,32 @@
       .map((i) => i.currentSrc || i.src)
       .filter((u) => u && !u.startsWith('data:'));
 
+    // ข้อความบนการ์ด — ตัวโหลดใช้ตั้งชื่อไฟล์ ถ้าไม่มีก็ได้แค่ flow_<uuid>
+    // รายงานทีละแหล่งว่ามีอะไรบ้าง เวลาชื่อไม่ออกจะได้รู้ว่าขาดตรงไหน
+    const ICON_WORD = /^[a-z_]{3,24}$/;
+    report.ข้อความบนการ์ด = [...document.querySelectorAll('video')]
+      .slice(0, 3).map((v) => {
+        const attrs = {};
+        let el = v;
+        for (let up = 0; up <= 5 && el; up++) {
+          for (const a of ['alt', 'title', 'aria-label']) {
+            const val = (el.getAttribute && el.getAttribute(a) || '').trim();
+            if (val) attrs[`ชั้น${up}.${a}`] = val.slice(0, 80);
+          }
+          el = el.parentElement;
+        }
+        const texts = [];
+        el = v.parentElement;
+        for (let up = 0; up < 5 && el; up++) {
+          (el.innerText || '').split('\n').map((s) => s.trim())
+            .filter((s) => s.length >= 12 && !ICON_WORD.test(s))
+            .slice(0, 2).forEach((s) => texts.push(`ชั้น${up + 1}: ${s.slice(0, 70)}`));
+          el = el.parentElement;
+        }
+        return { attribute: Object.keys(attrs).length ? attrs : 'ไม่มีเลย',
+                 ข้อความในการ์ด: [...new Set(texts)].slice(0, 4) };
+      });
+
     report.สื่อ = {
       videoElement: vids.slice(0, 6),
       วิดีโอที่หน้านี้เคยโหลด: [...new Set(res)].slice(0, 8).map(short),

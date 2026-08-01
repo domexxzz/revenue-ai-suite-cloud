@@ -890,27 +890,36 @@ def angle_goal(key: str) -> str:
 # Extra words per scene for the cases where the key itself will not appear —
 # "beforeafter" is written "before_after" in a filename, "vanity" shows up as
 # "mirror". Matching is on the lowercased filename with separators normalised.
+#
+# Thai words are the scene's own name, never its marketing vocabulary. Falling
+# back to each preset's `signals` was tried and produced confident nonsense:
+# "วัยรุ่นผิวมัน" landed on studio and "ยิม หลังออกกำลังกาย" on before/after,
+# because สิว and ผิวมัน belong to half the scenes at once. A wrong scene carries a
+# wrong Mandala score onto a file about to be approved, which is worse than no
+# label, so only words that name the scene itself are listed.
 _FILENAME_HINTS: dict[str, tuple[str, ...]] = {
-    "lab": ("lab", "laboratory", "research"),
-    "ingredient": ("ingredient", "botanical", "extract"),
-    "clinic": ("clinic", "dermatolog", "doctor"),
-    "teen": ("teen", "teenager"),
-    "student": ("student", "campus", "university", "school"),
-    "office": ("office", "workday", "professional", "desk"),
-    "male": ("male", "man ", "men ", "guy"),
-    "friends": ("friends", "group of"),
-    "vanity": ("vanity", "mirror", "bathroom"),
-    "morning": ("morning", "bedroom", "wake"),
-    "cafe": ("cafe", "coffee"),
-    "outdoor": ("outdoor", "sunlight", "sunny", "outside"),
-    "gym": ("gym", "workout", "fitness", "sweat"),
-    "studio": ("studio", "seamless", "hero shot"),
-    "flatlay": ("flatlay", "flat lay", "top down", "topdown"),
-    "beforeafter": ("beforeafter", "before after", "before and after", "transformation"),
-    "ugc": ("ugc", "review", "selfie", "handheld"),
-    "macro": ("macro", "texture", "closeup", "close up"),
-    "promo": ("promo", "sale", "discount", "offer"),
-    "gift": ("gift", "festive", "holiday", "present"),
+    "lab": ("lab", "laboratory", "research", "ห้องแล็บ", "แล็บ", "วิจัย"),
+    "ingredient": ("ingredient", "botanical", "extract", "สารสกัด", "ส่วนผสม"),
+    "clinic": ("clinic", "dermatolog", "doctor", "คลินิก", "หมอ"),
+    "teen": ("teen", "teenager", "วัยรุ่น"),
+    "student": ("student", "campus", "university", "school",
+                "นักเรียน", "นักศึกษา", "มหาลัย", "มหาวิทยาลัย"),
+    "office": ("office", "workday", "professional", "desk", "ออฟฟิศ", "วัยทำงาน"),
+    "male": ("male", "man ", "men ", "guy", "ผู้ชาย"),
+    "friends": ("friends", "group of", "เพื่อน"),
+    "vanity": ("vanity", "mirror", "bathroom", "โต๊ะเครื่องแป้ง", "กระจก", "ห้องน้ำ"),
+    "morning": ("morning", "bedroom", "wake", "ตอนเช้า", "ห้องนอน"),
+    "cafe": ("cafe", "coffee", "คาเฟ่", "กาแฟ"),
+    "outdoor": ("outdoor", "sunlight", "sunny", "outside", "กลางแจ้ง", "แดด"),
+    "gym": ("gym", "workout", "fitness", "sweat", "ยิม", "ออกกำลังกาย", "ฟิตเนส"),
+    "studio": ("studio", "seamless", "hero shot", "สตูดิโอ"),
+    "flatlay": ("flatlay", "flat lay", "top down", "topdown", "แฟลตเลย์", "จัดวาง"),
+    "beforeafter": ("beforeafter", "before after", "before and after",
+                    "transformation", "ก่อนหลัง", "ก่อน หลัง"),
+    "ugc": ("ugc", "review", "selfie", "handheld", "รีวิว", "เซลฟี่"),
+    "macro": ("macro", "texture", "closeup", "close up", "มาโคร", "เนื้อสัมผัส"),
+    "promo": ("promo", "sale", "discount", "offer", "โปรโมชัน", "ลดราคา", "ส่วนลด"),
+    "gift": ("gift", "festive", "holiday", "present", "ของขวัญ", "เทศกาล"),
 }
 
 
@@ -924,14 +933,18 @@ def match_scene(filename: str) -> str:
     if not filename:
         return ""
     low = filename.lower().replace("_", " ").replace("-", " ")
-    best, best_at = "", len(low) + 1
-    for key, hints in _FILENAME_HINTS.items():
-        for h in (key, *hints):
-            at = low.find(h.lower())
-            # ตัวที่โผล่ก่อนชนะ — ชื่อไฟล์ของ Flow เอาคำสำคัญไว้ต้น ๆ
-            if at >= 0 and at < best_at:
-                best, best_at = key, at
-    return best
+
+    def earliest(candidates: dict[str, tuple[str, ...]]) -> str:
+        best, best_at = "", len(low) + 1
+        for key, words in candidates.items():
+            for w in words:
+                at = low.find(w.lower())
+                # ตัวที่โผล่ก่อนชนะ — ชื่อไฟล์ของ Flow เอาคำสำคัญไว้ต้น ๆ
+                if 0 <= at < best_at:
+                    best, best_at = key, at
+        return best
+
+    return earliest({k: (k, *v) for k, v in _FILENAME_HINTS.items()})
 
 
 # ── Relevance scoring ───────────────────────────────────────────────────────────
