@@ -136,7 +136,31 @@
   // บุ๊กมาร์กเก็บโค้ดไว้ในตัวเอง แก้ไฟล์แล้วไม่ลากใหม่ก็ยังรันของเก่า และไม่มีทางรู้
   // จากภายนอกเลยว่าที่รันอยู่คือรุ่นไหน เสียเวลาไปหนึ่งรอบเต็มเพราะแยกไม่ออกว่า
   // "แก้แล้วไม่ได้ผล" หรือ "ยังไม่ได้ลากใหม่" — ขึ้นเลขไว้ ปัญหานี้จบ
-  const BUILD = 'v7';
+  const BUILD = 'v8';
+
+  // ── ดูว่าคลิกทำให้ Flow ขยับจริงไหม ──────────────────────────────────────
+  //
+  // v7 เช็คว่า "เมนูปิดแล้ว" ซึ่งไม่ใช่หลักฐานว่าเลือกสำเร็จ — คลิกที่ไม่โดนอะไรเลย
+  // ก็ทำให้เมนูปิดได้ (overlay ปิดตัวเองเวลาคลิกนอกรายการ) v7 จึงรายงานว่ากด 3 ครั้ง
+  // ไม่มีข้อผิดพลาด ทั้งที่ Chrome ไม่เคยถูกสั่งโหลดเลย
+  //
+  // หลักฐานจริงคือคำขอที่วิ่งออกไป — ถ้ากดติด Flow ต้องยิง request ไปเอาไฟล์
+  // PerformanceObserver เห็นทุก resource ที่โหลด รวมถึงที่เกิดจาก XHR/fetch
+  const netHits = [];
+  let netObserver = null;
+  try {
+    netObserver = new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) {
+        if (/\.(mp4|webm|mov|jpe?g|png|gif)(\?|$)|download|videoblob|storage|media/i
+            .test(e.name)) {
+          netHits.push({ at: Date.now(), url: e.name.slice(0, 120) });
+        }
+      }
+    });
+    netObserver.observe({ entryTypes: ['resource'] });
+  } catch (e) { /* เบราว์เซอร์เก่าไม่มีก็ข้ามไป ไม่ใช่เรื่องคอขาดบาดตาย */ }
+
+  const netSince = (t) => netHits.filter((h) => h.at >= t);
 
   hud.innerHTML =
     `<b style="color:#2dd4bf">⬇️ Flow Download Helper</b>` +
@@ -383,14 +407,19 @@
       if (!safeClick(quality, 'เลือกความละเอียด')) {
         return 'ตัวเลือกความละเอียดเข้าข่ายลบ — ไม่กด';
       }
-      // เมนูปิด = คลิกไปถึงตัวที่ทำงานจริง · เมนูยังอยู่ = กดไม่ติด
-      //
-      // นี่คือสัญญาณเดียวที่สคริปต์ในหน้าเว็บพิสูจน์ได้เอง เพราะมันมองไม่เห็นไฟล์
-      // ในเครื่อง ก่อนหน้านี้ตอบ true ทันทีหลังกด จึงรายงานว่าสำเร็จ 15 ครั้งทั้งที่
-      // Chrome ไม่เคยถูกสั่งโหลดเลยสักครั้ง
+      // เมนูปิดอย่างเดียวไม่พอ — ต้องเห็นว่ามีคำขอวิ่งออกไปด้วย
+      const t0 = Date.now();
       const closed = await waitFor(() => !document.body.contains(target)
         || !visible(target), 2000);
       if (!closed) return 'กดตัวเลือกความละเอียดแล้วเมนูไม่ปิด — คลิกไม่ติด';
+
+      // ให้เวลา Flow ยิงคำขอสักหน่อย แล้วดูว่ามีอะไรวิ่งออกไปจริงไหม
+      const fired = await waitFor(() => netSince(t0).length ? netSince(t0) : null, 4000);
+      if (!fired) {
+        return 'เมนูปิดแต่ไม่มีคำขอวิ่งออกไป — Flow ไม่ได้รับคำสั่ง';
+      }
+      console.log('[flow-helper] คำขอหลังกด:',
+                  fired.map((h) => h.url.slice(0, 90)).join(' , '));
     } else {
       // เผื่อ UI รุ่นที่กดแล้วโหลดตรง ไม่มีเมนูย่อย
       describeClick('รายการดาวน์โหลด', clickTarget(item));
