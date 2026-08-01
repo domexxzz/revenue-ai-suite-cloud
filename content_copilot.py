@@ -258,7 +258,7 @@ _TONE_LOOKS = {
 def build_image_prompt(brief: dict) -> str:
     """Short product-photography prompt (kept for compatibility / quick use)."""
     brand = brief.get("brand_name") or "the brand"
-    item = brief.get("top_item") or "the product"
+    item = english_item(brief.get("top_item") or "the product")
     look = _TONE_LOOKS.get(brief.get("tone", ""), _TONE_LOOKS["friendly"])
     return (
         f"Professional product photography of {item} by {brand}, "
@@ -312,7 +312,9 @@ _VIDEO_AVOID = ("no on-screen text, no watermark, no logo distortion, no jarring
 _PRODUCT_FORMS: dict[str, dict] = {
     "bar": {
         "keywords": ["สบู่", "soap", "ก้อน", "bar"],
-        "desc": "a solid soap bar with softly rounded edges and a matte surface, "
+        # Describes the shape only — the subject line already names the product,
+        # so repeating "soap bar" here reads as "a soap bar … a solid soap bar".
+        "desc": "a solid bar with softly rounded edges and a matte surface, "
                 "resting flat and stable",
         "physics": "a solid bar never pours, drips or squeezes. It lathers only when "
                    "wet and rubbed — foam builds gradually into small irregular "
@@ -357,6 +359,46 @@ _PRODUCT_FORMS: dict[str, dict] = {
     },
 }
 
+# Thai product words → English. Image and video models read these prompts in
+# English; leaving a Thai noun in the middle of one invites a phonetic guess.
+# "สบู่" came back as "soup" from Veo — close enough in sound, wrong product
+# entirely — even though "soap bar" appeared later in the same sentence.
+_ITEM_EN: list[tuple[str, str]] = [
+    ("สบู่", "soap bar"),
+    ("เซรั่ม", "serum"),
+    ("ครีมกันแดด", "sunscreen"),
+    ("กันแดด", "sunscreen"),
+    ("ครีมบำรุง", "moisturiser cream"),
+    ("ครีม", "cream"),
+    ("โฟมล้างหน้า", "facial cleansing foam"),
+    ("โฟม", "cleansing foam"),
+    ("โทนเนอร์", "toner"),
+    ("มาส์ก", "face mask"),
+    ("เอสเซนส์", "essence"),
+    ("เอสเซ้นส์", "essence"),
+    ("แชมพู", "shampoo"),
+    ("ลิป", "lip balm"),
+    ("อาหารเสริม", "supplement"),
+    ("วิตามิน", "vitamin supplement"),
+    ("เมนู", "dish"),
+    ("สินค้าเด่น", "signature product"),
+    ("สินค้า", "product"),
+]
+
+
+def english_item(item: str) -> str:
+    """English name for the product, for use inside English prompts.
+
+    Falls back to the original text when nothing matches — better a word the
+    model may not know than a silent mistranslation.
+    """
+    low = (item or "").lower()
+    for thai, eng in _ITEM_EN:
+        if thai in low:
+            return eng
+    return (item or "the product").strip()
+
+
 _DEFAULT_FORM = {
     "desc": "the product with its label facing camera, resting stable and level",
     "physics": "the product keeps a consistent shape, size and label across every "
@@ -386,9 +428,9 @@ def detect_product_form(item: str, brand_context: str = "") -> dict:
 def _master_scene(brief: dict) -> tuple[str, str, str]:
     """(subject, setting, styling) tuned to the vertical and product form."""
     brand = brief.get("brand_name") or "the brand"
-    item = brief.get("top_item") or "the product"
+    item = english_item(brief.get("top_item") or "the product")
     if brief.get("vertical") == "product":
-        form = detect_product_form(item, brief.get("brand_context", ""))
+        form = detect_product_form(brief.get("top_item", ""), brief.get("brand_context", ""))
         return (
             f"A single {item} by {brand} — {form['desc']}, front-facing hero "
             "placement, label crisp and fully legible",
@@ -541,7 +583,7 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
     subject, setting, styling = _master_scene(brief)
     aspect = video_aspect_for(brief)
     motion = _TONE_MOTION.get(tone, _TONE_MOTION["friendly"])
-    item = brief.get("top_item") or "the product"
+    item = english_item(brief.get("top_item") or "the product")
     preset = _scene_preset(scene) if scene else {}
     vo = build_voiceover(brief)
 
@@ -566,7 +608,7 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
     closing = shots[2] if len(shots) > 2 else shots[-1]
     if preset.get("cast"):
         cta_visual = (
-            f"{closing} จบด้วย: the person looks straight into the lens and smiles "
+            f"{closing} Ends with: the person looks straight into the lens and smiles "
             "warmly — genuine, relaxed, closed mouth or a soft natural smile — "
             "holding the product so its label faces camera. "
             "IMPORTANT: they are NOT speaking — lips stay still, no talking, no "
