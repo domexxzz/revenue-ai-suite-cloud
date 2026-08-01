@@ -2416,9 +2416,37 @@ def _render_scene_score(filename: str) -> None:
                    "ไม่ใช่การทำนายยอด engagement")
 
 
+def _render_move_to_platform(file: dict, all_folders: dict, current: str = "") -> None:
+    """Let the reviewer say where this clip is going.
+
+    A clip that arrives without a platform in its name is not a TikTok clip we
+    failed to recognise — it has no platform yet. The choice belongs here, where
+    someone is looking at the clip and deciding, not to a guess made from a
+    filename at download time. Offered for every file, since a guessed platform
+    can be wrong too and one clip often suits more than one place.
+    """
+    fid = file["id"]
+    targets = sorted(n for n in all_folders
+                     if n.upper() not in {"POSTED", "REJECTED"} and n != current)
+    if not targets:
+        return
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        dest = st.selectbox("ย้ายไปโฟลเดอร์", options=targets,
+                            key=f"q_dest_{fid}", label_visibility="collapsed")
+    with c2:
+        if st.button("📁 ย้าย", key=f"q_move_{fid}", width="stretch"):
+            if move_file(fid, all_folders[dest]):
+                _clear_queue_cache()
+                st.toast(f"ย้ายไป {dest} แล้ว", icon="📁")
+                st.rerun()
+            else:
+                st.error("ย้ายไม่สำเร็จ")
+
+
 def _render_queue_file(folder_name: str, platform: str, file: dict,
                        line_token: str, fb_token: str, fb_page_id: str,
-                       ig_business_id: str) -> None:
+                       ig_business_id: str, all_folders: dict | None = None) -> None:
     """One queued item: preview, then approve-and-post or reject."""
     mime = file.get("mimeType", "")
     fid = file["id"]
@@ -2435,6 +2463,11 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
         with act:
             if file.get("webViewLink"):
                 st.markdown(f"[🔗 เปิดใน Drive]({file['webViewLink']})")
+
+        # เลือกปลายทางได้ทุกไฟล์ ไม่ใช่แค่ไฟล์ที่ยังไม่มีแพลตฟอร์ม — ของที่ระบบเดาไว้
+        # ก็เดาผิดได้ และคลิปเดียวลงได้หลายที่ ปุ่มนี้จึงต้องมีเสมอ
+        if all_folders:
+            _render_move_to_platform(file, all_folders, folder_name)
 
         media_bytes = None
         caption = ""
@@ -2743,12 +2776,13 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
             order = "เก่าสุดก่อน" if oldest_first else "ใหม่สุดก่อน"
             st.caption(f"แสดง {shown} จาก {len(files)} ไฟล์ · เรียง{order}")
         if not platform:
-            st.caption("⚠️ เดาแพลตฟอร์มจากชื่อโฟลเดอร์ไม่ได้ — อนุมัติแล้วจะโพสต์ไม่ได้")
+            st.caption("⚠️ เดาแพลตฟอร์มจากชื่อโฟลเดอร์ไม่ได้ — เลือกปลายทางให้แต่ละไฟล์ก่อน")
 
         for f in files[:shown]:
             total += 1
             _render_queue_file(folder_name, platform, f,
-                               line_token, fb_token, fb_page_id, ig_business_id)
+                               line_token, fb_token, fb_page_id, ig_business_id,
+                               all_folders=folders)
 
         remaining = len(files) - shown
         if remaining > 0:

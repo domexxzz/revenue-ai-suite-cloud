@@ -47,8 +47,17 @@ _PLATFORM_HINTS = [
 ]
 
 # Where a file goes when no platform is named in the filename.
+#
+# Videos used to default to TikTok VDO, which was survivable while Flow named its
+# exports after the prompt — some of those carried a platform word. Downloading
+# straight from the media URL gives names like flow_e2564572.mp4 with no hint at
+# all, so every clip landed in TikTok and quietly claimed to be a TikTok clip.
+#
+# A 9:16 clip is not inherently TikTok's; it could go to Reels or a Facebook feed.
+# Unsorted is the truthful answer, and the approval queue lets the platform be
+# chosen there — which is the moment the decision is actually being made.
 FALLBACK_IMAGE_FOLDER = "รูปภาพ"
-FALLBACK_VIDEO_FOLDER = "TikTok VDO"
+FALLBACK_VIDEO_FOLDER = "รอจัด"
 
 
 def default_watch_dir() -> Path:
@@ -161,7 +170,8 @@ def resolve_local_target(local_root: Path, path: Path,
     for name in names:
         if name.strip().lower() == wanted.strip().lower():
             return local_root / name, f"{name} (ในเครื่อง)"
-    return local_root, "โฟลเดอร์หลัก (ในเครื่อง)"
+    # ยังไม่มีโฟลเดอร์นั้น — สร้างเอาเลย ดีกว่าเทลงโฟลเดอร์หลักปนกับของอื่น
+    return local_root / wanted, f"{wanted} (ในเครื่อง)"
 
 
 def _unique_path(target: Path) -> Path:
