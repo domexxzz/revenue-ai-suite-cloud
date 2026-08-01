@@ -43,6 +43,13 @@
   // ตัวคั่น รายการจริงในเมนูจึงเป็น "downloadดาวน์โหลด"
   const DOWNLOAD_LABELS = ['ดาวน์โหลด', 'download', 'Download'];
 
+  // ปุ่ม ⋮ ของการ์ด — textContent จริงคือ "more_vertเพิ่มเติม"
+  const MENU_LABELS = ['more_vert', 'more_horiz', 'ตัวเลือกเพิ่มเติม', 'More options',
+                       'เพิ่มเติม', 'ตัวเลือก', 'Options', 'overflow'];
+
+  // ปุ่ม ⋮ บนหัวเว็บก็ชื่อเดียวกัน แต่มันอยู่บนสุดของหน้าเสมอ
+  const HEADER_ZONE_PX = 60;
+
   // เมนูย่อยหลังกด "ดาวน์โหลด" — 270p เป็น GIF ส่วน 1080p/4K เป็นการอัปสเกลจาก
   // ไฟล์เดิม ได้ไฟล์ใหญ่ขึ้นแต่รายละเอียดเท่าเดิม จึงเลือกขนาดตั้งเดิม
   const QUALITY_LABELS = ['ขนาดตั้งเดิม', 'Original size', 'Original'];
@@ -182,14 +189,13 @@
   // คลิกขวาที่ตัวรูปตรง ๆ ได้เมนูสั้นที่มีแค่ "ลบ" — Flow ไม่ถือว่ากำลังพูดถึงคลิปใบนั้น
   // แต่มุมอื่นของการ์ดอาจได้เมนูเต็ม จึงไล่ลองจนกว่าจะเจอเมนูที่มี "ดาวน์โหลด"
   // ระหว่างไล่ลองจะไม่กดรายการใดในเมนูเลย ปิดด้วย Escape อย่างเดียว
+  //
+  // เหลือ 3 มุมพอ — วัดบนหน้าจริงแล้วว่าไม่มีมุมไหนเปิดเมนูได้เลย การไล่ 8 มุมจึงเป็น
+  // การเสียเวลา 13 วินาทีทุกครั้งก่อนจะไปโหมดที่ใช้ได้จริง
   function menuTargets(tile) {
-    const out = [{ el: tile, corner: 'กลาง', ชื่อ: 'ไทล์ กลาง' },
-                 { el: tile, corner: 'ซ้ายบน', ชื่อ: 'ไทล์ ซ้ายบน' },
-                 { el: tile, corner: 'ขวาล่าง', ชื่อ: 'ไทล์ ขวาล่าง' }];
-    let up = tile;
-    for (let i = 0; i < 2 && up.parentElement && up.parentElement !== document.body; i++) {
-      up = up.parentElement;
-      out.push({ el: up, corner: 'กลาง', ชื่อ: `ชั้นเหนือไทล์ +${i + 1}` });
+    const out = [{ el: tile, corner: 'กลาง', ชื่อ: 'ไทล์ กลาง' }];
+    if (tile.parentElement && tile.parentElement !== document.body) {
+      out.push({ el: tile.parentElement, corner: 'กลาง', ชื่อ: 'ชั้นเหนือไทล์' });
     }
     const media = tile.querySelector('img, video');
     if (media) out.push({ el: media, corner: 'กลาง', ชื่อ: 'ตัวรูป' });
@@ -241,6 +247,34 @@
     }
     return [...tiles];
   }
+
+  function isMenuButton(b) {
+    const t = (b.textContent || '').trim();
+    return MENU_LABELS.some((l) => {
+      const needle = l.toLowerCase();
+      return t.startsWith(l) || t.includes(l)
+        || (b.getAttribute('aria-label') || '').toLowerCase().includes(needle)
+        || (b.getAttribute('title') || '').toLowerCase().includes(needle)
+        || (b.getAttribute('data-testid') || '').toLowerCase().includes(needle);
+    });
+  }
+
+  // ปุ่ม ⋮ ของการ์ดที่ผู้ใช้กำลังชี้อยู่ — ปุ่มไอคอนเล็ก อยู่ในจอ ไม่ใช่แถบหัวเว็บ
+  function cardMenuButton() {
+    const hit = [...document.querySelectorAll('button, [role="button"]')]
+      .filter(isMenuButton)
+      .map((b) => ({ b, r: b.getBoundingClientRect() }))
+      .find(({ r }) => r.width > 0 && r.height > 0
+        && r.width <= 48 && r.height <= 48
+        && r.top >= HEADER_ZONE_PX
+        && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth);
+    return hit ? hit.b : null;
+  }
+
+  const posKey = (b) => {
+    const r = b.getBoundingClientRect();
+    return `${Math.round(r.left)},${Math.round(r.top)}`;
+  };
 
   // เมนูที่เพิ่งโผล่ใต้ body — ใช้ diff แทนการค้นทั้งหน้า จะได้ไม่ไปเจอเมนูค้าง
   const bodyKids = () => new Set(document.body.children);
@@ -304,8 +338,12 @@
   let menuDump = '';
   const setStep = (s) => { step = s; stepAt = Date.now(); };
 
+  // ตอนรอผู้ใช้ชี้เมาส์ไม่ใช่การค้าง — คนอาจละสายตาไปทำอย่างอื่นก่อน จึงยกเว้น
+  // ตัวจับเวลาให้ขั้นนี้ ไม่งั้นมันจะตัดจบเองทั้งที่ทุกอย่างปกติ
+  let waitingForUser = false;
+
   const ticker = setInterval(() => {
-    if (Date.now() - stepAt > STEP_TIMEOUT_MS && !stuckAt) {
+    if (!waitingForUser && Date.now() - stepAt > STEP_TIMEOUT_MS && !stuckAt) {
       stuckAt = step;
       stopped = true;
       return;
@@ -320,13 +358,8 @@
   // (เจอมาแล้วตอน cardMenuButton คืน object แทนที่จะคืนตัวปุ่ม)
   try {
 
-  // ── คลิกขวาทุกใบ ─────────────────────────────────────────────────────────
-  // ไม่ลองก่อนแล้วค่อยเลือกทางอีกต่อไป — คลิกขวาคือทางหลัก ทำไปเลย ถ้าใบไหน
-  // ไม่ขึ้นเมนูก็ข้ามใบนั้นแล้วไปต่อ สรุปเหตุผลทั้งหมดตอนจบทีเดียว
-  //
   // จำด้วย src ของสื่อ เพราะ node จะหลุดเมื่อ Flow เรนเดอร์รายการใหม่หลังโหลดเสร็จ
   const seen = new Set();
-  let workingCorner = '';
   const keyOf = (t) => {
     const m = t.querySelector('img, video');
     return m ? (m.currentSrc || m.src || m.getAttribute('poster') || '') : '';
@@ -334,7 +367,7 @@
 
   setStep('กำลังหาคลิปในหน้า');
   total = findTiles().length;
-  log(`เจอสื่อ ${total} ชิ้น — เริ่มคลิกขวาทีละใบ (สูงสุด ${MAX_PER_RUN})`);
+  log(`เจอสื่อ ${total} ชิ้น (สูงสุด ${MAX_PER_RUN} ไฟล์ต่อรอบ)`);
   if (!total) {
     clearInterval(ticker);
     say('หาคลิปในหน้าไม่เจอ — เลื่อนหน้าให้เห็นคลิปก่อนแล้วกดใหม่');
@@ -343,43 +376,90 @@
     return;
   }
 
-  for (let i = 0; i < total && ok < MAX_PER_RUN && !stopped; i++) {
-    setStep(`เลื่อนไปคลิปที่ ${i + 1}`);
-    const tile = findTiles().find((t) => keyOf(t) && !seen.has(keyOf(t)));
-    if (!tile) break;
-    seen.add(keyOf(tile));
-
-    tile.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    await sleep(500);
-
-    // มุมที่ใช้ได้เจอแล้วครั้งแรก ก็ใช้มุมนั้นซ้ำกับใบที่เหลือ ไม่ต้องไล่ลองใหม่ทุกใบ
-    setStep(`คลิกขวาคลิปที่ ${i + 1}`);
-    const { menuRoot, via, lastSeen } = await openCardMenu(
-      tile, (name) => setStep(`คลิกขวาคลิปที่ ${i + 1} — ลอง${name}`));
-    if (!menuRoot) {
-      if (lastSeen) { menuDump = lastSeen; problems.push('ทุกมุมได้เมนูที่ไม่มี "ดาวน์โหลด"'); }
-      else problems.push('คลิกขวาแล้วเมนูไม่เปิด');
+  // ── ลองคลิกขวาแค่ใบเดียว แล้วค่อยตัดสิน ──────────────────────────────────
+  // วัดบนหน้าจริงแล้ว: ยิง contextmenu ครบ 8 มุม ไม่มีเมนูโผล่สักมุม — Flow ไม่รับ
+  // event สังเคราะห์ (น่าจะเช็ค isTrusted) เหมือนที่ :hover ก็ปลอมไม่ได้
+  // จึงลองแค่ใบแรกใบเดียวพอ ถ้าไม่ขึ้นก็ไม่เสียเวลาไล่ลองอีก 14 ใบ
+  setStep('ลองคลิกขวา');
+  const first = findTiles()[0];
+  let autoMode = false;
+  if (first) {
+    const probe = await openCardMenu(first, (n) => setStep(`ลองคลิกขวา — ${n}`));
+    if (probe.menuRoot) {
+      autoMode = true;
+      log(`คลิกขวาใช้ได้ที่: ${probe.via}`);
       await closeMenu();
-      if (menuDump) stopped = true;   // ใบอื่นก็จะเหมือนกัน ไม่ต้องไล่ต่อ
-      continue;
+    } else if (probe.lastSeen) {
+      menuDump = probe.lastSeen;
+      log('คลิกขวาเปิดเมนูได้ แต่ไม่มี "ดาวน์โหลด" ในนั้น');
+    } else {
+      log('คลิกขวาแบบสคริปต์ไม่มีผลบนหน้านี้ — เปลี่ยนเป็นโหมดชี้เมาส์');
     }
-    if (via && !workingCorner) { workingCorner = via; log(`มุมที่ใช้ได้: ${via}`); }
+  }
 
-    setStep(`กดดาวน์โหลดคลิปที่ ${i + 1}`);
-    const res = await downloadFromMenu(menuRoot);
-    if (res !== true) {
-      problems.push(res);
+  if (autoMode) {
+    // ── ทางอัตโนมัติ ─────────────────────────────────────────────────────
+    for (let i = 0; i < total && ok < MAX_PER_RUN && !stopped; i++) {
+      setStep(`เลื่อนไปคลิปที่ ${i + 1}`);
+      const tile = findTiles().find((t) => keyOf(t) && !seen.has(keyOf(t)));
+      if (!tile) break;
+      seen.add(keyOf(tile));
+
+      tile.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      await sleep(500);
+
+      setStep(`คลิกขวาคลิปที่ ${i + 1}`);
+      const { menuRoot } = await openCardMenu(tile);
+      if (!menuRoot) { problems.push('คลิกขวาแล้วเมนูไม่เปิด'); await closeMenu(); continue; }
+
+      setStep(`กดดาวน์โหลดคลิปที่ ${i + 1}`);
+      const res = await downloadFromMenu(menuRoot);
+      if (res !== true) { problems.push(res); await closeMenu(); continue; }
+
+      ok++;
+      log(`ดาวน์โหลดแล้ว ${ok} ไฟล์`);
+      setStep('รอเมนูปิด');
+      await waitFor(() => !document.body.contains(menuRoot), 1500);
       await closeMenu();
-      continue;
+      setStep('พักก่อนไฟล์ถัดไป');
+      await humanDelay();   // หน่วงแบบคน — กันยิงถี่
     }
+  } else {
+    // ── ทางที่ต้องมีเมาส์จริง ────────────────────────────────────────────
+    // แถบ ⋮ โผล่จาก :hover ซึ่งสคริปต์สร้างไม่ได้ แต่ทุกขั้นหลังจากนั้นสั่งได้หมด
+    // จึงรอให้ผู้ใช้ชี้เมาส์ แล้วรับช่วงต่อ — 4 จังหวะต่อคลิปเหลือแค่วางเมาส์
+    let lastKey = '';
+    while (ok < MAX_PER_RUN && !stopped) {
+      setStep('รอคุณชี้เมาส์ที่คลิป 👉');
+      waitingForUser = true;
+      const btn = await waitFor(
+        () => { const b = cardMenuButton(); return b && posKey(b) !== lastKey ? b : null; },
+        180000);
+      waitingForUser = false;
+      setStep('เจอแล้ว');
+      if (!btn) break;
+      lastKey = posKey(btn);
 
-    ok++;
-    log(`ดาวน์โหลดแล้ว ${ok} ไฟล์`);
-    setStep('รอเมนูปิด');
-    await waitFor(() => !document.body.contains(menuRoot), 1500);
-    await closeMenu();
-    setStep('พักก่อนไฟล์ถัดไป');
-    await humanDelay();   // หน่วงแบบคน — กันยิงถี่
+      setStep('เจอแล้ว — กำลังเปิดเมนู');
+      const before = bodyKids();
+      await hover(btn);
+      if (!safeClick(btn, 'เปิดเมนู')) { problems.push('ปุ่มที่จับได้เข้าข่ายลบ'); continue; }
+
+      const menuRoot = await waitFor(() => newMenu(before), 2500);
+      if (!menuRoot) { problems.push('กด ⋮ แล้วเมนูไม่เปิด'); await closeMenu(); continue; }
+
+      setStep('กดดาวน์โหลด');
+      const res = await downloadFromMenu(menuRoot);
+      if (res !== true) { problems.push(res); await closeMenu(); continue; }
+
+      ok++;
+      log(`ดาวน์โหลดแล้ว ${ok} ไฟล์`);
+      setStep('รอเมนูปิด');
+      await waitFor(() => !document.body.contains(menuRoot), 1500);
+      await closeMenu();
+      setStep('✅ เสร็จใบนี้ — เลื่อนเมาส์ไปใบถัดไป');
+      await humanDelay();
+    }
   }
   } catch (e) {
     clearInterval(ticker);
