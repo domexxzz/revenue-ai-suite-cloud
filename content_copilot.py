@@ -362,6 +362,12 @@ _VIDEO_AVOID = ("no on-screen text, no watermark, no logo distortion, no jarring
 _PRODUCT_FORMS: dict[str, dict] = {
     "bar": {
         "keywords": ["สบู่", "soap", "ก้อน", "bar"],
+        # Naming the wrong packaging explicitly. Saying "soap bar" once was not
+        # enough — the model rendered a squeeze tube, the default shape for
+        # skincare, because the shot directions all said "the product".
+        "avoid": "no tube, no squeeze tube, no bottle, no pump, no dropper, "
+                 "no jar, no pouch, no liquid container of any kind — "
+                 "the product is a solid bar of soap and nothing else",
         # Describes the shape only — the subject line already names the product,
         # so repeating "soap bar" here reads as "a soap bar … a solid soap bar".
         "desc": "a solid bar with softly rounded edges and a matte surface, "
@@ -377,6 +383,8 @@ _PRODUCT_FORMS: dict[str, dict] = {
     "bottle": {
         "keywords": ["เซรั่ม", "serum", "โทนเนอร์", "toner", "แชมพู", "shampoo",
                      "เอสเซนส์", "เอสเซ้นส์", "essence", "ขวด", "bottle", "น้ำตบ"],
+        "avoid": "no soap bar, no tube, no jar, no sachet — the product is a "
+                 "bottle and nothing else",
         "desc": "a slim glass bottle with a dropper or pump, label facing camera, "
                 "standing upright and stable",
         "physics": "liquid inside settles level and stays level. A drop forms, hangs, "
@@ -389,6 +397,8 @@ _PRODUCT_FORMS: dict[str, dict] = {
     "tube": {
         "keywords": ["ครีม", "cream", "โฟม", "foam", "เจล", "gel", "หลอด", "tube",
                      "กันแดด", "sunscreen"],
+        "avoid": "no soap bar, no bottle, no jar — the product is a squeeze tube "
+                 "and nothing else",
         "desc": "a soft squeeze tube with a flip cap, label facing camera, "
                 "standing or lying flat",
         "physics": "product only appears when the tube is squeezed — it extrudes in a "
@@ -399,6 +409,8 @@ _PRODUCT_FORMS: dict[str, dict] = {
     },
     "jar": {
         "keywords": ["มาส์ก", "mask", "กระปุก", "jar", "บาล์ม", "balm", "สครับ", "scrub"],
+        "avoid": "no soap bar, no tube, no bottle — the product is a jar and "
+                 "nothing else",
         "desc": "a wide round jar with the lid set beside it, contents visible, "
                 "sitting level",
         "physics": "the thick contents hold a scooped indentation once disturbed and do "
@@ -434,6 +446,20 @@ _ITEM_EN: list[tuple[str, str]] = [
     ("สินค้าเด่น", "signature product"),
     ("สินค้า", "product"),
 ]
+
+
+def name_the_product(text: str, item: str) -> str:
+    """Replace generic "the product" in shot directions with the real name.
+
+    Scene shots are written generically so they suit any brand, but a model
+    reading "the product" five times in a skincare setting draws the shape it
+    sees most often — it returned a squeeze tube for a soap bar. Naming the
+    product in the directions the model actually renders settles it.
+    """
+    if not item:
+        return text
+    text = re.sub(r"\bthe product\b", f"the {item}", text)
+    return re.sub(r"\bproduct in frame\b", f"{item} in frame", text)
 
 
 def english_item(item: str) -> str:
@@ -617,7 +643,10 @@ def build_master_image_prompt(brief: dict, scene: str = "") -> str:
         _IMAGE_AVOID + ", no floating objects, no impossible shadows, no melted or "
         "warped product shape"
         + (", no extra fingers, no distorted faces, no uncanny expressions"
-           if preset.get("cast") else ""),
+           if preset.get("cast") else "")
+        # Naming the wrong packaging outright — describing the right one was not
+        # enough on its own.
+        + (f". {form['avoid']}" if form.get("avoid") else ""),
     ]
     return "\n".join(lines)
 
@@ -642,6 +671,7 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
         f"Wider hero shot showing the full scene: {setting}, with {styling}.",
         "Final settle on the product centred in frame, held steady for a caption overlay.",
     ]
+    shots = [name_the_product(s, item) for s in shots]
     lighting = preset.get("lighting") or _TONE_LIGHT.get(tone, _TONE_LIGHT["friendly"])
     mood = _TONE_GRADE.get(tone, _TONE_GRADE["friendly"])
     if preset.get("mood"):
@@ -670,6 +700,7 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
             "camera and clear space around it for the call-to-action overlay. "
             "No hands enter the frame. The voiceover plays over this shot as narration."
         )
+    cta_visual = name_the_product(cta_visual, item)
 
     beats = [
         ("HOOK", f"0:00-0:0{h_end}" if h_end < 10 else f"0:00-0:{h_end}",
@@ -771,6 +802,7 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
           "changing shape size or label between shots, no liquid flowing upward, "
           "no objects teleporting or appearing from nowhere, no background swapping "
           "mid-clip"
+        + (f". {form['avoid']}" if form.get("avoid") else "")
         + ", ห้ามพากย์ภาษาอื่นนอกจากไทย, ห้ามเสียงหุ่นยนต์",
     ]
     return "\n".join(lines)
