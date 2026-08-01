@@ -126,6 +126,20 @@
   }
 
   // ── เริ่มทำงาน ───────────────────────────────────────────────────────────
+  // กันกดผิดหน้า: ปุ่มในแอปเป็น "ของที่ต้องลาก" ไม่ใช่ปุ่มสั่งงาน พอกดมันเลย
+  // รันบนหน้าแอปเอง แล้วไปไล่หา media ของหน้านั้นแทน ซึ่งไม่มีวันเจอคลิปจาก Flow
+  // เช็คแค่โฮสต์ ไม่เช็ค path เพราะ Labs ย้าย path บ่อยกว่าโดเมน
+  if (!/(^|\.)labs\.google$/.test(location.hostname)) {
+    say('ยังไม่ได้อยู่บนหน้า Google Flow');
+    hud.querySelector('#fdh-msg').innerHTML =
+      '<b style="color:#fbbf24">ยังไม่ได้อยู่บนหน้า Google Flow</b><br>' +
+      'ปุ่มนี้ต้อง <b>ลาก</b> ขึ้นแถบบุ๊กมาร์กก่อน (ไม่ใช่กด)<br>' +
+      'แล้วค่อยเปิดโปรเจกต์ใน Flow และกดบุ๊กมาร์กนั้น';
+    hud.querySelector('#fdh-stop').textContent = 'ปิด';
+    hud.querySelector('#fdh-stop').onclick = () => hud.remove();
+    return;
+  }
+
   const tiles = findTiles();
   say(`เจอสื่อ ${tiles.length} ชิ้น — เริ่มดาวน์โหลด (สูงสุด ${MAX_PER_RUN})`);
   if (!tiles.length) {

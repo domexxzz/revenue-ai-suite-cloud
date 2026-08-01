@@ -2530,8 +2530,9 @@ def _render_flow_sync(authed: bool = True) -> None:
         st.code(f'{Path.cwd() / ".venv/Scripts/python.exe"} {Path.cwd() / "flow_watch.py"}',
                 language="powershell")
 
-        st.caption("2️⃣ ลากปุ่มนี้ขึ้นแถบบุ๊กมาร์กครั้งเดียว — จากนั้นเปิดโปรเจกต์ใน Flow "
-                   "แล้วกดปุ่มนั้น มันจะไล่กดดาวน์โหลดให้เอง")
+        st.caption("2️⃣ **ลาก**ปุ่มส้มขึ้นแถบบุ๊กมาร์ก — อย่ากดตรงนี้ ตัวปุ่มไม่ได้สั่งงาน "
+                   "มันคือของที่ต้องเอาไปเก็บไว้ พอเก็บแล้วค่อยเปิดโปรเจกต์ใน Flow "
+                   "แล้วกดบุ๊กมาร์กอันนั้น มันจะไล่กดดาวน์โหลดให้เอง")
         try:
             import flow_bookmarklet
             uri = flow_bookmarklet.build()
@@ -2547,9 +2548,10 @@ def _render_flow_sync(authed: bool = True) -> None:
                 <a href="{html_lib.escape(uri, quote=True)}"
                    style="display:inline-block;background:#F59E0B;color:#111827;
                           font-weight:700;padding:.6rem 1.2rem;border-radius:10px;
-                          text-decoration:none;cursor:grab">⬇️ โหลดคลิปจาก Flow</a>
-                <span style="color:#6B7280;margin-left:.6rem">← ลากขึ้นแถบบุ๊กมาร์ก
-                (เปิดแถบด้วย Ctrl+Shift+B)</span></div>''',
+                          text-decoration:none;cursor:grab"
+                   title="ลากขึ้นแถบบุ๊กมาร์ก — กดตรงนี้ไม่ทำงาน">⬇️ โหลดคลิปจาก Flow</a>
+                <span style="color:#6B7280;margin-left:.6rem">👈 <b>ลาก</b>ขึ้นแถบบุ๊กมาร์ก
+                (เปิดแถบด้วย Ctrl+Shift+B) — กดตรงนี้ไม่ทำงาน</span></div>''',
                 height=60,
             )
             st.caption("ทำงานในเบราว์เซอร์ปกติที่คุณล็อกอินอยู่แล้ว · หน่วง 3-5 วิต่อไฟล์ · "
