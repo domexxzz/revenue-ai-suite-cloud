@@ -29,6 +29,10 @@ token.json
 youtube_token.json
 *.json.key
 
+# Flow bot — browser session and download history (contains your Google session!)
+.flow_profile/
+flow_bot_state.json
+
 # OS
 .DS_Store
 Thumbs.db
