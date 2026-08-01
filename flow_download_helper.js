@@ -25,7 +25,11 @@
   const MAX_DELAY_MS = 5000;
 
   // ข้อความบนเมนู — Flow เป็น Labs ปรับ UI บ่อย ถ้าหาไม่เจอให้แก้ตรงนี้
-  const DOWNLOAD_LABELS = ['ดาวน์โหลด', 'Download'];
+  //
+  // 'download' คือชื่อ ligature ของไอคอน ซึ่ง Material วางไว้ติดหน้าป้ายกำกับโดยไม่มี
+  // ตัวคั่น ข้อความจริงของรายการเมนูจึงเป็น "downloadดาวน์โหลด" — เดิมจับด้วย
+  // startsWith('ดาวน์โหลด') อย่างเดียวเลยไม่เจอ ทั้งที่เมนูเปิดอยู่ตรงหน้า
+  const DOWNLOAD_LABELS = ['ดาวน์โหลด', 'download', 'Download'];
   // บนหน้าจริง ปุ่มเมนูมี textContent ว่า "more_vertเพิ่มเติม" — Material วางชื่อ
   // ligature ของไอคอนไว้ติดกับป้ายกำกับโดยไม่มีตัวคั่น จึงจับด้วย startsWith ได้
   const MENU_LABELS = ['more_vert', 'more_horiz', 'ตัวเลือกเพิ่มเติม', 'More options',
@@ -113,16 +117,26 @@
   function findByText(root, labels) {
     for (const label of labels) {
       for (const sel of CLICKABLE) {
+        // includes เป็นด่านสุดท้าย เพราะข้อความจริงอาจมีชื่อไอคอนนำหน้าและมีคำอื่น
+        // ต่อท้าย เช่น "downloadดาวน์โหลดวิดีโอ" — แต่ยังจัดลำดับ exact > startsWith
+        // ไว้ข้างล่าง จึงไม่กลายเป็นการจับมั่ว
         const hits = [...root.querySelectorAll(sel)].filter((n) => {
           const t = (n.textContent || '').trim();
-          if (t === label || t.startsWith(label)) return true;
+          if (t === label || t.startsWith(label) || t.includes(label)) return true;
           // ปุ่มไอคอนไม่มีข้อความ ชื่อจริงอยู่ใน aria-label
           const aria = (n.getAttribute('aria-label') || '').trim();
-          return aria === label || aria.startsWith(label);
+          return aria === label || aria.startsWith(label) || aria.includes(label);
         });
         if (!hits.length) continue;
-        const exact = hits.filter((n) => (n.textContent || '').trim() === label);
-        const pool = exact.length ? exact : hits;
+        // ตรงเป๊ะมาก่อน ขึ้นต้นด้วยมาถัดมา แล้วค่อยเป็นแค่มีคำนั้นอยู่
+        const txt = (n) => (n.textContent || '').trim();
+        let pool = hits.filter((n) => txt(n) === label);
+        if (!pool.length) pool = hits.filter((n) => txt(n).startsWith(label));
+        if (!pool.length) pool = hits;
+        // ในชั้นเดียวกัน ข้อความสั้นกว่า = มีคำเกินน้อยกว่า = ตรงกับที่ขอมากกว่า
+        // เมนูจริงมีทั้ง "ดาวน์โหลด" และ "ดาวน์โหลดต้นฉบับ" การเรียงตาม DOM จะได้
+        // อันไหนก็ได้แล้วแต่ลำดับ ซึ่งไม่ใช่การเลือก
+        pool = [...pool].sort((a, b) => txt(a).length - txt(b).length);
         // ตัวที่ไม่มีตัวอื่นในกองซ้อนอยู่ข้างใน = ตัวจริง ไม่ใช่กล่องห่อ
         const deepest = pool.find((n) => !pool.some((o) => o !== n && n.contains(o)));
         return deepest || pool[pool.length - 1];
@@ -268,6 +282,7 @@
   let fail = 0;
   const why = { noMenuButton: 0, menuDidNotOpen: 0, noDownloadItem: 0 };
   const buttonReport = [];
+  let menuDump = '';
 
   // ถ้าหน้าเปลี่ยน แปลว่ามีคลิกไปโดนอะไรที่พาเข้าไปในคลิป ไทล์ที่จำไว้ก็ไม่อยู่ใน DOM
   // แล้ว การไล่กดต่อมีแต่จะกดมั่วไปเรื่อย — หยุดทันทีและบอกว่าเกิดอะไรขึ้น
@@ -318,8 +333,12 @@
     if (!item) {
       why.noDownloadItem++;
       fail++;
-      console.warn('[flow-helper] เมนูเปิดแต่ไม่เจอ "ดาวน์โหลด" — เมนูมี:',
-                   (menuRoot.innerText || '').split('\n').filter(Boolean));
+      // ต่อเป็นสตริงเดียว ไม่ใช่ array — Console ย่อ array ไว้เป็น "Array(22)"
+      // ต้องกดกางถึงจะเห็น ซึ่งพอส่งภาพหน้าจอมาก็อ่านอะไรไม่ได้เลย
+      const menuText = (menuRoot.innerText || '').split('\n')
+        .map((s) => s.trim()).filter(Boolean).join(' | ');
+      console.warn('[flow-helper] เมนูเปิดแต่ไม่เจอ "ดาวน์โหลด" — เมนูมี: ' + menuText);
+      if (!menuDump) menuDump = menuText;
       await closeMenu();
       continue;
     }
@@ -355,7 +374,15 @@
     + (reasons.length ? `<br><span style="color:#fbbf24">${reasons.join('<br>')}</span>` : '')
     + (navigatedAway() ? '<br><span style="color:#fbbf24">หน้าเปลี่ยนระหว่างทาง — '
                        + 'กด Back แล้วลองใหม่</span>' : '')
-    + (fail ? '<br><span style="color:#9aa5a2">รายละเอียดอยู่ใน Console (F12)</span>' : '');
+    // เมนูที่เปิดได้แต่ไม่เจอรายการดาวน์โหลด — โชว์ทั้งเมนูตรงนี้เลย จะได้คัดลอกส่งมา
+    // ได้โดยไม่ต้องเปิด Console แล้วนั่งกางกล่อง Array
+    + (menuDump ? '<br><span style="color:#9aa5a2">รายการในเมนู:</span>'
+                + '<textarea readonly style="width:100%;height:90px;margin-top:6px;'
+                + 'background:#0b0f12;color:#cfe;border:1px solid #2b3a36;'
+                + 'border-radius:8px;padding:6px;font:12px/1.4 ui-monospace,monospace">'
+                + menuDump.replace(/</g, '&lt;') + '</textarea>' : '')
+    + (fail && !menuDump
+        ? '<br><span style="color:#9aa5a2">รายละเอียดอยู่ใน Console (F12)</span>' : '');
   hud.querySelector('#fdh-stop').textContent = 'ปิด';
   hud.querySelector('#fdh-stop').onclick = () => hud.remove();
   console.log('[flow-helper] เสร็จแล้ว ไฟล์จะไปอยู่ในโฟลเดอร์ดาวน์โหลดของ Chrome');
