@@ -167,6 +167,81 @@
     await sleep(400);
   }
 
+  // ── คลิกขวา ──────────────────────────────────────────────────────────────
+  // เป็นทางที่ใช้ได้จริงถ้า Flow ดัก contextmenu เอง เพราะนั่นคือ JS event ที่
+  // สคริปต์ยิงได้ ต่างจาก :hover ที่เบราว์เซอร์ปิดตายไม่ให้ปลอม
+  // (การยิง contextmenu แบบสังเคราะห์ไม่ทำให้เมนูของ Chrome เด้งขึ้นมาด้วย)
+  async function rightClick(el) {
+    const r = el.getBoundingClientRect();
+    const at = { bubbles: true, cancelable: true, button: 2, buttons: 2,
+                 clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    el.dispatchEvent(new MouseEvent('pointerdown', at));
+    el.dispatchEvent(new MouseEvent('mousedown', at));
+    el.dispatchEvent(new MouseEvent('contextmenu', at));
+    el.dispatchEvent(new MouseEvent('mouseup', at));
+    await sleep(250);
+  }
+
+  // หาไทล์สื่อ — การ์ดที่หุ้ม media ชิ้นเดียว ไม่ใช่ทั้ง grid
+  function findTiles() {
+    const vw = innerWidth;
+    const vh = innerHeight;
+    const media = [...document.querySelectorAll('img, video')].filter((m) => {
+      const r = m.getBoundingClientRect();
+      return r.width >= 100 && r.height >= 100 &&
+             r.width <= vw * 0.6 && r.height <= vh * 0.9;
+    });
+    const tiles = new Set();
+    for (const m of media) {
+      const mr = m.getBoundingClientRect();
+      const mArea = mr.width * mr.height;
+      let el = m;
+      let best = null;
+      for (let up = 0; up < 5 && el.parentElement; up++) {
+        el = el.parentElement;
+        const r = el.getBoundingClientRect();
+        if (r.width > vw * 0.7 || r.height > vh * 0.9) break;
+        if (el.querySelectorAll('img, video').length > 1) break;
+        if (r.width * r.height > mArea * 3) break;
+        best = el;
+      }
+      if (best) tiles.add(best);
+    }
+    return [...tiles];
+  }
+
+  // เมนูที่เพิ่งโผล่ใต้ body — ใช้ diff แทนการค้นทั้งหน้า จะได้ไม่ไปเจอเมนูค้าง
+  const bodyKids = () => new Set(document.body.children);
+  const newMenu = (before) => [...document.body.children].find(
+    (n) => !before.has(n) && (n.textContent || '').trim());
+
+  // กดดาวน์โหลดในเมนูที่เปิดอยู่ แล้วเลือกความละเอียด
+  // คืน true เมื่อกดสำเร็จ · คืนข้อความเหตุผลเมื่อไม่สำเร็จ
+  async function downloadFromMenu(menuRoot) {
+    const item = findByText(menuRoot, DOWNLOAD_LABELS);
+    if (!item) {
+      const menuText = (menuRoot.innerText || '').split('\n')
+        .map((s) => s.trim()).filter(Boolean).join(' | ');
+      console.warn('[flow-helper] เมนูมี: ' + menuText);
+      return 'เมนูเปิดแต่ไม่มี "ดาวน์โหลด"';
+    }
+    // เมนูย่อยความละเอียดเปิดด้วย hover — อันนี้เป็น JS ไม่ใช่ CSS :hover จึงสั่งได้
+    await hover(item);
+    let quality = await waitFor(() => findByText(document.body, QUALITY_LABELS), 1800);
+    if (!quality) {
+      item.click();
+      quality = await waitFor(() => findByText(document.body, QUALITY_LABELS), 1800);
+    }
+    if (quality) {
+      await hover(quality);
+      await sleep(200);
+      quality.click();
+    } else {
+      item.click();   // เผื่อ UI รุ่นที่กดแล้วโหลดตรง ไม่มีเมนูย่อย
+    }
+    return true;
+  }
+
   // ── กันกดผิดหน้า ─────────────────────────────────────────────────────────
   if (!/(^|\.)labs\.google$/.test(location.hostname)) {
     say('<b style="color:#fbbf24">ยังไม่ได้อยู่บนหน้า Google Flow</b><br>'
@@ -187,13 +262,69 @@
   let ok = 0;
   let lastKey = '';
   const problems = [];
-  say(IDLE_MSG(0));
-  log(`พร้อมแล้ว — ชี้เมาส์ที่คลิปได้เลย (สูงสุด ${MAX_PER_RUN} ไฟล์ต่อรอบ)`);
 
   // ครอบไว้ทั้งก้อน — error ใน async IIFE จะกลายเป็น unhandled rejection ที่ไม่โผล่
   // ที่ไหนเลย HUD ค้างอยู่ที่ข้อความเดิมเหมือนกำลังรออยู่ ทั้งที่ตายไปแล้ว
   // (เจอมาแล้วตอน cardMenuButton คืน object แทนที่จะคืนตัวปุ่ม)
   try {
+
+  // ── ลองคลิกขวาก่อน ───────────────────────────────────────────────────────
+  // ถ้า Flow ดัก contextmenu เอง ทางนี้ทำได้อัตโนมัติทั้งหมดโดยไม่ต้องพึ่ง :hover
+  // ที่ปลอมไม่ได้ ลองกับไทล์ใบแรกก่อน แล้วค่อยตัดสินว่าจะเดินทางไหน
+  say('🔍 กำลังลองคลิกขวา…');
+  let autoMode = false;
+  const probe = findTiles()[0];
+  if (probe) {
+    const before = bodyKids();
+    await rightClick(probe);
+    const menu = await waitFor(() => newMenu(before), 1500);
+    if (menu) {
+      autoMode = findByText(menu, DOWNLOAD_LABELS) ? true : false;
+      if (!autoMode) log('คลิกขวาเปิดเมนูได้ แต่ในเมนูไม่มี "ดาวน์โหลด"');
+      await closeMenu();
+    }
+  }
+  log(autoMode ? 'คลิกขวาใช้ได้ — ทำอัตโนมัติทั้งหมด'
+               : 'คลิกขวาไม่ได้ผล — เปลี่ยนเป็นโหมดชี้เมาส์');
+
+  if (autoMode) {
+    // จำด้วย src ของสื่อ เพราะ node จะหลุดเมื่อ Flow เรนเดอร์รายการใหม่
+    const seen = new Set();
+    const keyOf = (t) => {
+      const m = t.querySelector('img, video');
+      return m ? (m.currentSrc || m.src || m.getAttribute('poster') || '') : '';
+    };
+    const total = findTiles().length;
+    say(`⚙️ คลิกขวาใช้ได้ — ไล่โหลด ${Math.min(total, MAX_PER_RUN)} ไฟล์ให้เอง`);
+
+    for (let i = 0; i < total && ok < MAX_PER_RUN && !stopped; i++) {
+      const tile = findTiles().find((t) => keyOf(t) && !seen.has(keyOf(t)));
+      if (!tile) break;
+      seen.add(keyOf(tile));
+
+      tile.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      await sleep(500);
+
+      const before = bodyKids();
+      await rightClick(tile);
+      const menuRoot = await waitFor(() => newMenu(before), 2500);
+      if (!menuRoot) { problems.push('คลิกขวาแล้วเมนูไม่เปิด'); await closeMenu(); continue; }
+
+      const res = await downloadFromMenu(menuRoot);
+      if (res !== true) { problems.push(res); await closeMenu(); continue; }
+
+      ok++;
+      log(`ดาวน์โหลดแล้ว ${ok} ไฟล์`);
+      say(`⚙️ กำลังไล่โหลด… <b>${ok}/${Math.min(total, MAX_PER_RUN)}</b>`);
+      await waitFor(() => !document.body.contains(menuRoot), 1500);
+      await closeMenu();
+      await humanDelay();   // หน่วงแบบคน — กันยิงถี่
+    }
+  } else {
+
+  say(IDLE_MSG(0));
+  log(`พร้อมแล้ว — ชี้เมาส์ที่คลิปได้เลย (สูงสุด ${MAX_PER_RUN} ไฟล์ต่อรอบ)`);
+
   while (ok < MAX_PER_RUN && !stopped) {
     // รอปุ่ม ⋮ ที่ยังไม่เคยทำ — ผู้ใช้ต้องชี้เมาส์ก่อน สคริปต์สร้าง :hover เองไม่ได้
     const btn = await waitFor(
@@ -221,30 +352,8 @@
       continue;
     }
 
-    const item = findByText(menuRoot, DOWNLOAD_LABELS);
-    if (!item) {
-      const menuText = (menuRoot.innerText || '').split('\n')
-        .map((s) => s.trim()).filter(Boolean).join(' | ');
-      problems.push('เมนูเปิดแต่ไม่มี "ดาวน์โหลด"');
-      console.warn('[flow-helper] เมนูมี: ' + menuText);
-      await closeMenu();
-      continue;
-    }
-
-    // เมนูย่อยความละเอียดเปิดด้วย hover — อันนี้เป็น JS ไม่ใช่ CSS :hover จึงสั่งได้
-    await hover(item);
-    let quality = await waitFor(() => findByText(document.body, QUALITY_LABELS), 1800);
-    if (!quality) {
-      item.click();
-      quality = await waitFor(() => findByText(document.body, QUALITY_LABELS), 1800);
-    }
-    if (quality) {
-      await hover(quality);
-      await sleep(200);
-      quality.click();
-    } else {
-      item.click();   // เผื่อ UI รุ่นที่กดแล้วโหลดตรง ไม่มีเมนูย่อย
-    }
+    const res = await downloadFromMenu(menuRoot);
+    if (res !== true) { problems.push(res); await closeMenu(); continue; }
 
     ok++;
     log(`ดาวน์โหลดแล้ว ${ok} ไฟล์`);
@@ -253,6 +362,7 @@
     say(`✅ โหลดใบนี้แล้ว — เลื่อนเมาส์ไปใบถัดไป<br><b>โหลดแล้ว ${ok}/${MAX_PER_RUN}</b>`);
     await humanDelay();   // หน่วงแบบคน — กันยิงถี่
     if (ok < MAX_PER_RUN && !stopped) say(IDLE_MSG(ok));
+  }
   }
   } catch (e) {
     console.error('[flow-helper] พัง:', e);
