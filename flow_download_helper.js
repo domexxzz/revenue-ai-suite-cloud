@@ -47,6 +47,32 @@
   // ไฟล์เดิม ได้ไฟล์ใหญ่ขึ้นแต่รายละเอียดเท่าเดิม จึงเลือกขนาดตั้งเดิม
   const QUALITY_LABELS = ['ขนาดตั้งเดิม', 'Original size', 'Original'];
 
+  // ห้ามกดเด็ดขาด
+  //
+  // เมนูคลิกขวาที่สคริปต์เปิดได้จริงบางทีมีแค่ "ลบ" รายการเดียว ซึ่งแปลว่าถ้าการจับ
+  // ข้อความพลาดเมื่อไหร่ คลิปของผู้ใช้หายทันทีและเอาคืนไม่ได้ ต่อให้ตรรกะตอนนี้จะ
+  // หาแต่คำว่า "ดาวน์โหลด" ก็ตาม — ราคาของการพลาดสูงเกินกว่าจะไว้ใจตรรกะอย่างเดียว
+  // จึงเช็คซ้ำที่ปลายทางก่อนกดทุกครั้ง
+  const DESTRUCTIVE_LABELS = ['ลบ', 'ย้ายลงถังขยะ', 'ถังขยะ', 'delete', 'Delete',
+                              'remove', 'Remove', 'Trash', 'trash', 'Move to trash'];
+
+  const isDestructive = (el) => {
+    const t = ((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || ''))
+      .toLowerCase();
+    return DESTRUCTIVE_LABELS.some((l) => t.includes(l.toLowerCase()));
+  };
+
+  // กดได้ก็ต่อเมื่อไม่เข้าข่ายทำลาย — ถ้าเข้าข่าย ไม่กดและบอกออกมา
+  function safeClick(el, what) {
+    if (isDestructive(el)) {
+      console.warn(`[flow-helper] ไม่กด "${(el.textContent || '').trim().slice(0, 40)}" `
+                 + `ตอน${what} เพราะเข้าข่ายลบ/ทิ้ง`);
+      return false;
+    }
+    el.click();
+    return true;
+  }
+
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const humanDelay = () =>
     sleep(MIN_DELAY_MS + Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS));
@@ -186,24 +212,29 @@
   async function downloadFromMenu(menuRoot) {
     const item = findByText(menuRoot, DOWNLOAD_LABELS);
     if (!item) {
-      const menuText = (menuRoot.innerText || '').split('\n')
+      menuDump = (menuRoot.innerText || '').split('\n')
         .map((s) => s.trim()).filter(Boolean).join(' | ');
-      console.warn('[flow-helper] เมนูมี: ' + menuText);
+      console.warn('[flow-helper] เมนูมี: ' + menuDump);
       return 'เมนูเปิดแต่ไม่มี "ดาวน์โหลด"';
     }
+    if (isDestructive(item)) return 'รายการที่จับได้เข้าข่ายลบ — ไม่กด';
+
     // เมนูย่อยความละเอียดเปิดด้วย hover — อันนี้เป็น JS ไม่ใช่ CSS :hover จึงสั่งได้
     await hover(item);
     let quality = await waitFor(() => findByText(document.body, QUALITY_LABELS), 1800);
     if (!quality) {
-      item.click();
+      if (!safeClick(item, 'กดดาวน์โหลด')) return 'รายการที่จับได้เข้าข่ายลบ — ไม่กด';
       quality = await waitFor(() => findByText(document.body, QUALITY_LABELS), 1800);
     }
     if (quality) {
       await hover(quality);
       await sleep(200);
-      quality.click();
+      if (!safeClick(quality, 'เลือกความละเอียด')) {
+        return 'ตัวเลือกความละเอียดเข้าข่ายลบ — ไม่กด';
+      }
     } else {
-      item.click();   // เผื่อ UI รุ่นที่กดแล้วโหลดตรง ไม่มีเมนูย่อย
+      // เผื่อ UI รุ่นที่กดแล้วโหลดตรง ไม่มีเมนูย่อย
+      if (!safeClick(item, 'กดดาวน์โหลด')) return 'รายการที่จับได้เข้าข่ายลบ — ไม่กด';
     }
     return true;
   }
@@ -230,6 +261,7 @@
   let step = 'กำลังเริ่ม';
   let stepAt = Date.now();
   let stuckAt = '';
+  let menuDump = '';
   const setStep = (s) => { step = s; stepAt = Date.now(); };
 
   const ticker = setInterval(() => {
@@ -289,7 +321,14 @@
 
     setStep(`กดดาวน์โหลดคลิปที่ ${i + 1}`);
     const res = await downloadFromMenu(menuRoot);
-    if (res !== true) { problems.push(res); await closeMenu(); continue; }
+    if (res !== true) {
+      problems.push(res);
+      await closeMenu();
+      // เมนูที่คลิกขวาเปิดได้ไม่มี "ดาวน์โหลด" — ใบอื่นก็จะเหมือนกันทั้งหมด
+      // การคลิกขวาต่ออีก 14 ครั้งไม่ได้อะไรเพิ่ม นอกจากเปิดเมนูที่มีแต่ "ลบ" ซ้ำ ๆ
+      if (menuDump) { stopped = true; }
+      continue;
+    }
 
     ok++;
     log(`ดาวน์โหลดแล้ว ${ok} ไฟล์`);
@@ -317,7 +356,16 @@
   const stuckNote = stuckAt
     ? `<br><span style="color:#f87171">หยุดเองเพราะค้างที่ขั้น: ${stuckAt}</span>`
     : '';
-  say(`<b>เสร็จ — ดาวน์โหลด ${ok} ชิ้น</b>${stuckNote}${note}`
+  // เมนูที่คลิกขวาได้ไม่มีดาวน์โหลด = ทางนี้ตันบนหน้านี้ บอกให้ชัดว่าเจออะไรและ
+  // ต้องทำยังไงต่อ ดีกว่าปล่อยให้เดาว่าทำไมได้ 0 ไฟล์
+  const dumpNote = menuDump
+    ? '<br><span style="color:#9aa5a2">เมนูที่คลิกขวาเปิดได้มีแค่:</span>'
+      + `<div style="margin-top:4px;padding:6px;background:#0b0f12;border-radius:6px;`
+      + `font:12px/1.4 ui-monospace,monospace">${menuDump.replace(/</g, '&lt;')}</div>`
+      + '<span style="color:#fbbf24">คลิกขวาแบบสคริปต์ได้เมนูสั้นกว่าที่คุณคลิกเอง '
+      + '— ทางนี้ตัน ต้องคลิกขวาด้วยมือ แล้วเลือกดาวน์โหลดเอง</span>'
+    : '';
+  say(`<b>เสร็จ — ดาวน์โหลด ${ok} ชิ้น</b>${stuckNote}${note}${dumpNote}`
     + (ok >= MAX_PER_RUN ? '<br>ครบเพดานต่อรอบแล้ว กดบุ๊กมาร์กใหม่ได้ถ้ายังเหลือ' : ''));
   if (stuckAt) console.warn('[flow-helper] ค้างที่ขั้น: ' + stuckAt);
   hud.querySelector('#fdh-stop').textContent = 'ปิด';
