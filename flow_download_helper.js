@@ -95,14 +95,32 @@
     return [...tiles];
   }
 
+  // หาปุ่ม/เมนูจากข้อความ
+  //
+  // เวอร์ชันแรกเอา match แรกใน document order ซึ่งคือ div ที่ "ห่อ" เมนูอยู่ ไม่ใช่
+  // ตัวเมนูเอง — เพราะ textContent ของกล่องข้างนอกก็เท่ากับข้อความข้างในเป๊ะ พอคลิก
+  // กล่องข้างนอก handler ที่ผูกไว้กับลูกจึงไม่ทำงาน แต่สคริปต์นับว่าสำเร็จ ทดสอบแล้ว
+  // ได้ ok=4 ทั้งที่ไม่มีไฟล์ถูกโหลดสักไฟล์
+  //
+  // จึงต้องเลือกสามชั้น: ชนิดที่กดได้จริงมาก่อน → ข้อความตรงเป๊ะมาก่อนขึ้นต้นด้วย →
+  // ตัวที่ลึกที่สุดมาก่อน (ไม่มีลูกที่ข้อความเหมือนกัน)
+  const CLICKABLE = ['[role="menuitem"]', 'button', '[role="button"]', 'a', 'li',
+                     'span', 'div'];
+
   function findByText(root, labels) {
-    const nodes = [...root.querySelectorAll('button, [role="button"], [role="menuitem"], span, div')];
     for (const label of labels) {
-      const hit = nodes.find((n) => {
-        const t = (n.textContent || '').trim();
-        return t === label || t.startsWith(label);
-      });
-      if (hit) return hit;
+      for (const sel of CLICKABLE) {
+        const hits = [...root.querySelectorAll(sel)].filter((n) => {
+          const t = (n.textContent || '').trim();
+          return t === label || t.startsWith(label);
+        });
+        if (!hits.length) continue;
+        const exact = hits.filter((n) => (n.textContent || '').trim() === label);
+        const pool = exact.length ? exact : hits;
+        // ตัวที่ไม่มีตัวอื่นในกองซ้อนอยู่ข้างใน = ตัวจริง ไม่ใช่กล่องห่อ
+        const deepest = pool.find((n) => !pool.some((o) => o !== n && n.contains(o)));
+        return deepest || pool[pool.length - 1];
+      }
     }
     return null;
   }

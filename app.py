@@ -1,4 +1,5 @@
 import datetime as dt
+import html as html_lib
 import io
 import json
 import re
@@ -2529,14 +2530,36 @@ def _render_flow_sync(authed: bool = True) -> None:
         st.code(f'{Path.cwd() / ".venv/Scripts/python.exe"} {Path.cwd() / "flow_watch.py"}',
                 language="powershell")
 
-        st.caption("2️⃣ กดดาวน์โหลดทุกคลิปใน Flow รวดเดียว — เปิด Flow ใน Chrome → กด F12 → "
-                   "แท็บ Console → วางสคริปต์นี้ → Enter")
+        st.caption("2️⃣ ลากปุ่มนี้ขึ้นแถบบุ๊กมาร์กครั้งเดียว — จากนั้นเปิดโปรเจกต์ใน Flow "
+                   "แล้วกดปุ่มนั้น มันจะไล่กดดาวน์โหลดให้เอง")
+        try:
+            import flow_bookmarklet
+            uri = flow_bookmarklet.build()
+        except Exception as e:  # noqa: BLE001 — helper file may be missing
+            uri = ""
+            st.caption(f"⚠️ สร้างบุ๊กมาร์กเล็ตไม่ได้: {e}")
+
+        if uri:
+            # Streamlit ตัด href ที่ขึ้นต้นด้วย javascript: ทิ้งใน st.markdown จึงต้อง
+            # วางผ่าน components.html — ลากออกจาก iframe ไปแถบบุ๊กมาร์กได้ตามปกติ
+            st.components.v1.html(
+                f'''<div style="font:15px system-ui,sans-serif">
+                <a href="{html_lib.escape(uri, quote=True)}"
+                   style="display:inline-block;background:#F59E0B;color:#111827;
+                          font-weight:700;padding:.6rem 1.2rem;border-radius:10px;
+                          text-decoration:none;cursor:grab">⬇️ โหลดคลิปจาก Flow</a>
+                <span style="color:#6B7280;margin-left:.6rem">← ลากขึ้นแถบบุ๊กมาร์ก
+                (เปิดแถบด้วย Ctrl+Shift+B)</span></div>''',
+                height=60,
+            )
+            st.caption("ทำงานในเบราว์เซอร์ปกติที่คุณล็อกอินอยู่แล้ว · หน่วง 3-5 วิต่อไฟล์ · "
+                       "สูงสุด 15 ไฟล์ต่อรอบ · กดซ้ำได้ถ้ายังเหลือ")
+
         helper = Path(__file__).parent / "flow_download_helper.js"
         if helper.exists():
-            with st.popover("📋 เปิดสคริปต์เพื่อคัดลอก", width="stretch"):
+            with st.expander("ถ้าลากบุ๊กมาร์กไม่ได้ — ใช้ Console แทน"):
+                st.caption("เปิด Flow ใน Chrome → F12 → แท็บ Console → วางสคริปต์นี้ → Enter")
                 st.code(helper.read_text(encoding="utf-8"), language="javascript")
-            st.caption("สคริปต์ทำงานบนหน้าที่คุณเปิดเอง หน่วง 3-5 วิต่อไฟล์ "
-                       "และจำกัด 15 ไฟล์ต่อรอบ")
 
         st.caption("ทางเลือก: ตั้งเวลาแทน watcher (ทุก 5 นาที)")
         st.code(
