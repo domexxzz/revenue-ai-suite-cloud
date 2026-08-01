@@ -136,7 +136,7 @@
   // บุ๊กมาร์กเก็บโค้ดไว้ในตัวเอง แก้ไฟล์แล้วไม่ลากใหม่ก็ยังรันของเก่า และไม่มีทางรู้
   // จากภายนอกเลยว่าที่รันอยู่คือรุ่นไหน เสียเวลาไปหนึ่งรอบเต็มเพราะแยกไม่ออกว่า
   // "แก้แล้วไม่ได้ผล" หรือ "ยังไม่ได้ลากใหม่" — ขึ้นเลขไว้ ปัญหานี้จบ
-  const BUILD = 'v11';
+  const BUILD = 'v12';
 
   // ── โหลดจาก URL ตรง ๆ ────────────────────────────────────────────────────
   //
@@ -154,9 +154,17 @@
   //
   // ถ้า fetch ไม่ผ่านก็ยอมรับว่าโหลดจากในหน้าไม่ได้ แล้วส่ง URL ออกไปให้ฝั่ง Python
   // โหลดแทน — URL ที่ CDN เซ็นมาใช้ได้โดยไม่ต้องมีคุกกี้
+  // credentials ต้องเป็นค่าเริ่มต้น (same-origin) ห้ามใส่ 'include'
+  //
+  // ลิงก์ไฟล์จริงตอบ Access-Control-Allow-Origin: * และเบราว์เซอร์ปฏิเสธคำขอที่แนบ
+  // คุกกี้ไปยังปลายทางที่ตอบ * เสมอ — 'include' จึงทำให้ fetch ล้มทุกครั้ง ทั้งที่
+  // ปลายทางเปิดให้เข้าถึงอยู่แล้ว วัดแล้ว: include ล้ม · ค่าเริ่มต้นได้ครบ 50,000 bytes
+  //
+  // ค่าเริ่มต้นยังส่งคุกกี้ให้ labs.google ตอนขา redirect (same-origin) แล้วไม่ส่งต่อ
+  // ให้ CDN ซึ่งพอดีกับที่ทั้งสองฝั่งต้องการ
   async function directDownload(url, name) {
     try {
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await fetch(url);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const blob = await res.blob();
       const obj = URL.createObjectURL(blob);
@@ -186,7 +194,9 @@
         const parsed = new URL(u, location.href);
         base = parsed.pathname.split('/').pop() || '';
         if (!/\.\w{2,5}$/.test(base)) {
-          const id = (parsed.searchParams.get('name') || '').slice(0, 8);
+          // id อยู่ได้สองที่: ?name=<uuid> ในลิงก์ redirect ของ labs.google
+          // หรือท้าย path /video/<uuid> ในลิงก์ที่ CDN เซ็นมา — เอาอันที่มี
+          const id = (parsed.searchParams.get('name') || base || '').slice(0, 8);
           base = `flow_${id || out.size + 1}.mp4`;
         }
       } catch (e) {

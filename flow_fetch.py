@@ -21,7 +21,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import requests
 
@@ -59,10 +59,16 @@ def name_for(url: str, index: int) -> str:
     ลิงก์ของ Flow เป็น /video/<uuid> ซึ่งไม่มีนามสกุล และคลิปทุกอันมี path
     หน้าตาเหมือนกัน ถ้าตั้งชื่อจาก path จะได้ชื่อซ้ำกันหมด จึงใช้ uuid แทน
     """
-    last = Path(urlparse(url).path).name or f"clip{index}"
+    parsed = urlparse(url)
+    last = Path(parsed.path).name or ""
     if re.search(r"\.\w{2,5}$", last):
         return last
-    return f"flow_{last[:8] or index}.mp4"
+    # id อยู่ได้สองที่: ท้าย path ของลิงก์ที่ CDN เซ็นมา (/video/<uuid>) หรือ
+    # ?name=<uuid> ของลิงก์ redirect — เอาจาก query ก่อน เพราะ path ของ redirect
+    # เป็น media.getMediaUrlRedirect เหมือนกันทุกคลิป ตั้งชื่อจากมันจะซ้ำกันหมด
+    qs = parse_qs(parsed.query).get("name", [""])[0]
+    ident = (qs or last)[:8]
+    return f"flow_{ident or index}.mp4"
 
 
 def fetch_one(url: str, dest_dir: Path, index: int = 1) -> FetchResult:
