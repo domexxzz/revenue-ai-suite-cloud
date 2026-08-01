@@ -211,7 +211,7 @@ def resolve_target(drive_root: str, path: Path, platform_override: str = "") -> 
     with no hint of where the file should go — so an explicit override matters
     more here than the filename guess does.
     """
-    from google_drive import resolve_platform_folder, list_child_folders
+    from google_drive import resolve_platform_folder, list_child_folders, ensure_subfolder
 
     kind = classify(path)
     platform = platform_override or guess_platform(path.name)
@@ -226,7 +226,13 @@ def resolve_target(drive_root: str, path: Path, platform_override: str = "") -> 
     for name, fid in folders.items():
         if name.strip().lower() == wanted.strip().lower():
             return fid, name
-    # Last resort: the root itself, so a file is never silently dropped.
+
+    # ยังไม่มีโฟลเดอร์นั้นใน Drive — สร้างให้ เหมือนที่ฝั่งเครื่องทำ ไม่งั้นคลิปที่ยัง
+    # ไม่รู้แพลตฟอร์มจะไปกองที่โฟลเดอร์หลักปนกับของอื่น
+    made = ensure_subfolder(drive_root, wanted)
+    if made:
+        return made, wanted
+    # สร้างไม่ได้จริง ๆ ก็ลงโฟลเดอร์หลัก ดีกว่าทำไฟล์หาย
     return drive_root, "โฟลเดอร์หลัก"
 
 

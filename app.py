@@ -2375,19 +2375,30 @@ def _render_flow_paste_links() -> None:
     if urls:
         st.caption(f"เจอ {len(urls)} ลิงก์ (ตัดซ้ำแล้ว)")
 
-    if st.button(f"⬇️ โหลด {len(urls)} ไฟล์ลง Drive", disabled=not urls,
+    # ขึ้น Drive ตรงเป็นค่าเริ่มต้น — ไฟล์วิ่งจาก CDN เข้าหน่วยความจำแล้วขึ้นคลาวด์เลย
+    # ไม่เหลืออะไรในเครื่อง และไม่ต้องรอ Drive for Desktop ซิงก์
+    to_drive = st.radio(
+        "ปลายทาง", ["☁️ ขึ้น Google Drive ตรง (ไม่ลงเครื่อง)", "💾 ลงเครื่องก่อน"],
+        horizontal=True, key="flow_paste_dest", label_visibility="collapsed",
+    ).startswith("☁️")
+
+    if st.button(f"⬇️ โหลด {len(urls)} ไฟล์", disabled=not urls,
                  width="stretch", key="flow_paste_go"):
         prog = st.progress(0.0, text="กำลังเริ่ม…")
-        results = flow_fetch.fetch_all(
-            urls, on_progress=lambda i, n, u: prog.progress(
-                (i - 1) / n, text=f"ไฟล์ {i}/{n}"))
+        track = lambda i, n, u: prog.progress((i - 1) / n, text=f"ไฟล์ {i}/{n}")  # noqa: E731
+        if to_drive:
+            results = flow_fetch.fetch_all_to_drive(urls, QUEUE_ROOT_FOLDER_ID,
+                                                    on_progress=track)
+        else:
+            results = flow_fetch.fetch_all(urls, on_progress=track)
         prog.progress(1.0, text="เสร็จแล้ว")
         ok = [r for r in results if r.ok]
         (st.success if len(ok) == len(results) else st.warning)(
             f"โหลดสำเร็จ {len(ok)}/{len(results)} ไฟล์")
         for r in results:
             if r.ok:
-                st.markdown(f"✅ **{r.path.name}** — {r.bytes / 1048576:.1f} MB")
+                where = f" → {r.folder}" if r.folder else ""
+                st.markdown(f"✅ **{r.path.name}** — {r.bytes / 1048576:.1f} MB{where}")
             else:
                 st.markdown(f"❌ {r.url[:60]}… — {r.error}")
         if ok:

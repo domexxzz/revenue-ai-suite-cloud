@@ -136,45 +136,7 @@
   // บุ๊กมาร์กเก็บโค้ดไว้ในตัวเอง แก้ไฟล์แล้วไม่ลากใหม่ก็ยังรันของเก่า และไม่มีทางรู้
   // จากภายนอกเลยว่าที่รันอยู่คือรุ่นไหน เสียเวลาไปหนึ่งรอบเต็มเพราะแยกไม่ออกว่า
   // "แก้แล้วไม่ได้ผล" หรือ "ยังไม่ได้ลากใหม่" — ขึ้นเลขไว้ ปัญหานี้จบ
-  const BUILD = 'v14';
-
-  // ── โหลดจาก URL ตรง ๆ ────────────────────────────────────────────────────
-  //
-  // ทางที่ไม่ต้องแตะ UI ของ Flow เลย จึงไม่ติดกำแพงที่วัดมาแล้ว — :hover ปลอมไม่ได้
-  // และการเลือกในเมนูไม่ทำให้ไฟล์ออก แต่การกด <a download> บน blob เป็นสิ่งที่
-  // เบราว์เซอร์ยอมรับมาตลอด (ปุ่ม Export CSV ทุกเว็บทำแบบนี้)
-  //
-  // ห้าม fallback ไปชี้ href ที่ URL ต้นทางเด็ดขาด — ไฟล์จริงอยู่ที่
-  // flow-content.google คนละ origin กับ labs.google พอข้าม origin เบราว์เซอร์จะเมิน
-  // แอตทริบิวต์ download แล้ว "เปิด" ไฟล์แทน ผลคือหน้า Flow ถูกพาออกไปหน้าวิดีโอ
-  // งานที่เหลือหยุดหมด (เจอมาแล้ว) ถ้า fetch ไม่ผ่านก็ส่ง URL ให้ฝั่ง Python โหลดแทน
-  //
-  // credentials ต้องเป็นค่าเริ่มต้น (same-origin) ห้ามใส่ 'include'
-  //
-  // ลิงก์ไฟล์จริงตอบ Access-Control-Allow-Origin: * และเบราว์เซอร์ปฏิเสธคำขอที่แนบ
-  // คุกกี้ไปยังปลายทางที่ตอบ * เสมอ — 'include' จึงทำให้ fetch ล้มทุกครั้ง ทั้งที่
-  // ปลายทางเปิดให้เข้าถึงอยู่แล้ว วัดแล้ว: include ล้ม · ค่าเริ่มต้นได้ครบ 50,000 bytes
-  //
-  // ค่าเริ่มต้นยังส่งคุกกี้ให้ labs.google ตอนขา redirect (same-origin) แล้วไม่ส่งต่อ
-  // ให้ CDN ซึ่งพอดีกับที่ทั้งสองฝั่งต้องการ
-  async function directDownload(url, name) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const blob = await res.blob();
-      const obj = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = obj;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(obj), 60000);
-      return { ok: true, how: 'blob', bytes: blob.size };
-    } catch (e) {
-      return { ok: false, why: String(e).slice(0, 80) };
-    }
-  }
+  const BUILD = 'v15';
 
   // ── ชื่อไฟล์จาก prompt บนการ์ด ───────────────────────────────────────────
   //
@@ -640,52 +602,36 @@
   const urls = mediaUrls();
   log(`เจอ URL วิดีโอในหน้า ${urls.length} รายการ`);
   if (urls.length) {
-    const failed = [];
-    for (const m of urls.slice(0, MAX_PER_RUN)) {
-      if (stopped) break;
-      setStep(`โหลดตรงจาก URL (${ok + 1})`);
-      const r = await directDownload(m.url, m.name);
-      if (r.ok) {
-        ok++;
-        log(`โหลดตรง: ${m.name} — ${(r.bytes / 1048576).toFixed(1)}MB`);
-      } else {
-        failed.push(m.url);
-        log(`โหลดตรงไม่ได้: ${m.name} — ${r.why}`);
-      }
-      await humanDelay();
-    }
     clearInterval(ticker);
+    const picked = urls.slice(0, MAX_PER_RUN);
 
-    // ที่โหลดจากในหน้าไม่ได้ = ไฟล์อยู่คนละ origin ซึ่งเบราว์เซอร์ไม่ให้อ่าน
-    // แต่ URL พวกนี้ CDN เซ็นมาแล้ว ใช้ได้โดยไม่ต้องมีคุกกี้ — ส่งให้ฝั่ง Python
-    // ในแอปโหลดแทนได้เลย จึงเอามาวางในกล่องให้คัดลอกทีเดียว
-    if (failed.length) {
-      hud.querySelector('#fdh-msg').innerHTML =
-        `<b>โหลดจากในหน้าได้ ${ok} ไฟล์ · ต้องให้แอปช่วยอีก ${failed.length}</b>`
-        + '<br><span style="color:#9aa5a2">ไฟล์อยู่คนละโดเมน เบราว์เซอร์เลยไม่ให้โหลดตรง '
-        + 'แต่ลิงก์พวกนี้ใช้ได้เอง — กดคัดลอกแล้วเอาไปวางในแอป หน้า “คิวอนุมัติ” '
-        + '→ ช่อง “วางลิงก์จาก Flow”</span>'
-        + '<textarea id="fdh-urls" readonly style="width:100%;height:110px;margin-top:8px;'
-        + 'background:#0b0f12;color:#cfe;border:1px solid #2b3a36;border-radius:8px;'
-        + 'padding:6px;font:11px/1.4 ui-monospace,monospace"></textarea>'
-        + '<button id="fdh-copy" style="width:100%;margin-top:6px;padding:6px;'
-        + 'border-radius:8px;border:1px solid #3d4f4a;background:#1b2724;color:#e8f0ee;'
-        + 'cursor:pointer">📋 คัดลอกลิงก์ทั้งหมด</button>';
-      const ta = hud.querySelector('#fdh-urls');
-      ta.value = failed.join('\n');
-      hud.querySelector('#fdh-copy').onclick = async () => {
-        ta.select();
-        try { await navigator.clipboard.writeText(ta.value); }
-        catch (e) { document.execCommand('copy'); }
-        hud.querySelector('#fdh-copy').textContent = '✅ คัดลอกแล้ว';
-      };
-    } else {
-      say(`<b>โหลดตรงจาก URL ${ok} ไฟล์</b>`
-        + '<br><span style="color:#9aa5a2">ไปดูของที่มาถึงจริงที่หน้า “คิวอนุมัติ”</span>');
-    }
+    // ไม่โหลดลงเครื่องแล้ว — ส่งลิงก์ให้แอปไปโหลดขึ้น Drive ตรง
+    //
+    // ลิงก์ที่ CDN เซ็นมาใช้ได้โดยไม่ต้องมีคุกกี้ ฝั่ง Python จึงดึงไฟล์เข้าหน่วยความจำ
+    // แล้วอัปขึ้น Drive ได้เลย ไม่ต้องผ่านดิสก์ ไม่ต้องรอ Drive for Desktop ซิงก์
+    // และไม่กินที่ในเครื่อง — ตรงกับที่ผู้ใช้ขอว่า "อย่าเพิ่งลงในเครื่อง"
+    hud.querySelector('#fdh-msg').innerHTML =
+      `<b>เจอคลิป ${picked.length} ไฟล์</b>`
+      + '<br><span style="color:#9aa5a2">กดคัดลอก แล้วเอาไปวางในแอป หน้า '
+      + '“คิวอนุมัติ” → ช่อง “วางลิงก์จาก Flow” → เลือก “ขึ้น Google Drive ตรง”</span>'
+      + '<textarea id="fdh-urls" readonly style="width:100%;height:110px;margin-top:8px;'
+      + 'background:#0b0f12;color:#cfe;border:1px solid #2b3a36;border-radius:8px;'
+      + 'padding:6px;font:11px/1.4 ui-monospace,monospace"></textarea>'
+      + '<button id="fdh-copy" style="width:100%;margin-top:6px;padding:6px;'
+      + 'border-radius:8px;border:1px solid #3d4f4a;background:#1b2724;color:#e8f0ee;'
+      + 'cursor:pointer">📋 คัดลอกลิงก์ทั้งหมด</button>';
+    const ta = hud.querySelector('#fdh-urls');
+    // แนบชื่อที่อ่านจาก prompt มาด้วยเป็นคอมเมนต์ ฝั่งแอปตัดทิ้งตอนแยกลิงก์
+    ta.value = picked.map((m) => `${m.url}  # ${m.name}`).join('\n');
+    hud.querySelector('#fdh-copy').onclick = async () => {
+      ta.select();
+      try { await navigator.clipboard.writeText(ta.value); }
+      catch (e) { document.execCommand('copy'); }
+      hud.querySelector('#fdh-copy').textContent = '✅ คัดลอกแล้ว';
+    };
     hud.querySelector('#fdh-stop').textContent = 'ปิด';
     hud.querySelector('#fdh-stop').onclick = () => hud.remove();
-    log('เสร็จแล้ว');
+    log('เสร็จแล้ว — เอาลิงก์ไปวางในแอป');
     return;
   }
   log('ไม่เจอ URL วิดีโอในหน้า — ลองทางเมนูแทน');

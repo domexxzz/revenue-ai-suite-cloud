@@ -40,17 +40,36 @@ class FetchResult:
     path: Path | None = None
     bytes: int = 0
     error: str = ""
+    folder: str = ""      # ชื่อโฟลเดอร์ปลายทาง (เฉพาะตอนขึ้น Drive ตรง)
+    link: str = ""        # ลิงก์ไฟล์บน Drive
+
+
+def parse_links(text: str) -> list[tuple[str, str]]:
+    """ดึง (ลิงก์, ชื่อไฟล์) จากข้อความที่วางมา
+
+    บุ๊กมาร์กเล็ตส่งมาบรรทัดละ ``<url>  # <ชื่อจาก prompt>`` ชื่อนั้นมีหมวดฉากติดมา
+    ซึ่งคิวอนุมัติใช้แสดงเป้าหมายและคะแนน Mandala ถ้าทิ้งไปแล้วไปตั้งชื่อจาก id
+    ในลิงก์แทน ข้อมูลนั้นหายทันที — จึงอ่านมาใช้ ไม่ใช่แค่มองข้ามว่าเป็นคอมเมนต์
+    """
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for line in (text or "").splitlines():
+        m = re.search(r"https?://\S+", line)
+        if not m:
+            continue
+        url = m.group(0).rstrip("\",'")
+        if url in seen:
+            continue
+        seen.add(url)
+        after = line[m.end():]
+        named = re.search(r"#\s*(\S.*?)\s*$", after)
+        out.append((url, named.group(1) if named else ""))
+    return out
 
 
 def parse_urls(text: str) -> list[str]:
-    """ดึงลิงก์ออกจากข้อความที่วางมา — รับได้ทั้งบรรทัดละอันและปนกันมั่ว ๆ"""
-    found = re.findall(r"https?://\S+", text or "")
-    seen: list[str] = []
-    for u in found:
-        u = u.rstrip('",\'')
-        if u not in seen:
-            seen.append(u)
-    return seen
+    """ดึงเฉพาะลิงก์ — ใช้ตอนนับจำนวนหรือเวลาไม่สนใจชื่อ"""
+    return [u for u, _ in parse_links(text)]
 
 
 def name_for(url: str, index: int) -> str:
@@ -71,7 +90,8 @@ def name_for(url: str, index: int) -> str:
     return f"flow_{ident or index}.mp4"
 
 
-def fetch_one(url: str, dest_dir: Path, index: int = 1) -> FetchResult:
+def fetch_one(url: str, dest_dir: Path, index: int = 1,
+              filename: str = "") -> FetchResult:
     """โหลดลิงก์เดียวลงโฟลเดอร์ปลายทาง"""
     try:
         with requests.get(url, stream=True, timeout=TIMEOUT_SEC) as r:
@@ -81,7 +101,8 @@ def fetch_one(url: str, dest_dir: Path, index: int = 1) -> FetchResult:
             dest_dir.mkdir(parents=True, exist_ok=True)
             # เขียนเป็นไฟล์ .part ก่อน แล้วค่อยเปลี่ยนชื่อ — watcher เฝ้าโฟลเดอร์นี้อยู่
             # ถ้าเห็นไฟล์ครึ่ง ๆ กลาง ๆ มันจะคว้าไปทั้งที่ยังเขียนไม่เสร็จ
-            target = flow_sync._unique_path(dest_dir / name_for(url, index))
+            target = flow_sync._unique_path(
+                dest_dir / (filename or name_for(url, index)))
             part = target.with_suffix(target.suffix + ".part")
             size = 0
             with open(part, "wb") as fh:
@@ -95,17 +116,67 @@ def fetch_one(url: str, dest_dir: Path, index: int = 1) -> FetchResult:
         return FetchResult(url, False, error=str(e)[:120])
 
 
-def fetch_all(text_or_urls: str | list[str], dest_dir: Path | None = None,
+def _as_pairs(text_or_links) -> list[tuple[str, str]]:
+    """รับได้ทั้งข้อความที่วางมา รายการลิงก์ล้วน หรือคู่ (ลิงก์, ชื่อ)"""
+    if isinstance(text_or_links, str):
+        return parse_links(text_or_links)
+    out = []
+    for item in text_or_links:
+        out.append(item if isinstance(item, tuple) else (item, ""))
+    return out
+
+
+def fetch_one_to_drive(url: str, drive_root: str, index: int = 1,
+                       filename: str = "") -> FetchResult:
+    """โหลดลิงก์เดียวขึ้น Google Drive ตรง ๆ โดยไม่แตะดิสก์
+
+    ไฟล์วิ่งจาก CDN เข้าหน่วยความจำแล้วขึ้น Drive เลย ไม่มีไฟล์เหลือในเครื่อง
+    ซึ่งแปลว่าไม่ต้องพึ่ง Drive for Desktop และไม่กินที่บนไดรฟ์ในเครื่องด้วย
+    """
+    from google_drive import upload_file
+
+    name = filename or name_for(url, index)
+    try:
+        r = requests.get(url, timeout=TIMEOUT_SEC)
+        if r.status_code != 200:
+            return FetchResult(url, False,
+                               error=f"HTTP {r.status_code} — ลิงก์อาจหมดอายุแล้ว")
+        data = r.content
+    except Exception as e:  # noqa: BLE001
+        return FetchResult(url, False, error=str(e)[:120])
+
+    folder_id, label = flow_sync.resolve_target(drive_root, Path(name))
+    mime = flow_sync.MIME_BY_EXT.get(Path(name).suffix.lower(),
+                                     "application/octet-stream")
+    link = upload_file(data, name, folder_id, mime_type=mime)
+    if not link:
+        return FetchResult(url, False, error="อัปโหลดขึ้น Drive ไม่สำเร็จ")
+    return FetchResult(url, True, path=Path(name), bytes=len(data),
+                       folder=label, link=link)
+
+
+def fetch_all_to_drive(text_or_links, drive_root: str,
+                       on_progress=None) -> list[FetchResult]:
+    """โหลดทุกลิงก์ขึ้น Drive ตรง ๆ ไม่ผ่านเครื่อง"""
+    pairs = _as_pairs(text_or_links)
+    out: list[FetchResult] = []
+    for i, (u, name) in enumerate(pairs, 1):
+        if on_progress:
+            on_progress(i, len(pairs), u)
+        out.append(fetch_one_to_drive(u, drive_root, i, filename=name))
+    return out
+
+
+def fetch_all(text_or_links, dest_dir: Path | None = None,
               on_progress=None) -> list[FetchResult]:
     """โหลดทุกลิงก์ที่ให้มา ลงโฟลเดอร์ที่ watcher เฝ้าอยู่"""
-    urls = (parse_urls(text_or_urls) if isinstance(text_or_urls, str)
-            else list(text_or_urls))
+    pairs = _as_pairs(text_or_links)
     dest = Path(dest_dir) if dest_dir else Path(flow_sync.default_watch_dir())
     out: list[FetchResult] = []
-    for i, u in enumerate(urls, 1):
+    for i, (u, name) in enumerate(pairs, 1):
         if on_progress:
-            on_progress(i, len(urls), u)
-        out.append(fetch_one(u, dest, i))
+            on_progress(i, len(pairs), u)
+        out.append(fetch_one(u, dest, i, filename=name))
     return out
 
 
