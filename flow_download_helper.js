@@ -136,7 +136,62 @@
   // บุ๊กมาร์กเก็บโค้ดไว้ในตัวเอง แก้ไฟล์แล้วไม่ลากใหม่ก็ยังรันของเก่า และไม่มีทางรู้
   // จากภายนอกเลยว่าที่รันอยู่คือรุ่นไหน เสียเวลาไปหนึ่งรอบเต็มเพราะแยกไม่ออกว่า
   // "แก้แล้วไม่ได้ผล" หรือ "ยังไม่ได้ลากใหม่" — ขึ้นเลขไว้ ปัญหานี้จบ
-  const BUILD = 'v9';
+  const BUILD = 'v10';
+
+  // ── โหลดจาก URL ตรง ๆ ────────────────────────────────────────────────────
+  //
+  // ทางที่ไม่ต้องแตะ UI ของ Flow เลย ซึ่งแปลว่าไม่ติดกำแพงเดิม — :hover ปลอมไม่ได้
+  // และการเลือกในเมนูไม่ทำให้ไฟล์ออก แต่การกด <a download> ด้วยสคริปต์เป็นสิ่งที่
+  // เบราว์เซอร์ยอมรับมาตลอด (ปุ่ม Export CSV ทุกเว็บทำแบบนี้)
+  //
+  // ลอง fetch เป็น blob ก่อน เพราะข้าม origin ได้ถ้าเซิร์ฟเวอร์เปิด CORS และได้ชื่อ
+  // ไฟล์ตามที่เราตั้ง ถ้า fetch ไม่ผ่านค่อยชี้ href ตรง ๆ ซึ่งได้ผลเมื่อ same-origin
+  async function directDownload(url, name) {
+    try {
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const blob = await res.blob();
+      const obj = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = obj;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(obj), 60000);
+      return { ok: true, how: 'blob', bytes: blob.size };
+    } catch (e) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return { ok: true, how: 'ตรง', note: String(e).slice(0, 60) };
+    }
+  }
+
+  // เก็บ URL ของสื่อจากทุกที่ที่พอจะหาได้ในหน้า
+  function mediaUrls() {
+    const out = new Map();          // url -> ชื่อไฟล์ที่จะตั้ง
+    const add = (u, hint) => {
+      if (!u || u.startsWith('data:') || u.startsWith('blob:')) return;
+      if (out.has(u)) return;
+      let base = '';
+      try { base = new URL(u, location.href).pathname.split('/').pop() || ''; }
+      catch (e) { /* URL เพี้ยนก็ปล่อยชื่อว่างไว้ */ }
+      if (!/\.\w{2,5}$/.test(base)) base = `${hint}_${out.size + 1}.mp4`;
+      out.set(u, base);
+    };
+    for (const v of document.querySelectorAll('video')) add(v.currentSrc || v.src, 'flow');
+    try {
+      for (const e of performance.getEntriesByType('resource')) {
+        if (/\.(mp4|webm|mov)(\?|$)/i.test(e.name)) add(e.name, 'flow');
+      }
+    } catch (e) { /* ไม่มีก็ข้าม */ }
+    return [...out.entries()].map(([url, name]) => ({ url, name }));
+  }
 
   // ── ดูว่าคลิกทำให้ Flow ขยับจริงไหม ──────────────────────────────────────
   //
@@ -487,18 +542,47 @@
     return m ? (m.currentSrc || m.src || m.getAttribute('poster') || '') : '';
   };
 
+  // ── ทางที่ 1: โหลดจาก URL ตรง ๆ ─────────────────────────────────────────
+  // ต้องมาก่อนการหาไทล์ เพราะไม่ได้พึ่งไทล์เลย — URL มีได้แม้หาการ์ดไม่เจอ
+  // (เคยวางไว้ทีหลัง แล้วโดนบรรทัด "หาคลิปในหน้าไม่เจอ" ตัดจบก่อนถึง)
+  // ไม่ต้องแตะเมนูของ Flow เลย จึงไม่ติดกำแพงที่วัดมาแล้วสองชั้น
+  // ทำก่อนเสมอ เพราะถ้าได้ก็จบ และเป็นทางเดียวที่รู้ผลทันทีว่าไฟล์ออกหรือไม่
+  setStep('หา URL ของไฟล์ในหน้า');
+  const urls = mediaUrls();
+  log(`เจอ URL วิดีโอในหน้า ${urls.length} รายการ`);
+  if (urls.length) {
+    for (const m of urls.slice(0, MAX_PER_RUN)) {
+      if (stopped) break;
+      setStep(`โหลดตรงจาก URL (${ok + 1})`);
+      const r = await directDownload(m.url, m.name);
+      log(`โหลดตรง: ${m.name} — ${r.how}${r.bytes ? ` ${(r.bytes/1048576).toFixed(1)}MB` : ''}`);
+      ok++;
+      await humanDelay();
+    }
+    clearInterval(ticker);
+    say(`<b>สั่งโหลดตรงจาก URL ${ok} ไฟล์</b>`
+      + '<br><span style="color:#9aa5a2">ไปดูของที่มาถึงจริงที่หน้า “คิวอนุมัติ”</span>');
+    hud.querySelector('#fdh-stop').textContent = 'ปิด';
+    hud.querySelector('#fdh-stop').onclick = () => hud.remove();
+    log('เสร็จแล้ว');
+    return;
+  }
+  log('ไม่เจอ URL วิดีโอในหน้า — ลองทางเมนูแทน');
+
   setStep('กำลังหาคลิปในหน้า');
   total = findTiles().length;
   log(`เจอสื่อ ${total} ชิ้น (สูงสุด ${MAX_PER_RUN} ไฟล์ต่อรอบ)`);
   if (!total) {
     clearInterval(ticker);
-    say('หาคลิปในหน้าไม่เจอ — เลื่อนหน้าให้เห็นคลิปก่อนแล้วกดใหม่');
+    say('หาคลิปในหน้าไม่เจอ และไม่เจอ URL ของไฟล์ด้วย'
+      + '<br><span style="color:#9aa5a2">ลองเลื่อนหน้าให้เห็นคลิป หรือกดเล่นสักคลิป '
+      + 'หนึ่งก่อน แล้วกดบุ๊กมาร์กใหม่ — พอคลิปถูกโหลด URL จะโผล่ให้จับได้</span>');
     hud.querySelector('#fdh-stop').textContent = 'ปิด';
     hud.querySelector('#fdh-stop').onclick = () => hud.remove();
     return;
   }
 
-  // ── ลองคลิกขวาแค่ใบเดียว แล้วค่อยตัดสิน ──────────────────────────────────
+  // ── ทางที่ 2: ผ่านเมนูคลิกขวา ────────────────────────────────────────────
   // วัดบนหน้าจริงแล้ว: ยิง contextmenu ครบ 8 มุม ไม่มีเมนูโผล่สักมุม — Flow ไม่รับ
   // event สังเคราะห์ (น่าจะเช็ค isTrusted) เหมือนที่ :hover ก็ปลอมไม่ได้
   // จึงลองแค่ใบแรกใบเดียวพอ ถ้าไม่ขึ้นก็ไม่เสียเวลาไล่ลองอีก 14 ใบ

@@ -132,6 +132,43 @@
       .map((s) => (s.textContent || '').trim())
       .filter((t) => t && t.length < 24 && /^[a-z_]+$/.test(t)))];
 
+    // ── URL ของไฟล์สื่อ ──────────────────────────────────────────────────
+    // ถ้าได้ URL ตรง ๆ ก็ไม่ต้องกดเมนูของ Flow เลย สั่งโหลดเองได้ด้วย <a download>
+    // ซึ่งเป็นวิธีที่เบราว์เซอร์ยอมรับ ไม่ติดกำแพง :hover
+    //
+    // เรื่องที่ต้องรู้คือ origin — ถ้าไฟล์อยู่คนละ origin และไม่เปิด CORS
+    // แอตทริบิวต์ download จะถูกเมิน กลายเป็นเปิดหน้าใหม่แทนที่จะโหลด
+    const originOf = (u) => { try { return new URL(u, location.href).origin; }
+                              catch (e) { return '?'; } };
+    const short = (u) => (u || '').slice(0, 110);
+
+    const vids = [...document.querySelectorAll('video')].map((v) => ({
+      src: short(v.currentSrc || v.src),
+      poster: short(v.getAttribute('poster')),
+      origin: originOf(v.currentSrc || v.src),
+    })).filter((v) => v.src || v.poster);
+
+    // ทุกอย่างที่หน้านี้เคยโหลด รวมถึงที่มาจาก fetch/XHR — วิดีโอที่เคยเล่นจะโผล่ตรงนี้
+    let res = [];
+    try {
+      res = performance.getEntriesByType('resource')
+        .map((e) => e.name)
+        .filter((n) => /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(n));
+    } catch (e) { /* ไม่มีก็ข้าม */ }
+
+    const imgs = [...document.querySelectorAll('img')]
+      .map((i) => i.currentSrc || i.src)
+      .filter((u) => u && !u.startsWith('data:'));
+
+    report.สื่อ = {
+      videoElement: vids.slice(0, 6),
+      วิดีโอที่หน้านี้เคยโหลด: [...new Set(res)].slice(0, 8).map(short),
+      originของวิดีโอ: [...new Set(res.map(originOf))],
+      ตัวอย่างรูป: [...new Set(imgs)].slice(0, 4).map(short),
+      originของรูป: [...new Set(imgs.map(originOf))],
+      originหน้านี้: location.origin,
+    };
+
     // ── ลองคลิกขวาหลายมุม ────────────────────────────────────────────────
     // คลิกขวาที่ตัวรูปได้เมนูสั้นที่มีแค่ "ลบ" ส่วนตอนคนคลิกเองได้เมนูเต็ม
     // ความต่างอาจอยู่ที่ว่าคลิกโดน element ไหน หรือโดนตรงพิกัดไหนของการ์ด
