@@ -182,6 +182,25 @@
     await sleep(200);
   }
 
+  // บอกว่าเมาส์ออกจากตรงนั้นแล้ว
+  //
+  // เดิมยิงแต่ event ตอนเมาส์เข้า ไม่เคยบอกว่าออก Flow จึงถือว่าเมาส์ยังอยู่ที่การ์ด
+  // ใบเดิมและไม่ย้ายแถบ ❤️ ↩️ ⋮ ไปไหน — log จริงเห็นการ์ดอยู่ที่ x=726 แต่ ⋮ ยังค้าง
+  // ที่ x=507 ของใบก่อน ทุกใบหลังจากนั้นจึงหาปุ่มของตัวเองไม่เจอ
+  async function unhover(el) {
+    if (!el || !el.isConnected) return;
+    const at = { bubbles: true, cancelable: true, clientX: 0, clientY: 0 };
+    for (const type of ['pointermove', 'mousemove', 'pointerout', 'mouseout',
+                        'pointerleave', 'mouseleave']) {
+      const Ctor = type.startsWith('pointer') && window.PointerEvent
+        ? PointerEvent : MouseEvent;
+      el.dispatchEvent(new Ctor(type, at));
+    }
+    // ขยับ "เมาส์" ไปมุมจอ เผื่อ Flow ดูจากตำแหน่งไม่ใช่จาก event ที่ element
+    document.body.dispatchEvent(new MouseEvent('mousemove', at));
+    await sleep(250);
+  }
+
   // ปุ่มเปิดเมนูของการ์ด — ต้องหานอกการ์ด ไม่ใช่ในการ์ด
   //
   // ตรวจหน้าจริงแล้วพบว่าในการ์ดมีของกดได้แค่สองชิ้น: <a> ที่ลิงก์ไป /edit/ กับปุ่ม
@@ -311,6 +330,7 @@
   // แล้ว การไล่กดต่อมีแต่จะกดมั่วไปเรื่อย — หยุดทันทีและบอกว่าเกิดอะไรขึ้น
   const startUrl = location.href;
   const navigatedAway = () => location.href !== startUrl;
+  let lastTile = null;
 
   for (let i = 0; i < tileCount && ok < MAX_PER_RUN && !stopped; i++) {
     if (navigatedAway()) {
@@ -322,6 +342,10 @@
     seen.add(next.key);
     const tile = next.tile;
     say(`[${i + 1}/${tileCount}] สำเร็จ ${ok} · พลาด ${fail}`);
+
+    // ต้องบอกว่าเมาส์ออกจากใบก่อนหน้าแล้ว ไม่งั้นแถบควบคุมจะไม่ย้ายมาใบนี้
+    await unhover(lastTile);
+    lastTile = tile;
 
     tile.scrollIntoView({ block: 'center', behavior: 'smooth' });
     await sleep(600);
@@ -369,18 +393,28 @@
       continue;
     }
 
-    item.click();
-
     // "ดาวน์โหลด" ไม่ได้โหลดทันที มันกางเมนูย่อยเลือกความละเอียดต่ออีกชั้น
     // (270p GIF · 720p ขนาดตั้งเดิม · 1080p เพิ่มความละเอียดแล้ว · 4K)
-    // เลือก "ขนาดตั้งเดิม" เป็นค่าเริ่มต้น — ได้คลิปจริงตามที่เรนเดอร์มา ไม่ใช่ GIF
-    // และไม่ใช่ไฟล์อัปสเกลที่ใหญ่กว่าโดยไม่ได้รายละเอียดเพิ่มจริง
-    const quality = await waitFor(
-      () => findByText(document.body, QUALITY_LABELS), 2500);
+    //
+    // และเมนูย่อยเปิดด้วยการ hover ไม่ใช่การคลิก — คลิกก่อนอาจปิดเมนูทิ้งเลย
+    // จึง hover ก่อน ถ้าไม่มีอะไรกางค่อยคลิกเป็นทางสำรอง
+    await hover(item);
+    let quality = await waitFor(
+      () => findByText(document.body, QUALITY_LABELS), 1800);
+    if (!quality) {
+      item.click();
+      quality = await waitFor(() => findByText(document.body, QUALITY_LABELS), 1800);
+    }
+
     if (quality) {
-      await sleep(300);
+      // เลือก "ขนาดตั้งเดิม" — ได้คลิปจริงตามที่เรนเดอร์มา ไม่ใช่ GIF และไม่ใช่
+      // ไฟล์อัปสเกลที่ใหญ่กว่าโดยไม่ได้รายละเอียดเพิ่มจริง
+      await hover(quality);
+      await sleep(200);
       quality.click();
       await sleep(500);
+    } else {
+      item.click();   // เผื่อ UI รุ่นที่กดแล้วโหลดตรง ไม่มีเมนูย่อย
     }
 
     ok++;
