@@ -3074,9 +3074,27 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
 
     vid_key = f"copilot_vid_{mi}"
     with st.expander("🎬 วิดีโอ — Master Prompt", expanded=bool(st.session_state.get(vid_key))):
+        # The scene fixes where the clip is shot; the angle picks how it is told,
+        # so the same scene yields several genuinely different videos.
+        angle = ""
+        if SCENES_AVAILABLE:
+            angles = scene_presets.angles_for(scene)
+            angle = st.radio(
+                "🎞️ แนวการเล่าเรื่อง — เลือกได้หลายแบบในหมวดเดียวกัน",
+                options=angles,
+                format_func=scene_presets.angle_label,
+                horizontal=True,
+                key=f"copilot_angle_{mi}",
+            )
+            st.caption(f"🎯 {scene_presets.angle_goal(angle)}")
+            if not scene_presets.has_people(scene):
+                st.caption("📦 หมวดนี้ไม่มีคนในภาพ แนวที่ต้องมีตัวแสดง (รีวิว, สาธิต, "
+                           "ก่อน-หลัง) จึงไม่ขึ้นให้เลือก")
+
         st.caption(f"📋 คัดลอกไปวางใน Google Flow ได้เลย · สัดส่วน {aspect} · "
                    "10 วินาที · Hook → Decision → CTA · เสียงพากย์ไทย")
-        st.code(content_copilot.build_master_video_prompt(brief, scene, 10), language=None)
+        st.code(content_copilot.build_master_video_prompt(brief, scene, 10, angle),
+                language=None)
         st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้", FLOW_PROJECT_URL,
                        width="stretch")
 
@@ -3105,7 +3123,7 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
                 status = st.empty()
                 with st.spinner("กำลังสร้างวิดีโอ... (ปกติ 1-3 นาที อย่าปิดหน้านี้)"):
                     vid, msg = ai_provider.generate_video(
-                        content_copilot.build_master_video_prompt(brief, scene, secs),
+                        content_copilot.build_master_video_prompt(brief, scene, secs, angle),
                         gemini_key, tier=tier, seconds=secs,
                         aspect_ratio=aspect, on_progress=status.info,
                     )

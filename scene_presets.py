@@ -456,6 +456,207 @@ def goal_for(key: str) -> str:
     return get(key).get("goal", "")
 
 
+# ── Video angles ────────────────────────────────────────────────────────────────
+
+# A scene says *where* the clip is shot; an angle says *how it is told*. The same
+# gym locker room can carry a problem-first spot, a how-to, or a phone review, and
+# those are three different videos. Angles sit on top of any scene so the two
+# choices multiply instead of forcing one combined list of a hundred presets.
+#
+# `hook` and `decision` replace the scene's first two shots. The third — the
+# scene's own payoff — always survives, because that is what a before/after or a
+# flat lay is actually for. Templates are English throughout and take {item} and
+# {brand}; mixing Thai into visual direction is what once turned "สบู่" into soup.
+#
+# `vo` overrides only the hook and decision narration. The CTA line stays with the
+# campaign, since that is where a discount and its deadline live and an angle has
+# no business dropping them.
+VIDEO_ANGLES: dict[str, dict] = {
+    "hero": {
+        "label": "✨ โชว์สินค้าเด่น",
+        "goal": "ให้สินค้าเป็นพระเอก — ใช้ได้กับทุกหมวด ปลอดภัยที่สุด",
+        "needs_cast": False,
+        "structure": "เล่าตามฉากที่เลือกโดยตรง ไม่บิดโครงสร้าง",
+        # No hook/decision: falls through to the scene's own three shots, which is
+        # exactly the behaviour every clip had before angles existed.
+    },
+    "problem_solution": {
+        "label": "😣 ปัญหา → ทางออก",
+        "goal": "เปิดด้วยความรู้สึกที่คนดูมีอยู่แล้ว แล้วค่อยเสนอสินค้า",
+        "needs_cast": True,
+        "structure": "บีต 1 คือปัญหาล้วนๆ ยังไม่เห็นสินค้า บีต 2 สินค้าเข้ามาแก้",
+        "hook": ("The person notices the problem on their own skin — they catch "
+                 "their reflection or touch their cheek, and their expression "
+                 "drops. Face and upper body in frame. No product visible yet in "
+                 "this beat."),
+        "decision": ("They reach for the {item} and begin using it. Their expression "
+                     "shifts from concern to relief. The {item} is clearly visible "
+                     "with its label facing camera."),
+        "movement": ("slightly unsteady handheld while the problem is on screen, "
+                     "settling into a smooth stable frame the moment the product "
+                     "appears"),
+        "vo": {
+            "hook": "ปัญหาเดิมๆ ที่ล้างหน้ายังไงก็ไม่หายสักที",
+            "decision": "{item}เข้ามาแก้ตรงจุด ใช้ง่ายทุกวัน ไม่ต้องเปลี่ยนทั้งกิจวัตร",
+        },
+    },
+    "demo": {
+        "label": "🧼 สาธิตวิธีใช้",
+        "goal": "ตอบคำถามว่าใช้ยังไง — ลดความลังเลของคนที่ไม่เคยใช้สบู่ก้อน",
+        "needs_cast": True,
+        "structure": "โชว์ขั้นตอนจริง ตีฟอง ลูบไล้ ล้างออก เห็นมือชัดตลอด",
+        "hook": ("Close-up on the person's hands holding the {item} up to camera, "
+                 "label facing the lens, before anything else happens."),
+        "decision": ("Step by step: they wet the {item} and work it between their "
+                     "palms until it lathers into dense foam, then apply the foam "
+                     "to their face. Hands and forearms fill the frame; water and "
+                     "foam are clearly visible."),
+        "movement": ("steady over-the-shoulder and overhead angles on the hands, "
+                     "small deliberate push-ins, no shake"),
+        "vo": {
+            "hook": "ใช้ยังไงให้ได้ผลจริง?",
+            "decision": "ถู{item}ให้เกิดฟอง แล้วนวดเบาๆ ทั่วหน้า ก่อนล้างออกด้วยน้ำสะอาด",
+        },
+    },
+    "pov": {
+        "label": "📱 รีวิวมุมมองที่หนึ่ง",
+        "goal": "ให้ความรู้สึกว่าเพื่อนเล่าให้ฟัง น่าเชื่อกว่าโฆษณา",
+        "needs_cast": True,
+        "structure": "เหมือนถือมือถือถ่ายเอง เฟรมไม่เป๊ะ ไม่จัดจนดูเป็นโฆษณา",
+        "hook": ("Shot as if the person is holding the camera themselves at arm's "
+                 "length — slightly off-centre framing, imperfect natural "
+                 "composition, their face partly in frame."),
+        "decision": ("They hold the {item} up towards the lens and turn it so the "
+                     "label reads clearly, then gesture at their own skin."),
+        "movement": ("handheld at arm's length throughout — natural sway and small "
+                     "reframing corrections, deliberately not smooth or stabilised"),
+        "vo": {
+            "hook": "ใช้มาสองอาทิตย์ ขอรีวิวจริงๆ ให้ฟัง",
+            "decision": "{item}ไม่ทำให้หน้าแห้งตึง แล้วสิวก็ยุบเร็วขึ้นกว่าเดิม",
+        },
+    },
+    "transformation": {
+        "label": "🔁 ก่อน → หลัง",
+        "goal": "พิสูจน์ผลลัพธ์ — หลักฐานที่คนลังเลอยากเห็นที่สุด",
+        "needs_cast": True,
+        "structure": "สองเฟรมเดียวกันเป๊ะ ต่างกันแค่สภาพผิว ตัดชนให้เห็นความต่าง",
+        "hook": ("The person's skin at its worst in this scene — visible "
+                 "congestion and shine under plain unflattering light. No product "
+                 "in frame."),
+        "decision": ("A clean match cut to the same person, weeks later: identical "
+                     "framing, pose and distance, skin visibly calmer and more "
+                     "even. The {item} sits in frame beside them. The change is "
+                     "realistic and moderate — improved skin, not different skin."),
+        "movement": ("locked off on a tripod for both halves — identical framing, "
+                     "focal length and camera distance so the cut reads as one shot"),
+        "vo": {
+            "hook": "สองอาทิตย์ก่อน กับตอนนี้",
+            "decision": "ใช้{item}ต่อเนื่องทุกวัน ไม่ได้ทำอะไรเพิ่มเลย",
+        },
+    },
+    "myth_bust": {
+        "label": "❌✅ เข้าใจผิด → เข้าใจใหม่",
+        "goal": "ให้ความรู้แล้วแก้ความเชื่อผิดๆ คนดูจบคลิปแล้วได้อะไรกลับไป",
+        "needs_cast": False,
+        "structure": "เฟรมเดียวกัน ต่างกันแค่วิธีทำ ให้ภาพเล่าเองโดยไม่ต้องมีตัวหนังสือ",
+        "hook": ("The common mistake shown plainly in one clear frame — just the "
+                 "action people get wrong, nothing labelling it."),
+        "decision": ("The correct way, from the identical camera position and "
+                     "framing, done properly with the {item}. The contrast between the "
+                     "two beats is obvious without a word of text."),
+        # A product-only scene has nobody to perform the mistake, and asking for
+        # "the action people get wrong" there contradicts the [CAST] block that
+        # bans people outright. The same idea, told through the object instead.
+        "hook_nocast": ("The mistake in one plain frame — the {item} left in the wrong "
+                        "place and visibly the worse for it. Nothing in frame "
+                        "labels it as wrong."),
+        "decision_nocast": ("The correct way, from an identical camera position and "
+                            "framing, with the {item} kept properly. The contrast "
+                            "between the two beats is obvious without a word of text."),
+        "movement": ("identical camera position and framing across both beats, so "
+                     "the difference sits in the action rather than the shot"),
+        "vo": {
+            "hook": "เรื่องนี้หลายคนยังเข้าใจผิดอยู่",
+            "decision": "ที่ถูกคือแบบนี้ — ใช้{item}อย่างถูกวิธี ผลต่างกันเยอะ",
+        },
+    },
+    "texture": {
+        "label": "🔬 พิสูจน์ด้วยฟองและเนื้อ",
+        "goal": "ตอบคนที่กลัวว่าจะแรงเกินไป ให้เห็นเนื้อสัมผัสจริง",
+        "needs_cast": False,
+        "structure": "มาโครล้วน เห็นผิวสัมผัสและฟองก่อตัวแบบเรียลไทม์",
+        "hook": ("Extreme macro on the {item} itself — surface texture, edges, and the "
+                 "way light catches it, filling the whole frame."),
+        "decision": ("Water meets the {item} and dense fine foam builds and spreads in "
+                     "real time, still in macro, individual bubbles visible."),
+        "movement": ("slow macro push-in with gentle rack focus, tripod stable — "
+                     "tiny precise moves only"),
+        "vo": {
+            "hook": "เนื้อสัมผัสบอกอะไรได้มากกว่าที่คิด",
+            "decision": "{item}ให้ฟองละเอียด อ่อนโยนกับผิว ไม่ตึงหลังล้าง",
+        },
+    },
+    "reveal": {
+        "label": "🎬 เปิดตัวแบบดราม่า",
+        "goal": "สร้างความรู้สึกพรีเมียม เหมาะกับเปิดตัวหรือคอนเทนต์แบรนด์",
+        "needs_cast": False,
+        "structure": "เริ่มมืดเกือบทั้งเฟรม แล้วค่อยกวาดแสงเผยสินค้า ไม่มีคัต",
+        "hook": ("The {item} almost entirely in shadow, only one edge catching light. "
+                 "The frame is dark and quiet."),
+        "decision": ("Light sweeps across and the {item} is revealed in full, label "
+                     "clear and centred, the setting resolving into view around it."),
+        "movement": "one slow continuous cinematic push-in with a sweeping light, no cuts",
+        "vo": {
+            "hook": "สิ่งที่ผิวคุณรออยู่",
+            "decision": "{item} จาก {brand}",
+        },
+    },
+    "three_reasons": {
+        "label": "🔢 3 เหตุผล",
+        "goal": "ยัดข้อมูลได้เยอะในเวลาสั้น เหมาะกับคนที่กำลังเปรียบเทียบหลายแบรนด์",
+        "needs_cast": False,
+        "structure": "ตัดเร็วสามจังหวะ เว้นที่ว่างไว้ใส่เลข 1-2-3 ตอนตัดต่อ",
+        "hook": ("Reason one in a single clear frame with the {item} present, composed "
+                 "with empty space on one side for a number overlay added later."),
+        "decision": ("Reasons two and three as two quick successive frames in the "
+                     "same setting — a different angle and detail each time, with "
+                     "the {item} present in both and the same empty space kept clear."),
+        "movement": ("quick decisive cuts between locked frames, each held just "
+                     "long enough to read"),
+        "vo": {
+            "hook": "3 เหตุผลที่คนเปลี่ยนมาใช้{item}",
+            "decision": "หนึ่ง ใช้ง่าย สอง อ่อนโยนพอสำหรับทุกวัน สาม คุ้มกว่าที่คิด",
+        },
+    },
+}
+
+DEFAULT_ANGLE = "hero"
+
+
+def angles_for(scene: str) -> list[str]:
+    """Angles that make sense for this scene, default first.
+
+    An angle needing a cast is dropped from a product-only scene: there is nobody
+    to notice a problem or hold a phone, and offering it would produce a prompt
+    that asks for a person the [CAST] block forbids.
+    """
+    people = has_people(scene)
+    keys = [k for k, a in VIDEO_ANGLES.items() if people or not a["needs_cast"]]
+    return sorted(keys, key=lambda k: (k != DEFAULT_ANGLE, VIDEO_ANGLES[k]["label"]))
+
+
+def angle(key: str) -> dict:
+    return VIDEO_ANGLES.get(key) or VIDEO_ANGLES[DEFAULT_ANGLE]
+
+
+def angle_label(key: str) -> str:
+    return angle(key)["label"]
+
+
+def angle_goal(key: str) -> str:
+    return angle(key)["goal"]
+
+
 # ── Relevance scoring ───────────────────────────────────────────────────────────
 
 def score_scenes(brand_text: str) -> dict[str, int]:

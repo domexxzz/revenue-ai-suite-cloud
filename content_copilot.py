@@ -458,8 +458,17 @@ def name_the_product(text: str, item: str) -> str:
     """
     if not item:
         return text
-    text = re.sub(r"\bthe product\b", f"the {item}", text)
-    return re.sub(r"\bproduct in frame\b", f"{item} in frame", text)
+
+    # Case-insensitive, keeping the original capitalisation. A sentence opening
+    # "The product settles centred…" was slipping past a case-sensitive match, so
+    # the very shot that decides the final frame kept saying "product" — which is
+    # the exact wording that rendered a squeeze tube instead of a bar of soap.
+    def sub(m: re.Match) -> str:
+        out = f"the {item}"
+        return out[0].upper() + out[1:] if m.group(0)[0].isupper() else out
+
+    text = re.sub(r"\bthe product\b", sub, text, flags=re.I)
+    return re.sub(r"\bproduct in frame\b", f"{item} in frame", text, flags=re.I)
 
 
 def english_item(item: str) -> str:
@@ -567,9 +576,16 @@ _VO_VOICE = {
 }
 
 
-def build_voiceover(brief: dict) -> dict:
-    """Thai voiceover script for the Hook → Decision → CTA arc."""
-    lines = _VO_LINES.get(brief.get("campaign", ""), _VO_LINES["hero_product"])
+def build_voiceover(brief: dict, angle: dict | None = None) -> dict:
+    """Thai voiceover script for the Hook → Decision → CTA arc.
+
+    An angle may rewrite the hook and decision lines to match how it tells the
+    story. It never touches the CTA: that is where a discount and its deadline
+    live, and losing them would quietly turn a flash sale into a brand film.
+    """
+    lines = dict(_VO_LINES.get(brief.get("campaign", ""), _VO_LINES["hero_product"]))
+    if angle and angle.get("vo"):
+        lines.update({k: v for k, v in angle["vo"].items() if k in ("hook", "decision")})
     fields = {
         "item": brief.get("top_item") or "สินค้าของเรา",
         "brand": brief.get("brand_name") or "แบรนด์ของเรา",
@@ -593,6 +609,17 @@ def _scene_preset(scene: str) -> dict:
         return {}
 
 
+def _video_angle(key: str) -> dict:
+    """Look up a storytelling angle; an unset or unknown key means no rewrite."""
+    if not key:
+        return {}
+    try:
+        import scene_presets
+        return scene_presets.VIDEO_ANGLES.get(key, {})
+    except Exception:  # noqa: BLE001 — scene library is optional
+        return {}
+
+
 def build_master_image_prompt(brief: dict, scene: str = "") -> str:
     """Structured master prompt for image generation — ready to paste into Flow.
 
@@ -612,28 +639,35 @@ def build_master_image_prompt(brief: dict, scene: str = "") -> str:
     if preset.get("mood"):
         mood = f"{mood}; overall feeling {preset['mood']}"
 
+    # Every block the model renders from names the product. The scene library is
+    # written generically so it suits any brand, and "the product" left standing
+    # anywhere in the description is enough for the model to draw whatever shape
+    # it sees most often in that setting.
+    item = english_item(brief.get("top_item") or "the product")
+    named = lambda t: name_the_product(t, item)  # noqa: E731
+
     lines = [
-        "[SUBJECT]", subject, "",
-        "[SCENE & SETTING]", preset.get("setting") or setting, "",
-        "[STYLING & PROPS]", preset.get("styling") or styling, "",
+        "[SUBJECT]", named(subject), "",
+        "[SCENE & SETTING]", named(preset.get("setting") or setting), "",
+        "[STYLING & PROPS]", named(preset.get("styling") or styling), "",
     ]
     # State the cast either way. Leaving it unsaid is how a disembodied hand ends
     # up reaching in from off-frame with nobody attached to it.
-    lines += ["[CAST]", preset.get("cast") or _NO_CAST, ""]
+    lines += ["[CAST]", named(preset.get("cast") or _NO_CAST), ""]
     form = detect_product_form(brief.get("top_item", ""), brief.get("brand_context", ""))
     lines += [
         "[LIGHTING]", lighting, "",
-        "[CAMERA & LENS]", camera, "",
+        "[CAMERA & LENS]", named(camera), "",
         "[COMPOSITION]",
         f"hero composition with generous negative space for caption overlay, "
         f"framed for {aspect}", "",
         "[COLOUR & MOOD]", mood, "",
         "[PHYSICS & PLAUSIBILITY]",
-        form["physics"] + ". Shadows fall away from the light source and match the "
-        "objects casting them; reflections match the surface material; every item "
-        "rests on the surface with its full weight — nothing floats or hovers"
-        + (". Hands grip the product plausibly with five fingers, natural joints and "
-           "realistic contact pressure" if preset.get("cast") else ""), "",
+        named(form["physics"] + ". Shadows fall away from the light source and match "
+              "the objects casting them; reflections match the surface material; every "
+              "item rests on the surface with its full weight — nothing floats or hovers"
+              + (". Hands grip the product plausibly with five fingers, natural joints "
+                 "and realistic contact pressure" if preset.get("cast") else "")), "",
         "[STYLE]",
         "photorealistic commercial advertising photography, award-winning campaign quality, "
         "clean modern aesthetic", "",
@@ -651,12 +685,17 @@ def build_master_image_prompt(brief: dict, scene: str = "") -> str:
     return "\n".join(lines)
 
 
-def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -> str:
+def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10,
+                              angle: str = "") -> str:
     """Master video prompt: Hook → Decision → CTA with a Thai voiceover script.
 
     Defaults to a 10-second spot. Veo caps a single generation at 8 seconds, so
     the 10s version is meant for Google Flow (which can extend); the in-app
     generator passes seconds=8.
+
+    `scene` picks the setting, `angle` picks how the story is told within it. An
+    empty angle keeps the scene's own three shots, which is what every clip did
+    before angles existed.
     """
     tone = brief.get("tone", "friendly")
     subject, setting, styling = _master_scene(brief)
@@ -664,13 +703,27 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
     motion = _TONE_MOTION.get(tone, _TONE_MOTION["friendly"])
     item = english_item(brief.get("top_item") or "the product")
     preset = _scene_preset(scene) if scene else {}
-    vo = build_voiceover(brief)
+    ang = _video_angle(angle)
+    vo = build_voiceover(brief, ang)
 
     shots = preset.get("shots") or [
         f"Extreme close-up detail of the subject. {subject}.",
         f"Wider hero shot showing the full scene: {setting}, with {styling}.",
         "Final settle on the product centred in frame, held steady for a caption overlay.",
     ]
+    shots = list(shots)
+
+    # The angle rewrites the first two beats and leaves the third alone — the
+    # scene's payoff is the whole point of choosing that scene.
+    fields = {"item": item, "brand": brief.get("brand_name") or "the brand"}
+    for i, slot in enumerate(("hook", "decision")):
+        # An angle may carry a product-only rewrite of a beat, for scenes where
+        # the [CAST] block bans the person the default wording assumes.
+        text = (ang.get(f"{slot}_nocast") if not preset.get("cast") else "") \
+            or ang.get(slot)
+        if text and i < len(shots):
+            shots[i] = text.format(**fields)
+
     shots = [name_the_product(s, item) for s in shots]
     lighting = preset.get("lighting") or _TONE_LIGHT.get(tone, _TONE_LIGHT["friendly"])
     mood = _TONE_GRADE.get(tone, _TONE_GRADE["friendly"])
@@ -686,6 +739,10 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
     # It builds on the scene's own final shot rather than replacing it — otherwise
     # a before/after loses its side-by-side payoff and a flat lay never resolves.
     closing = shots[2] if len(shots) > 2 else shots[-1]
+    # Preset shots are written without terminal punctuation, so appending the CTA
+    # ran two sentences together: "…product on the shelf beside Ends with:".
+    if closing and closing[-1] not in ".!?":
+        closing += "."
     if preset.get("cast"):
         cta_visual = (
             f"{closing} Ends with: the person looks straight into the lens and smiles "
@@ -722,8 +779,10 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
         "[SUBJECT]", subject, "",
     ]
     if preset.get("setting"):
-        lines += ["[SCENE & SETTING]", preset["setting"], ""]
-    lines += ["[CAST]", preset.get("cast") or _NO_CAST, ""]
+        lines += ["[SCENE & SETTING]", name_the_product(preset["setting"], item), ""]
+    lines += ["[CAST]", name_the_product(preset.get("cast") or _NO_CAST, item), ""]
+    if ang.get("structure"):
+        lines += ["[โครงเรื่อง / STRUCTURE]", f"{ang['label']} — {ang['structure']}", ""]
 
     for name, timing, visual, vo_line, purpose in beats:
         lines += [
@@ -751,17 +810,18 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
         # English throughout: this block is read by the model, and mixing scripts
         # is what turned "สบู่" into a bowl of soup.
         "[PHYSICS & PLAUSIBILITY]",
-        form["physics"] + ". "
-        "Water and foam always run downward under gravity. Everything rests on a "
-        "real surface — nothing floats. Shadows and reflections match the objects "
-        "and the light direction. Camera motion stays continuous and physical."
-        # Handling notes only make sense when someone is there to do the handling —
-        # describing a grip in a product-only scene invites a stray hand into frame.
-        + (f" Handling: {form['handling']}. Hands have five fingers, natural "
-           "joints, and realistic contact pressure on the product."
-           if preset.get("cast")
-           else " The product stands or rests on its own — no hands enter the "
-                "frame to hold or steady it."), "",
+        name_the_product(
+            form["physics"] + ". "
+            "Water and foam always run downward under gravity. Everything rests on a "
+            "real surface — nothing floats. Shadows and reflections match the objects "
+            "and the light direction. Camera motion stays continuous and physical."
+            # Handling notes only make sense when someone is there to do the handling —
+            # describing a grip in a product-only scene invites a stray hand into frame.
+            + (f" Handling: {form['handling']}. Hands have five fingers, natural "
+               "joints, and realistic contact pressure on the product."
+               if preset.get("cast")
+               else " The product stands or rests on its own — no hands enter the "
+                    "frame to hold or steady it."), item), "",
         "[VOICEOVER DIRECTION]",
         f"{vo['voice']} — พากย์ภาษาไทยทั้งคลิป ออกเสียงชัด "
         "จังหวะพอดีกับความยาวแต่ละช่วง ไม่รีบจนฟังไม่ทัน",
@@ -777,9 +837,13 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10) -
         f"CTA: {vo['cta']}",
         "(ซับไตเติลไทยตรงกับเสียงพากย์ วางล่างกลางเฟรม — เป็นงานขั้นตัดต่อ)", "",
         "[CAMERA MOVEMENT]",
-        # A scene that specifies its own movement wins — a locked-off before/after
-        # and a handheld UGC clip both contradict the tone's default drift.
-        preset.get("movement") or f"{motion}; smooth controlled moves, no handheld shake",
+        # A scene that specifies its own movement wins, over the angle as well as
+        # the tone. Those overrides exist to settle real contradictions — a
+        # locked-off before/after, a deliberately unstable UGC clip — and letting
+        # an angle's "slow cinematic push-in" through would reopen them.
+        name_the_product(
+            preset.get("movement") or ang.get("movement")
+            or f"{motion}; smooth controlled moves, no handheld shake", item),
         "",
         "[LIGHTING]", lighting, "",
         "[COLOUR & MOOD]", mood, "",
