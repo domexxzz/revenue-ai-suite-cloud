@@ -52,10 +52,19 @@ FALLBACK_VIDEO_FOLDER = "TikTok VDO"
 
 
 def default_watch_dir() -> Path:
-    """Where Flow downloads usually land."""
+    """Where Flow downloads land.
+
+    Prefers the Drive-for-Desktop queue root when it exists: with Chrome set to
+    download there, a clip is already inside Drive the moment it finishes, and
+    sorting it is a move within the same mount rather than a trip through
+    Downloads. Falls back to Downloads when that mount isn't present.
+    """
     env = os.getenv("FLOW_WATCH_DIR", "").strip()
     if env:
         return Path(env)
+    local = default_local_root()
+    if local:
+        return local
     return Path.home() / "Downloads"
 
 
