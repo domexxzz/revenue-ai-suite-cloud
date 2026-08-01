@@ -2464,13 +2464,48 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
     size_mb = int(file.get("size") or 0) / 1024 / 1024
 
     with st.container(border=True):
+        # เนื้อหามาก่อนชื่อไฟล์เสมอ
+        #
+        # คนที่มากดอนุมัติตัดสินใจจากตัวคลิป ตัวภาพ หรือตัวข้อความ ไม่ใช่จากชื่อไฟล์
+        # อย่าง flow_df3978e5.mp4 ซึ่งไม่บอกอะไรเลย ของเดิมเอาชื่อไฟล์ขึ้นก่อนแล้วซ่อน
+        # ของจริงไว้หลังปุ่ม "กดโหลดเมื่อต้องการดู" — กลับหัวกับสิ่งที่หน้านี้มีไว้ทำ
+        media_bytes = None
+        caption = ""
+
+        if mime.startswith("image/"):
+            # thumbnailLink มากับรายการไฟล์อยู่แล้ว โชว์ได้ทันทีโดยไม่ต้องโหลดไฟล์เต็ม
+            thumb = file.get("thumbnailLink")
+            if thumb:
+                st.image(thumb.replace("=s220", "=s800"), width="stretch")
+            if st.button("🔍 ดูรูปเต็ม", key=f"q_prev_{fid}", width="stretch"):
+                st.session_state[f"q_data_{fid}"] = download_file(fid)
+            media_bytes = st.session_state.get(f"q_data_{fid}")
+            if media_bytes:
+                st.image(media_bytes, width="stretch")
+        elif mime.startswith("video/"):
+            # เล่นผ่านตัวเล่นของ Drive — เห็นคลิปได้ทันทีโดยไม่ต้องดึงไฟล์ทั้งก้อน
+            # ลงมาก่อน (คลิปละ ~2.4MB × 15 ต่อหน้า จะช้ามากถ้าโหลดทุกอัน)
+            st.components.v1.iframe(
+                f"https://drive.google.com/file/d/{fid}/preview", height=340)
+            with st.expander("โหลดไฟล์มาดูแบบเต็ม (ถ้าตัวเล่นด้านบนไม่ขึ้น)"):
+                if st.button("▶️ โหลดวิดีโอ", key=f"q_prev_{fid}", width="stretch"):
+                    st.session_state[f"q_data_{fid}"] = download_file(fid)
+                media_bytes = st.session_state.get(f"q_data_{fid}")
+                if media_bytes:
+                    st.video(media_bytes)
+        else:
+            caption = _queue_caption_for(file)
+            if caption:
+                st.text_area("ข้อความที่จะโพสต์", value=caption, height=160,
+                             key=f"q_cap_{fid}")
+
         top, act = st.columns([3, 1])
         with top:
-            st.markdown(f"**{file['name']}**")
+            _render_scene_score(file["name"])
             st.caption(f"{PLATFORM_THAI_NAMES.get(platform, folder_name)} · "
                        f"{mime.split('/')[-1]} · {size_mb:.1f} MB · "
-                       f"{file.get('createdTime', '')[:16].replace('T', ' ')}")
-            _render_scene_score(file["name"])
+                       f"{file.get('createdTime', '')[:16].replace('T', ' ')} · "
+                       f"{file['name']}")
         with act:
             if file.get("webViewLink"):
                 st.markdown(f"[🔗 เปิดใน Drive]({file['webViewLink']})")
@@ -2479,27 +2514,6 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
         # ก็เดาผิดได้ และคลิปเดียวลงได้หลายที่ ปุ่มนี้จึงต้องมีเสมอ
         if all_folders:
             _render_move_to_platform(file, all_folders, folder_name)
-
-        media_bytes = None
-        caption = ""
-
-        if mime.startswith("image/"):
-            if st.button("👁️ ดูรูป", key=f"q_prev_{fid}", width="stretch"):
-                st.session_state[f"q_data_{fid}"] = download_file(fid)
-            media_bytes = st.session_state.get(f"q_data_{fid}")
-            if media_bytes:
-                st.image(media_bytes, width="stretch")
-        elif mime.startswith("video/"):
-            st.caption("วิดีโอไฟล์ใหญ่ — กดโหลดเมื่อต้องการดู")
-            if st.button("▶️ โหลดวิดีโอมาดู", key=f"q_prev_{fid}", width="stretch"):
-                st.session_state[f"q_data_{fid}"] = download_file(fid)
-            media_bytes = st.session_state.get(f"q_data_{fid}")
-            if media_bytes:
-                st.video(media_bytes)
-        else:
-            caption = _queue_caption_for(file)
-            if caption:
-                st.text_area("แคปชัน", value=caption, height=140, key=f"q_cap_{fid}")
 
         text_to_post = st.session_state.get(f"q_cap_{fid}", caption)
         c1, c2 = st.columns(2)

@@ -136,7 +136,7 @@
   // บุ๊กมาร์กเก็บโค้ดไว้ในตัวเอง แก้ไฟล์แล้วไม่ลากใหม่ก็ยังรันของเก่า และไม่มีทางรู้
   // จากภายนอกเลยว่าที่รันอยู่คือรุ่นไหน เสียเวลาไปหนึ่งรอบเต็มเพราะแยกไม่ออกว่า
   // "แก้แล้วไม่ได้ผล" หรือ "ยังไม่ได้ลากใหม่" — ขึ้นเลขไว้ ปัญหานี้จบ
-  const BUILD = 'v15';
+  const BUILD = 'v16';
 
   // ── ชื่อไฟล์จาก prompt บนการ์ด ───────────────────────────────────────────
   //
@@ -236,6 +236,37 @@
       }
     } catch (e) { /* ไม่มีก็ข้าม */ }
     return [...out.entries()].map(([url, name]) => ({ url, name }));
+  }
+
+  // แปลงลิงก์ redirect เป็นลิงก์จริงที่ CDN เซ็นมา
+  //
+  // <video src> ชี้ไป labs.google/…/getMediaUrlRedirect?name=… ซึ่งต้องมีคุกกี้ถึงจะ
+  // เข้าได้ ฝั่ง Python ไม่มีคุกกี้จึงได้ 401 ทุกตัว (8 จาก 13 ในรอบจริง) ส่วนตัวที่
+  // สำเร็จคือลิงก์ flow-content.google ที่เก็บมาจาก resource timing ซึ่งเซ็นมาแล้ว
+  //
+  // เบราว์เซอร์แปลงให้ได้เพราะมันมีคุกกี้ — ยิง fetch แล้วอ่าน response.url ที่ตามลิงก์
+  // ไปจนสุด แล้ว abort ทิ้งทันที ไม่ต้องโหลดตัวไฟล์ลงมา (คลิปละ 2.4MB × 15 คงเปล่า
+  // ประโยชน์) และชื่อจาก prompt ก็ผูกอยู่กับลิงก์กลุ่มนี้พอดี จึงติดไปด้วย
+  async function resolveSigned(entries) {
+    const byFinal = new Map();
+    for (const e of entries) {
+      let final = e.url;
+      if (e.url.indexOf('getMediaUrlRedirect') >= 0) {
+        try {
+          const ctrl = new AbortController();
+          const res = await fetch(e.url, { signal: ctrl.signal });
+          if (res.url) final = res.url;
+          ctrl.abort();
+        } catch (err) {
+          // แปลงไม่ได้ก็ส่งของเดิมไป ฝั่งแอปจะรายงาน 401 ให้เห็นเอง
+          console.warn('[flow-helper] แปลงลิงก์ไม่ได้:', String(err).slice(0, 60));
+        }
+      }
+      // ลิงก์เดียวกันอาจมาทั้งแบบ redirect และแบบเซ็นแล้ว — เก็บอันที่มีชื่อไว้
+      const prev = byFinal.get(final);
+      if (!prev || (!prev.name && e.name)) byFinal.set(final, { url: final, name: e.name });
+    }
+    return [...byFinal.values()];
   }
 
   // ── ดูว่าคลิกทำให้ Flow ขยับจริงไหม ──────────────────────────────────────
@@ -599,9 +630,12 @@
   // ไม่ต้องแตะเมนูของ Flow เลย จึงไม่ติดกำแพงที่วัดมาแล้วสองชั้น
   // ทำก่อนเสมอ เพราะถ้าได้ก็จบ และเป็นทางเดียวที่รู้ผลทันทีว่าไฟล์ออกหรือไม่
   setStep('หา URL ของไฟล์ในหน้า');
-  const urls = mediaUrls();
-  log(`เจอ URL วิดีโอในหน้า ${urls.length} รายการ`);
-  if (urls.length) {
+  const found = mediaUrls();
+  log(`เจอ URL วิดีโอในหน้า ${found.length} รายการ`);
+  if (found.length) {
+    setStep(`แปลงลิงก์ให้ใช้ได้นอกเบราว์เซอร์ (${found.length} รายการ)`);
+    const urls = await resolveSigned(found);
+    log(`แปลงแล้วเหลือ ${urls.length} รายการ (ตัดซ้ำ)`);
     clearInterval(ticker);
     const picked = urls.slice(0, MAX_PER_RUN);
 

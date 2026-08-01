@@ -231,7 +231,8 @@ def list_files_in_folder(folder_id: str, page_size: int = 100,
                          oldest_first: bool = False) -> list[dict]:
     """Files directly inside a folder.
 
-    Returns dicts with id, name, mimeType, size, createdTime, webViewLink.
+    Returns dicts with id, name, mimeType, size, createdTime, webViewLink,
+    thumbnailLink.
     Folders are excluded — this is for reviewing content, not navigating.
 
     `oldest_first` matters for a review queue: sorting server-side means the
@@ -251,7 +252,9 @@ def list_files_in_folder(folder_id: str, page_size: int = 100,
             service.files()
             .list(
                 q=query,
-                fields="files(id,name,mimeType,size,createdTime,webViewLink)",
+                # thumbnailLink ให้หน้าคิวโชว์ภาพได้ทันทีโดยไม่ต้องดาวน์โหลดไฟล์เต็ม
+                fields=("files(id,name,mimeType,size,createdTime,webViewLink,"
+                        "thumbnailLink)"),
                 orderBy="createdTime" if oldest_first else "createdTime desc",
                 pageSize=page_size,
                 includeItemsFromAllDrives=True,
