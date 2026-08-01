@@ -2781,7 +2781,7 @@ def render_canva_page() -> None:
             else:
                 st.error(msg)
     else:
-        st.info("ยังไม่มีรูป — ไปหน้า 🗨️ Copilot สร้างรูปแล้วกด **ส่งไป Canva**")
+        st.info("ยังไม่มีรูป — ไปหน้า 🗨️ แชท AI สร้างรูปแล้วกด **ส่งไป Canva**")
 
 
 # ── Brain Storm (Business Model Canvas) ──────────────────────────────────────────
@@ -2789,7 +2789,7 @@ def render_canva_page() -> None:
 def _send_idea_to_copilot(prompt: str) -> None:
     """Hand an idea to the Chat Copilot and jump to that page."""
     st.session_state["copilot_pending"] = prompt
-    st.session_state["shop_menu"] = "🗨️ Copilot"
+    st.session_state["shop_menu"] = "🗨️ แชท AI"
 
 
 def render_brainstorm_page(ai_mode: str, api_key: str) -> None:
@@ -2887,11 +2887,17 @@ def render_brainstorm_page(ai_mode: str, api_key: str) -> None:
 # ── Chat Copilot ─────────────────────────────────────────────────────────────────
 
 def _copilot_examples() -> list[str]:
+    """Everyday phrasing, not marketing vocabulary.
+
+    Examples double as instructions here — someone unsure what to type copies
+    the shape of these. "Flash sale / โทนพรีเมียม" taught the wrong lesson: that
+    you need the jargon to be understood.
+    """
     return [
-        "ทำ flash sale ลด 20% ลง LINE พรุ่งนี้",
-        "เปิดตัวเซรั่มตัวใหม่ LEMED ลง IG + Facebook โทนพรีเมียม",
-        "เขียนแคปชัน TikTok เรื่องกันแดดสำหรับผิวมัน",
-        "ขอบคุณลูกค้า VIP แจกส่วนลด 15%",
+        "อยากได้คลิปลง TikTok",
+        "ทำโปรลดราคาหน่อย",
+        "โพสต์ให้คนที่เป็นสิวง่าย",
+        "ขอบคุณลูกค้าเก่า",
     ]
 
 
@@ -3183,8 +3189,22 @@ def _render_copilot_draft(mi: int, brief: dict, package: dict,
 def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
                         fb_token: str = "", fb_page_id: str = "",
                         ig_business_id: str = "") -> None:
-    st.title("🗨️ Chat Copilot")
-    st.caption("พิมพ์บอกสิ่งที่อยากได้ — ระบบร่างให้ อนุมัติแล้วโพสต์ได้ในแชทเดียว")
+    st.title("🗨️ แชท AI")
+    st.caption("พิมพ์บอกว่าอยากได้คอนเทนต์อะไร — AI คิดแคปชัน ภาพ และคลิปให้")
+
+    # Someone opening this for the first time should not have to guess what
+    # happens after they type. Three steps, stated once, at the top.
+    st.markdown(
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 14px">'
+        '<span style="background:rgba(45,212,191,.12);border:1px solid rgba(45,212,191,.35);'
+        'border-radius:999px;padding:5px 13px;font-size:13px">1️⃣ พิมพ์บอกสิ่งที่อยากได้</span>'
+        '<span style="background:rgba(45,212,191,.12);border:1px solid rgba(45,212,191,.35);'
+        'border-radius:999px;padding:5px 13px;font-size:13px">2️⃣ AI ร่างแคปชัน + prompt ภาพ/คลิป</span>'
+        '<span style="background:rgba(45,212,191,.12);border:1px solid rgba(45,212,191,.35);'
+        'border-radius:999px;padding:5px 13px;font-size:13px">3️⃣ กดอนุมัติ แล้วโพสต์</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     if not COPILOT_AVAILABLE:
         st.error("ไม่พบ content_copilot.py — ตรวจสอบไฟล์ในโฟลเดอร์โปรเจกต์")
@@ -3222,8 +3242,10 @@ def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
     if not msgs:
         with st.chat_message("assistant", avatar="🧴"):
             st.markdown(
-                "สวัสดีค่ะ! อยากได้คอนเทนต์แบบไหนดี? พิมพ์บอกได้เลย 😊 "
-                "หรือลองกดตัวอย่างด้านล่างนี้:"
+                "สวัสดีค่ะ! อยากได้คอนเทนต์อะไรดีคะ 😊\n\n"
+                "พิมพ์บอกแบบพูดคุยได้เลย ไม่ต้องรู้ศัพท์เทคนิค เช่น "
+                "*“อยากได้คลิปลง TikTok”* หรือ *“ทำโปรลดราคาหน่อย”*\n\n"
+                "**หรือกดตัวอย่างด้านล่างนี้ได้เลย** 👇"
             )
             ex_cols = st.columns(2)
             for i, ex in enumerate(_copilot_examples()):
@@ -3481,9 +3503,20 @@ with st.sidebar:
         if AFFILIATE_AVAILABLE:
             affiliate_ui.sidebar_controls()
     else:
+        # Customers open this to do one thing: chat, and get something to post.
+        # Ten equal-weight menu items made that choice look like ten choices, and
+        # the app opened on a dashboard of sample sales data that has nothing to
+        # do with it. The daily path is now the only thing on screen by default.
+        DAILY_PAGES = ["🗨️ แชท AI", "✋ คิวอนุมัติ"]
+        MORE_PAGES = [
+            "🧠 Brain Storm", "🎨 Canva", "📣 Content Studio", "💬 AI Inbox",
+            "📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "🧮 ROI Calculator",
+        ]
+        show_all = st.toggle("🧰 เครื่องมือทั้งหมด", value=False,
+                             help="เปิดเพื่อใช้เครื่องมือขั้นสูง — งานประจำวันใช้แค่ 2 เมนูบน")
         page = st.radio(
             "เมนู",
-            ["📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "🧠 Brain Storm", "🗨️ Copilot", "🎨 Canva", "✋ คิวอนุมัติ", "📣 Content Studio", "💬 AI Inbox", "🧮 ROI Calculator"],
+            DAILY_PAGES + (MORE_PAGES if show_all else []),
             label_visibility="collapsed",
             key="shop_menu",
         )
@@ -3755,7 +3788,7 @@ if page == "🧠 Brain Storm":
     render_brainstorm_page(ai_mode, api_key)
     st.stop()
 
-if page == "🗨️ Copilot":
+if page == "🗨️ แชท AI":
     render_copilot_page(ai_mode, api_key, line_token=line_token, fb_token=fb_token, fb_page_id=fb_page_id, ig_business_id=ig_business_id)
     st.stop()
 
