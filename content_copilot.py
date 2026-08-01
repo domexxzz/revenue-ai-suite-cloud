@@ -91,11 +91,51 @@ def _extract_discount(text: str) -> int:
     return 20
 
 
-def _extract_item(text: str) -> str:
+def product_from_context(brand_context: str) -> str:
+    """The product the brand actually sells, read from its brief.
+
+    LEMED sells one thing — a soap bar — but the extractor below happily picked
+    "เซรั่ม" out of a prompt and the whole pipeline then advertised a serum that
+    does not exist. The brand brief is the authority on what is for sale.
+    """
+    if not brand_context:
+        return ""
+    # "ชื่อสินค้า: LEMED Soap Anti-Acne 60g (สบู่ลดสิว เลอเมด)"
+    m = re.search(r"ชื่อสินค้า\s*[:：]\s*(.+)", brand_context)
+    line = m.group(1) if m else brand_context
     for kw in _ITEM_KEYWORDS:
-        if kw in text:
+        if kw in line:
             return kw
-    return "สินค้าเด่น"
+    # Fall back to any product word anywhere in the brief.
+    for kw in _ITEM_KEYWORDS:
+        if kw in brand_context:
+            return kw
+    return ""
+
+
+def _constrain_item(item: str, brand_context: str) -> str:
+    """Keep a proposed product inside the brand's catalogue."""
+    brand_product = product_from_context(brand_context)
+    if not brand_product:
+        return item or "สินค้าเด่น"
+    # Anything that already refers to the real product is fine as written.
+    if brand_product in (item or ""):
+        return item
+    return brand_product
+
+
+def _extract_item(text: str, brand_context: str = "") -> str:
+    """Product named in the request, constrained to what the brand sells."""
+    brand_product = product_from_context(brand_context)
+
+    # A brand with a known catalogue only offers what is in it — otherwise a
+    # passing mention of another product type invents a line that does not exist.
+    allowed = [brand_product] if brand_product else _ITEM_KEYWORDS
+    for kw in allowed:
+        if kw and kw in text:
+            return kw
+
+    return brand_product or "สินค้าเด่น"
 
 
 def _extract_brand(text: str, default_brand: str) -> str:
@@ -111,7 +151,7 @@ def _extract_platforms(text: str) -> list[str]:
 
 # ── Interpretation ──────────────────────────────────────────────────────────────
 
-def _interpret_local(prompt: str, default_brand: str) -> dict:
+def _interpret_local(prompt: str, default_brand: str, brand_context: str = "") -> dict:
     """Keyword-based intent parsing — no API key required."""
     p = f" {prompt.lower()} "
     campaign = _match_first(p, _CAMPAIGN_KEYWORDS, _DEFAULT_CAMPAIGN)
@@ -121,7 +161,7 @@ def _interpret_local(prompt: str, default_brand: str) -> dict:
         "tone": tone,
         "platforms": _extract_platforms(p),
         "brand_name": _extract_brand(prompt, default_brand),
-        "top_item": _extract_item(prompt),
+        "top_item": _extract_item(prompt, brand_context),
         "discount": _extract_discount(prompt),
         "summary": "",
         "source": "local",
@@ -144,6 +184,14 @@ def _interpret_ai(prompt: str, api_key: str, default_brand: str,
     )
     if brand_context:
         system_prompt += "\n\nบริบทแบรนด์ (ใช้เติมค่าที่ผู้ใช้ไม่ได้ระบุ):\n" + brand_context[:2000]
+        known = product_from_context(brand_context)
+        if known:
+            system_prompt += (
+                f"\n\nสำคัญ: แบรนด์นี้ขาย **{known}** เท่านั้น "
+                f'ค่า top_item ต้องเป็น "{known}" เสมอ '
+                "ห้ามตั้งชื่อสินค้าประเภทอื่นที่แบรนด์ไม่ได้ขาย "
+                "(เช่น เซรั่ม ครีม โทนเนอร์) แม้ผู้ใช้จะพิมพ์มาก็ตาม"
+            )
 
     user_prompt = (
         f'คำสั่งจากผู้ใช้: "{prompt}"\n\n'
@@ -165,10 +213,10 @@ def _interpret_ai(prompt: str, api_key: str, default_brand: str,
     )
     if not isinstance(data, dict):
         return None
-    return _sanitize_brief(data, default_brand)
+    return _sanitize_brief(data, default_brand, brand_context)
 
 
-def _sanitize_brief(data: dict, default_brand: str) -> dict:
+def _sanitize_brief(data: dict, default_brand: str, brand_context: str = "") -> dict:
     """Clamp Claude's output to valid enum values so downstream never breaks."""
     campaign = data.get("campaign")
     if campaign not in CAMPAIGN_TYPES:
@@ -188,7 +236,9 @@ def _sanitize_brief(data: dict, default_brand: str) -> dict:
         "tone": tone,
         "platforms": platforms,
         "brand_name": (data.get("brand_name") or default_brand or "ร้านของคุณ").strip(),
-        "top_item": (data.get("top_item") or "สินค้าเด่น").strip(),
+        # Hold the model to the catalogue too — asked for a campaign it may
+        # otherwise name a product the brand has never sold.
+        "top_item": _constrain_item((data.get("top_item") or "").strip(), brand_context),
         "discount": discount,
         "summary": (data.get("summary") or "").strip(),
         "source": "claude",
@@ -211,7 +261,7 @@ def interpret(prompt: str, api_key: str = "", default_brand: str = "ร้าน
         brief = _interpret_ai(prompt, api_key.strip(), default_brand, brand_context, provider)
         if brief:
             return brief
-    return _interpret_local(prompt, default_brand)
+    return _interpret_local(prompt, default_brand, brand_context)
 
 
 # ── Brief → context → package ───────────────────────────────────────────────────

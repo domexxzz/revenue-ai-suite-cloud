@@ -3199,6 +3199,12 @@ def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
     _mandala_badge()
     with st.expander("⚙️ ตั้งค่าแบรนด์เริ่มต้น (ไม่บังคับ)"):
         st.text_input("ชื่อแบรนด์", value="LEMED", key="copilot_brand")
+        # Show what the brief locks the catalogue to, so a request naming
+        # something else doesn't look like it was silently ignored.
+        known = content_copilot.product_from_context(content_copilot.load_brand_context())
+        if known:
+            st.success(f"🔒 สินค้าของแบรนด์: **{known}** — คอนเทนต์จะอ้างถึงสินค้านี้เสมอ "
+                       "(อ่านจากบริบทแบรนด์ ไม่ใช่เดาจากคำที่พิมพ์)")
         st.selectbox(
             "ประเภทธุรกิจ",
             options=["auto", "product", "fnb"],
