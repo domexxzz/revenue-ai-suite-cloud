@@ -2412,7 +2412,21 @@ def _render_flow_sync(authed: bool = True) -> None:
             st.rerun()
 
         st.divider()
-        st.caption("**ให้ทำงานอัตโนมัติทุก 5 นาที** — รันคำสั่งนี้ครั้งเดียวใน PowerShell:")
+        st.markdown("**⚡ ทำให้อัตโนมัติเต็มรูปแบบ**")
+        st.caption("1️⃣ รัน watcher ค้างไว้ — ไฟล์ลงปุ๊บจัดเข้าโฟลเดอร์ทันที ไม่ต้องกดปุ่มนี้อีก")
+        st.code(f'{Path.cwd() / ".venv/Scripts/python.exe"} {Path.cwd() / "flow_watch.py"}',
+                language="powershell")
+
+        st.caption("2️⃣ กดดาวน์โหลดทุกคลิปใน Flow รวดเดียว — เปิด Flow ใน Chrome → กด F12 → "
+                   "แท็บ Console → วางสคริปต์นี้ → Enter")
+        helper = Path(__file__).parent / "flow_download_helper.js"
+        if helper.exists():
+            with st.popover("📋 เปิดสคริปต์เพื่อคัดลอก", use_container_width=True):
+                st.code(helper.read_text(encoding="utf-8"), language="javascript")
+            st.caption("สคริปต์ทำงานบนหน้าที่คุณเปิดเอง หน่วง 3-5 วิต่อไฟล์ "
+                       "และจำกัด 15 ไฟล์ต่อรอบ")
+
+        st.caption("ทางเลือก: ตั้งเวลาแทน watcher (ทุก 5 นาที)")
         st.code(
             'schtasks /create /tn "FlowSync" /tr '
             f'"{Path.cwd() / ".venv/Scripts/python.exe"} {Path.cwd() / "flow_sync.py"}" '
