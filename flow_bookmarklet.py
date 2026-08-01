@@ -85,14 +85,29 @@ def _strip_comments(src: str) -> str:
     return "\n".join(ln for ln in lines if ln)
 
 
-def build(kind: str = "download") -> str:
-    """The whole helper as one javascript: URI, ready to be a bookmark."""
+MAX_PER_RUN_CEILING = 15
+
+
+def build(kind: str = "download", max_per_run: int | None = None) -> str:
+    """The whole helper as one javascript: URI, ready to be a bookmark.
+
+    `max_per_run` lowers the per-run cap — useful for checking whether a small
+    batch arrives in full before letting a big one loose. It can only go down:
+    the ceiling is there because batch downloading may sit badly with Flow's
+    terms, and a knob that raises it would be a knob for breaking that.
+    """
     src = SOURCES.get(kind)
     if src is None:
         raise ValueError(f"ไม่รู้จัก kind={kind!r} — มีแค่ {sorted(SOURCES)}")
     if not src.exists():
         raise FileNotFoundError(f"ไม่เจอ {src}")
     body = _strip_comments(src.read_text(encoding="utf-8"))
+
+    if max_per_run is not None:
+        n = max(1, min(int(max_per_run), MAX_PER_RUN_CEILING))
+        body, hits = re.subn(r"MAX_PER_RUN = \d+", f"MAX_PER_RUN = {n}", body)
+        if not hits:
+            raise RuntimeError("ไม่เจอ MAX_PER_RUN ในสคริปต์ — เปลี่ยนเพดานไม่ได้")
     # void(0) so the page is not replaced by the expression's return value —
     # without it the browser navigates away to whatever the script evaluated to.
     return "javascript:" + quote(f"(function(){{{body}}})();void 0;", safe="")

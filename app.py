@@ -2556,9 +2556,16 @@ def _render_flow_sync(authed: bool = True) -> None:
         st.caption("2️⃣ **ลาก**ปุ่มส้มขึ้นแถบบุ๊กมาร์ก — อย่ากดตรงนี้ ตัวปุ่มไม่ได้สั่งงาน "
                    "มันคือของที่ต้องเอาไปเก็บไว้ พอเก็บแล้วค่อยเปิดโปรเจกต์ใน Flow "
                    "แล้วกดบุ๊กมาร์กอันนั้น มันจะไล่กดดาวน์โหลดให้เอง")
+        # ลดจำนวนต่อรอบได้ เผื่ออยากลองน้อย ๆ ก่อนว่าไฟล์มาครบไหม
+        # เพดาน 15 ยังเท่าเดิม ปรับขึ้นไม่ได้
+        per_run = st.number_input(
+            "จำนวนไฟล์ต่อรอบ", min_value=1, max_value=15, value=15, step=1,
+            help="ลองตั้งน้อย ๆ ก่อน (เช่น 3) แล้วดูว่าไฟล์มาถึงครบไหม "
+                 "ก่อนจะปล่อยเต็ม 15 — ลากบุ๊กมาร์กใหม่ทุกครั้งที่เปลี่ยนเลขนี้")
+
         try:
             import flow_bookmarklet
-            uri = flow_bookmarklet.build("download")
+            uri = flow_bookmarklet.build("download", max_per_run=int(per_run))
             uri_inspect = flow_bookmarklet.build("inspect")
         except Exception as e:  # noqa: BLE001 — helper file may be missing
             uri = uri_inspect = ""
