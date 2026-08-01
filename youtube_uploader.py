@@ -9,37 +9,81 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+# Google refuses an OAuth request that mixes YouTube and Drive scopes, so YouTube
+# gets its own consent round and its own token file rather than sharing Drive's.
+SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+YOUTUBE_TOKEN_PATH = Path(__file__).parent / "youtube_token.json"
+OAUTH_PATH = Path(__file__).parent / "oauth_credentials.json"
+
+
+def needs_auth() -> bool:
+    """True when YouTube still needs its own authorization."""
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    import json
+
+    try:
+        import streamlit as st
+        token_json = st.secrets.get("youtube", {}).get("token_json", "")
+        if token_json:
+            creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+            if creds.valid:
+                return False
+            if creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                return False
+    except Exception:
+        pass
+
+    if not YOUTUBE_TOKEN_PATH.exists():
+        return True
+    try:
+        creds = Credentials.from_authorized_user_file(str(YOUTUBE_TOKEN_PATH), SCOPES)
+        if creds.valid:
+            return False
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            YOUTUBE_TOKEN_PATH.write_text(creds.to_json())
+            return False
+    except Exception:
+        pass
+    return True
+
+
+def run_first_time_auth() -> str:
+    """Run the YouTube-only OAuth flow and save its token."""
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    flow = InstalledAppFlow.from_client_secrets_file(str(OAUTH_PATH), SCOPES)
+    creds = flow.run_local_server(port=0)
+    YOUTUBE_TOKEN_PATH.write_text(creds.to_json())
+    return "auth_complete"
+
+
 def _build_youtube_service():
     from googleapiclient.discovery import build
     from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request
     import json
 
-    SCOPES = [
-        "https://www.googleapis.com/auth/drive.file",
-        "https://www.googleapis.com/auth/youtube.upload",
-    ]
-    TOKEN_PATH = Path(__file__).parent / "token.json"
-
     creds = None
 
-    # Try Streamlit secrets first
+    # Streamlit secrets first (cloud deployment), then the local token file.
     try:
         import streamlit as st
-        token_json = st.secrets.get("google_drive", {}).get("token_json", "")
+        token_json = st.secrets.get("youtube", {}).get("token_json", "")
         if token_json:
             creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
     except Exception:
         pass
 
-    if creds is None and TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
+    if creds is None and YOUTUBE_TOKEN_PATH.exists():
+        creds = Credentials.from_authorized_user_file(str(YOUTUBE_TOKEN_PATH), SCOPES)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            if TOKEN_PATH.exists():
-                TOKEN_PATH.write_text(creds.to_json())
+            YOUTUBE_TOKEN_PATH.write_text(creds.to_json())
         else:
             return None
 

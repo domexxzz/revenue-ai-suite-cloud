@@ -26,6 +26,7 @@ st_theme_out.txt
 credentials.json
 oauth_credentials.json
 token.json
+youtube_token.json
 *.json.key
 
 # OS

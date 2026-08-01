@@ -15,9 +15,11 @@ SCOPES = [
     # each draft into the right folder. `drive.file` alone only sees files the app
     # itself created, so folder discovery would return nothing.
     # NOTE: widening the scope requires the owner to re-authorize once.
+    #
+    # Drive scopes only. Google rejects a request that mixes YouTube and Drive
+    # scopes ("scopes that cannot be requested together"), so YouTube authorises
+    # separately into its own token — see youtube_uploader.YOUTUBE_TOKEN_PATH.
     "https://www.googleapis.com/auth/drive",
-    "https://www.googleapis.com/auth/drive.file",
-    "https://www.googleapis.com/auth/youtube.upload",
 ]
 TOKEN_PATH = Path(__file__).parent / "token.json"
 OAUTH_PATH = Path(__file__).parent / "oauth_credentials.json"
