@@ -60,21 +60,37 @@
   };
 
   // ── หาไทล์สื่อ ───────────────────────────────────────────────────────────
-  // ไทล์ = การ์ดที่มี <img>/<video> อยู่ข้างใน และไม่ได้ซ้อนไทล์อื่น
+  // ไทล์ = การ์ดที่หุ้ม media ชิ้นเดียว
+  //
+  // เวอร์ชันแรกไต่ขึ้นไปจนเจอ element ที่ใหญ่กว่า 120x120 แล้วหยุด — ทดสอบกับหน้า
+  // จริงของ Google แล้วพบว่า "ไทล์" แรกที่ได้คือทั้งหน้า (1920x945 มี media 86 ชิ้น
+  // ปุ่ม 65 ปุ่ม) เพราะ DOM จริงมี wrapper ซ้อนหลายชั้นที่ใหญ่เกินเกณฑ์ทันที
+  // จึงต้องกันสามอย่าง: อย่าโตเกินสัดส่วนของ media, อย่าหุ้ม media มากกว่าหนึ่งชิ้น
+  // (แปลว่าเป็น grid) และอย่าใหญ่เกือบเต็มจอ
   function findTiles() {
-    const media = [...document.querySelectorAll('img, video')];
+    const vw = innerWidth;
+    const vh = innerHeight;
+    const media = [...document.querySelectorAll('img, video')].filter((m) => {
+      const r = m.getBoundingClientRect();
+      return r.width >= 100 && r.height >= 100 &&
+             r.width <= vw * 0.6 && r.height <= vh * 0.9;
+    });
+
     const tiles = new Set();
     for (const m of media) {
+      const mr = m.getBoundingClientRect();
+      const mArea = mr.width * mr.height;
       let el = m;
-      for (let up = 0; up < 6 && el; up++) {
+      let best = null;
+      for (let up = 0; up < 5 && el.parentElement; up++) {
         el = el.parentElement;
-        if (!el) break;
         const r = el.getBoundingClientRect();
-        if (r.width > 120 && r.height > 120) {
-          tiles.add(el);
-          break;
-        }
+        if (r.width > vw * 0.7 || r.height > vh * 0.9) break;   // เกือบเต็มจอ = ไม่ใช่การ์ด
+        if (el.querySelectorAll('img, video').length > 1) break; // หุ้มหลายชิ้น = grid
+        if (r.width * r.height > mArea * 3) break;               // โตเกินตัว media
+        best = el;
       }
+      if (best) tiles.add(best);
     }
     return [...tiles];
   }
