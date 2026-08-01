@@ -75,31 +75,62 @@
     await sleep(500);   // รอให้ปุ่มที่โผล่ตอน hover เรนเดอร์เสร็จก่อนอ่าน
   }
 
-  const tiles = findTiles();
-  const report = { url: location.href, ไทล์ที่เจอ: tiles.length, การ์ด: [] };
+  // รายชื่อปุ่มทั้งหน้า ใช้เทียบก่อน/หลัง hover — แถบ ❤️ ↩️ ⋮ อาจไม่ได้อยู่ในการ์ด
+  // แต่ถูกเรนเดอร์เป็น portal ที่อื่นแล้ววางทับด้วย CSS ซึ่งการค้นในการ์ดจะไม่มีวันเจอ
+  const describe = (b) => ({
+    tag: b.tagName,
+    text: (b.textContent || '').trim().slice(0, 24),
+    aria: b.getAttribute('aria-label'),
+    title: b.getAttribute('title'),
+    testid: b.getAttribute('data-testid'),
+    cls: (b.className || '').toString().slice(0, 50),
+    ที่: (() => { const r = b.getBoundingClientRect();
+                  return `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`; })(),
+  });
+  const allClickable = () => [...document.querySelectorAll('button, [role="button"], a')];
 
-  for (let i = 0; i < Math.min(3, tiles.length); i++) {
-    const tile = tiles[i];
+  const tiles = findTiles();
+  const report = { url: location.href, ไทล์ที่เจอ: tiles.length };
+
+  if (tiles.length) {
+    const tile = tiles[0];
     tile.scrollIntoView({ block: 'center' });
     await sleep(400);
-    await hover(tile);
-    say(`อ่านการ์ดที่ ${i + 1}/${Math.min(3, tiles.length)}…`);
+    say('ดูก่อน hover…');
+    const before = new Set(allClickable());
 
-    report.การ์ด.push({
-      ปุ่ม: [...tile.querySelectorAll('button, [role="button"], a')].map((b) => ({
-        tag: b.tagName,
-        text: (b.textContent || '').trim().slice(0, 30),
-        aria: b.getAttribute('aria-label'),
-        title: b.getAttribute('title'),
-        testid: b.getAttribute('data-testid'),
-        cls: (b.className || '').toString().slice(0, 60),
-        มองเห็น: b.offsetParent !== null,
-      })),
-      // ไอคอนบางตัวไม่ได้อยู่ใน <button> แต่เป็น span ที่มีชื่อไอคอนเป็นข้อความ
-      ไอคอน: [...tile.querySelectorAll('span, i, svg')]
-        .map((s) => (s.textContent || '').trim())
-        .filter((t) => t && t.length < 24),
-    });
+    await hover(tile);
+    say('ดูหลัง hover…');
+
+    // ปุ่มที่เพิ่งโผล่ทั้งหน้า ไม่ว่าจะอยู่ในการ์ดหรือไม่ — นี่คือแถบควบคุมที่ตามหา
+    report.ปุ่มที่โผล่ตอนhover = allClickable().filter((b) => !before.has(b)).map(describe);
+
+    // ไล่ขึ้นไปทีละชั้นจากรูป เพื่อดูว่า "การ์ดจริง" ที่มีปุ่มครบอยู่ชั้นไหน
+    const img = tile.querySelector('img, video') || tile;
+    const chain = [];
+    let el = img;
+    for (let up = 0; up < 8 && el.parentElement; up++) {
+      el = el.parentElement;
+      const r = el.getBoundingClientRect();
+      chain.push({
+        ชั้น: up + 1,
+        tag: el.tagName,
+        cls: (el.className || '').toString().slice(0, 50),
+        ขนาด: `${Math.round(r.width)}x${Math.round(r.height)}`,
+        จำนวนปุ่ม: el.querySelectorAll('button, [role="button"]').length,
+        จำนวนลิงก์: el.querySelectorAll('a').length,
+        จำนวนสื่อ: el.querySelectorAll('img, video').length,
+        ไอคอน: [...new Set([...el.querySelectorAll('span, i')]
+          .map((s) => (s.textContent || '').trim())
+          .filter((t) => t && t.length < 24 && /^[a-z_]+$/.test(t)))].slice(0, 12),
+      });
+    }
+    report.ชั้นเหนือรูป = chain;
+
+    // ไอคอนทั้งหน้าตอนนี้ — ถ้า ⋮ อยู่ที่ไหนสักแห่ง ชื่อมันจะโผล่ในนี้
+    report.ไอคอนทั้งหน้า = [...new Set([...document.querySelectorAll('span, i')]
+      .map((s) => (s.textContent || '').trim())
+      .filter((t) => t && t.length < 24 && /^[a-z_]+$/.test(t)))];
   }
 
   const text = JSON.stringify(report, null, 1);
