@@ -30,6 +30,10 @@
   // ตัวคั่น ข้อความจริงของรายการเมนูจึงเป็น "downloadดาวน์โหลด" — เดิมจับด้วย
   // startsWith('ดาวน์โหลด') อย่างเดียวเลยไม่เจอ ทั้งที่เมนูเปิดอยู่ตรงหน้า
   const DOWNLOAD_LABELS = ['ดาวน์โหลด', 'download', 'Download'];
+
+  // เมนูย่อยหลังกด "ดาวน์โหลด" — เรียงตามลำดับที่อยากได้ ตัวแรกที่เจอชนะ
+  // ตั้งใจไม่ใส่ 270p (เป็น GIF) และไม่เอา 1080p/4K ที่เป็นการอัปสเกลจากต้นฉบับ
+  const QUALITY_LABELS = ['ขนาดตั้งเดิม', 'Original size', 'Original'];
   // บนหน้าจริง ปุ่มเมนูมี textContent ว่า "more_vertเพิ่มเติม" — Material วางชื่อ
   // ligature ของไอคอนไว้ติดกับป้ายกำกับโดยไม่มีตัวคั่น จึงจับด้วย startsWith ได้
   const MENU_LABELS = ['more_vert', 'more_horiz', 'ตัวเลือกเพิ่มเติม', 'More options',
@@ -271,11 +275,30 @@
     return;
   }
 
-  const tiles = findTiles();
-  say(`เจอสื่อ ${tiles.length} ชิ้น — เริ่มดาวน์โหลด (สูงสุด ${MAX_PER_RUN})`);
-  if (!tiles.length) {
+  const tileCount = findTiles().length;
+  say(`เจอสื่อ ${tileCount} ชิ้น — เริ่มดาวน์โหลด (สูงสุด ${MAX_PER_RUN})`);
+  if (!tileCount) {
     say('หาไทล์สื่อไม่เจอ — เลื่อนหน้าให้เห็นสื่อก่อนแล้วลองใหม่');
     return;
+  }
+
+  // หาไทล์ใหม่ทุกรอบ อย่าเก็บรายการไว้ตั้งแต่ต้น
+  //
+  // เดิมเก็บ tiles ไว้ครั้งเดียวแล้ววนใช้ พอโหลดใบแรกเสร็จ React เรนเดอร์รายการใหม่
+  // node ที่ถืออยู่ก็หลุดจาก DOM — getBoundingClientRect คืน 0x0 ทุกไทล์ที่เหลือ
+  // ปุ่มทุกตัวจึงถือว่า "ไม่ทับการ์ด" และรายงานออกมาว่าหาปุ่ม ⋮ ไม่เจอ 13 ครั้งรวด
+  // จำด้วย src ของสื่อแทน เพราะเป็นค่าที่อยู่รอดข้ามการเรนเดอร์
+  const seen = new Set();
+  const keyOf = (tile) => {
+    const m = tile.querySelector('img, video');
+    return m ? (m.currentSrc || m.src || m.getAttribute('poster') || '') : '';
+  };
+  function nextTile() {
+    for (const t of findTiles()) {
+      const k = keyOf(t);
+      if (k && !seen.has(k)) return { tile: t, key: k };
+    }
+    return null;
   }
 
   let ok = 0;
@@ -289,13 +312,16 @@
   const startUrl = location.href;
   const navigatedAway = () => location.href !== startUrl;
 
-  for (let i = 0; i < tiles.length && ok < MAX_PER_RUN && !stopped; i++) {
+  for (let i = 0; i < tileCount && ok < MAX_PER_RUN && !stopped; i++) {
     if (navigatedAway()) {
       say('หน้าเปลี่ยนไประหว่างทาง — หยุดไว้ก่อน');
       break;
     }
-    const tile = tiles[i];
-    say(`[${i + 1}/${tiles.length}] สำเร็จ ${ok} · พลาด ${fail}`);
+    const next = nextTile();
+    if (!next) break;                 // ไล่ครบทุกใบที่มองเห็นแล้ว
+    seen.add(next.key);
+    const tile = next.tile;
+    say(`[${i + 1}/${tileCount}] สำเร็จ ${ok} · พลาด ${fail}`);
 
     tile.scrollIntoView({ block: 'center', behavior: 'smooth' });
     await sleep(600);
@@ -344,6 +370,19 @@
     }
 
     item.click();
+
+    // "ดาวน์โหลด" ไม่ได้โหลดทันที มันกางเมนูย่อยเลือกความละเอียดต่ออีกชั้น
+    // (270p GIF · 720p ขนาดตั้งเดิม · 1080p เพิ่มความละเอียดแล้ว · 4K)
+    // เลือก "ขนาดตั้งเดิม" เป็นค่าเริ่มต้น — ได้คลิปจริงตามที่เรนเดอร์มา ไม่ใช่ GIF
+    // และไม่ใช่ไฟล์อัปสเกลที่ใหญ่กว่าโดยไม่ได้รายละเอียดเพิ่มจริง
+    const quality = await waitFor(
+      () => findByText(document.body, QUALITY_LABELS), 2500);
+    if (quality) {
+      await sleep(300);
+      quality.click();
+      await sleep(500);
+    }
+
     ok++;
     // รอให้เมนูปิดก่อนไปไทล์ถัดไป ไม่งั้นรอบหน้าจะมองเห็นเมนูเดิมเป็นของใหม่
     await waitFor(() => !document.body.contains(menuRoot), 1500);
