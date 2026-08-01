@@ -1,24 +1,25 @@
 /**
- * flow_download_helper.js — ชี้เมาส์ที่คลิป แล้วที่เหลือระบบกดให้เอง
+ * flow_download_helper.js — คลิกขวาไล่โหลดคลิปในหน้า Google Flow ให้อัตโนมัติ
  *
  * ใช้ยังไง
  *   1. เปิดโปรเจกต์ Flow ใน Chrome ปกติของคุณ (ที่ล็อกอินอยู่แล้ว)
- *   2. กดบุ๊กมาร์ก "⬇️ โหลดคลิปจาก Flow"
- *   3. เอาเมาส์ไปชี้ที่คลิปทีละใบ — พอแถบ ⋮ โผล่ ระบบจะกดต่อให้เองจนจบ
- *      แล้วเลื่อนเมาส์ไปใบถัดไป ทำไปเรื่อย ๆ
+ *   2. กดบุ๊กมาร์ก "⬇️ โหลดคลิปจาก Flow" — แล้วปล่อยให้มันทำงาน
  *
- * ทำไมต้องชี้เมาส์เอง
+ * ทำไมต้องคลิกขวา ไม่ใช่กดปุ่ม ⋮
  *   แถบ ❤️ ↩️ ⋮ ของ Flow โผล่จากสถานะ :hover ซึ่ง **เบราว์เซอร์ไม่ยอมให้สคริปต์
  *   สร้างขึ้นเองได้** ทดสอบตรง ๆ แล้ว: ยิง pointerover/pointerenter/mouseover/
  *   mouseenter/pointermove/mousemove ครบทุกตัวบน element ที่มี CSS :hover
  *   → element.matches(':hover') คืน false และปุ่มยัง display:none อยู่เหมือนเดิม
  *
- *   เวอร์ชันก่อนหน้าจึงได้ผลลัพธ์แปลก ๆ คือบางรอบโหลดได้ 1-4 ไฟล์ บางรอบได้ 0
- *   ทั้งที่โค้ดเหมือนกัน — เพราะที่โหลดได้คือใบที่ "เมาส์จริงของผู้ใช้" บังเอิญค้างอยู่
- *   ไม่ใช่ฝีมือสคริปต์ พอผู้ใช้เอามือออกจากเมาส์จริง ๆ ก็ได้ 0 จาก 15 ทันที
+ *   เวอร์ชันที่ไล่กด ⋮ จึงได้ผลแปลก ๆ คือบางรอบโหลดได้ 1-4 ไฟล์ บางรอบได้ 0 ทั้งที่
+ *   โค้ดเหมือนกัน — ที่โหลดได้คือใบที่ "เมาส์จริงของผู้ใช้" บังเอิญค้างอยู่ ไม่ใช่
+ *   ฝีมือสคริปต์ พอผู้ใช้เอามือออกจากเมาส์จริง ๆ ก็ได้ 0 จาก 15 ทันที
  *
- *   สิ่งที่สคริปต์ทำแทนได้คือทุกขั้นหลังจากนั้น — กด ⋮ หาเมนู ชี้ "ดาวน์โหลด"
- *   รอเมนูย่อย แล้วเลือกความละเอียด รวม 4 จังหวะต่อคลิป เหลือแค่ชี้เมาส์ค้างไว้
+ *   แต่คลิกขวาเป็นคนละเรื่อง — contextmenu คือ event ที่หน้าเว็บดักเอง สคริปต์ยิงได้
+ *   ต่างจาก :hover ที่เป็นสถานะของเบราว์เซอร์ ถ้า Flow ทำเมนูคลิกขวาของตัวเอง
+ *   (ซึ่งมันทำ) ทางนี้จึงเดินได้ครบโดยไม่ต้องแตะเมาส์เลย
+ *
+ *   การยิง contextmenu แบบสังเคราะห์ไม่ทำให้เมนูของ Chrome เด้งขึ้นมาด้วย
  *
  * ปลอดภัย: ทำงานบนหน้าที่คุณเปิดเอง ไม่มีเบราว์เซอร์อัตโนมัติ ไม่มีการล็อกอินผ่าน
  * โปรแกรม จึงไม่ไปยุ่งกับระบบตรวจจับใด ๆ ของ Google
@@ -38,20 +39,13 @@
   const MIN_DELAY_MS = 3000;   // หน่วงขั้นต่ำต่อไฟล์
   const MAX_DELAY_MS = 5000;
 
-  // บนหน้าจริง ปุ่มเมนูมี textContent ว่า "more_vertเพิ่มเติม" — Material วางชื่อ
-  // ligature ของไอคอนไว้ติดกับป้ายกำกับโดยไม่มีตัวคั่น จึงจับด้วย startsWith ได้
-  const MENU_LABELS = ['more_vert', 'more_horiz', 'ตัวเลือกเพิ่มเติม', 'More options',
-                       'เพิ่มเติม', 'ตัวเลือก', 'Options', 'overflow'];
-
-  // 'download' คือชื่อ ligature ของไอคอน รายการจริงจึงเป็น "downloadดาวน์โหลด"
+  // 'download' คือชื่อ ligature ของไอคอน ซึ่ง Material วางไว้ติดหน้าป้ายกำกับโดยไม่มี
+  // ตัวคั่น รายการจริงในเมนูจึงเป็น "downloadดาวน์โหลด"
   const DOWNLOAD_LABELS = ['ดาวน์โหลด', 'download', 'Download'];
 
   // เมนูย่อยหลังกด "ดาวน์โหลด" — 270p เป็น GIF ส่วน 1080p/4K เป็นการอัปสเกลจาก
   // ไฟล์เดิม ได้ไฟล์ใหญ่ขึ้นแต่รายละเอียดเท่าเดิม จึงเลือกขนาดตั้งเดิม
   const QUALITY_LABELS = ['ขนาดตั้งเดิม', 'Original size', 'Original'];
-
-  // ปุ่ม ⋮ บนหัวเว็บก็เข้าข่ายชื่อเดียวกัน แต่มันอยู่บนสุดของหน้าเสมอ
-  const HEADER_ZONE_PX = 60;
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const humanDelay = () =>
@@ -131,34 +125,6 @@
       }
     }
     return null;
-  }
-
-  function isMenuButton(b) {
-    const t = (b.textContent || '').trim();
-    return MENU_LABELS.some((l) => {
-      const needle = l.toLowerCase();
-      return t.startsWith(l) || t.includes(l)
-        || (b.getAttribute('aria-label') || '').toLowerCase().includes(needle)
-        || (b.getAttribute('title') || '').toLowerCase().includes(needle)
-        || (b.getAttribute('data-testid') || '').toLowerCase().includes(needle);
-    });
-  }
-
-  // ปุ่ม ⋮ ของการ์ดที่ผู้ใช้กำลังชี้อยู่ — เล็ก อยู่ในจอ และไม่ใช่แถบหัวเว็บ
-  function cardMenuButton() {
-    const cands = [...document.querySelectorAll('button, [role="button"]')]
-      .filter(isMenuButton)
-      .map((b) => ({ b, r: b.getBoundingClientRect() }))
-      .filter(({ r }) => r.width > 0 && r.height > 0
-        && r.width <= 48 && r.height <= 48          // ปุ่มไอคอน ไม่ใช่กล่องห่อ
-        && r.top >= HEADER_ZONE_PX                   // ไม่ใช่ ⋮ ของหัวเว็บ
-        && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth);
-    return cands.length ? cands[0].b : null;
-  }
-
-  function posKey(b) {
-    const r = b.getBoundingClientRect();
-    return `${Math.round(r.left)},${Math.round(r.top)}`;
   }
 
   async function closeMenu() {
@@ -252,119 +218,89 @@
     return;
   }
 
-  // ── วนรอผู้ใช้ชี้เมาส์ แล้วกดต่อให้เอง ───────────────────────────────────
-  const IDLE_MSG = (n) =>
-    `<b style="color:#fbbf24">👉 เอาเมาส์ไปชี้ที่คลิปสักใบ</b><br>`
-    + `พอแถบ ⋮ โผล่ ระบบจะกดดาวน์โหลดให้เอง<br>`
-    + `<span style="color:#9aa5a2">แล้วเลื่อนไปใบถัดไปเรื่อย ๆ</span><br>`
-    + `<b>โหลดแล้ว ${n}/${MAX_PER_RUN}</b>`;
-
+  // ── บอกตลอดว่าอยู่ขั้นไหน และกันค้าง ─────────────────────────────────────
+  //
+  // รอบก่อนผู้ใช้เจออาการ "ค้าง" แล้วบอกไม่ได้ว่าค้างตรงไหน เพราะ HUD เขียนข้อความ
+  // ทีเดียวตอนเริ่มขั้นแล้วเงียบยาว ตอนนี้เดินนาฬิกาให้เห็น และถ้าขั้นไหนใช้เวลา
+  // เกิน STEP_TIMEOUT ก็เลิกเองพร้อมบอกว่าค้างที่ขั้นอะไร ดีกว่าค้างไปเงียบ ๆ
+  const STEP_TIMEOUT_MS = 25000;
   let ok = 0;
-  let lastKey = '';
+  let total = 0;
   const problems = [];
+  let step = 'กำลังเริ่ม';
+  let stepAt = Date.now();
+  let stuckAt = '';
+  const setStep = (s) => { step = s; stepAt = Date.now(); };
+
+  const ticker = setInterval(() => {
+    if (Date.now() - stepAt > STEP_TIMEOUT_MS && !stuckAt) {
+      stuckAt = step;
+      stopped = true;
+      return;
+    }
+    const secs = Math.round((Date.now() - stepAt) / 1000);
+    say(`⚙️ ${step}${secs >= 2 ? ` (${secs} วิ)` : ''}`
+      + `<br><b>โหลดแล้ว ${ok}${total ? '/' + Math.min(total, MAX_PER_RUN) : ''}</b>`);
+  }, 500);
 
   // ครอบไว้ทั้งก้อน — error ใน async IIFE จะกลายเป็น unhandled rejection ที่ไม่โผล่
   // ที่ไหนเลย HUD ค้างอยู่ที่ข้อความเดิมเหมือนกำลังรออยู่ ทั้งที่ตายไปแล้ว
   // (เจอมาแล้วตอน cardMenuButton คืน object แทนที่จะคืนตัวปุ่ม)
   try {
 
-  // ── ลองคลิกขวาก่อน ───────────────────────────────────────────────────────
-  // ถ้า Flow ดัก contextmenu เอง ทางนี้ทำได้อัตโนมัติทั้งหมดโดยไม่ต้องพึ่ง :hover
-  // ที่ปลอมไม่ได้ ลองกับไทล์ใบแรกก่อน แล้วค่อยตัดสินว่าจะเดินทางไหน
-  say('🔍 กำลังลองคลิกขวา…');
-  let autoMode = false;
-  const probe = findTiles()[0];
-  if (probe) {
-    const before = bodyKids();
-    await rightClick(probe);
-    const menu = await waitFor(() => newMenu(before), 1500);
-    if (menu) {
-      autoMode = findByText(menu, DOWNLOAD_LABELS) ? true : false;
-      if (!autoMode) log('คลิกขวาเปิดเมนูได้ แต่ในเมนูไม่มี "ดาวน์โหลด"');
-      await closeMenu();
-    }
+  // ── คลิกขวาทุกใบ ─────────────────────────────────────────────────────────
+  // ไม่ลองก่อนแล้วค่อยเลือกทางอีกต่อไป — คลิกขวาคือทางหลัก ทำไปเลย ถ้าใบไหน
+  // ไม่ขึ้นเมนูก็ข้ามใบนั้นแล้วไปต่อ สรุปเหตุผลทั้งหมดตอนจบทีเดียว
+  //
+  // จำด้วย src ของสื่อ เพราะ node จะหลุดเมื่อ Flow เรนเดอร์รายการใหม่หลังโหลดเสร็จ
+  const seen = new Set();
+  const keyOf = (t) => {
+    const m = t.querySelector('img, video');
+    return m ? (m.currentSrc || m.src || m.getAttribute('poster') || '') : '';
+  };
+
+  setStep('กำลังหาคลิปในหน้า');
+  total = findTiles().length;
+  log(`เจอสื่อ ${total} ชิ้น — เริ่มคลิกขวาทีละใบ (สูงสุด ${MAX_PER_RUN})`);
+  if (!total) {
+    clearInterval(ticker);
+    say('หาคลิปในหน้าไม่เจอ — เลื่อนหน้าให้เห็นคลิปก่อนแล้วกดใหม่');
+    hud.querySelector('#fdh-stop').textContent = 'ปิด';
+    hud.querySelector('#fdh-stop').onclick = () => hud.remove();
+    return;
   }
-  log(autoMode ? 'คลิกขวาใช้ได้ — ทำอัตโนมัติทั้งหมด'
-               : 'คลิกขวาไม่ได้ผล — เปลี่ยนเป็นโหมดชี้เมาส์');
 
-  if (autoMode) {
-    // จำด้วย src ของสื่อ เพราะ node จะหลุดเมื่อ Flow เรนเดอร์รายการใหม่
-    const seen = new Set();
-    const keyOf = (t) => {
-      const m = t.querySelector('img, video');
-      return m ? (m.currentSrc || m.src || m.getAttribute('poster') || '') : '';
-    };
-    const total = findTiles().length;
-    say(`⚙️ คลิกขวาใช้ได้ — ไล่โหลด ${Math.min(total, MAX_PER_RUN)} ไฟล์ให้เอง`);
+  for (let i = 0; i < total && ok < MAX_PER_RUN && !stopped; i++) {
+    setStep(`เลื่อนไปคลิปที่ ${i + 1}`);
+    const tile = findTiles().find((t) => keyOf(t) && !seen.has(keyOf(t)));
+    if (!tile) break;
+    seen.add(keyOf(tile));
 
-    for (let i = 0; i < total && ok < MAX_PER_RUN && !stopped; i++) {
-      const tile = findTiles().find((t) => keyOf(t) && !seen.has(keyOf(t)));
-      if (!tile) break;
-      seen.add(keyOf(tile));
+    tile.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    await sleep(500);
 
-      tile.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      await sleep(500);
+    setStep(`คลิกขวาคลิปที่ ${i + 1}`);
+    const before = bodyKids();
+    await rightClick(tile);
 
-      const before = bodyKids();
-      await rightClick(tile);
-      const menuRoot = await waitFor(() => newMenu(before), 2500);
-      if (!menuRoot) { problems.push('คลิกขวาแล้วเมนูไม่เปิด'); await closeMenu(); continue; }
+    setStep(`รอเมนูของคลิปที่ ${i + 1}`);
+    const menuRoot = await waitFor(() => newMenu(before), 2500);
+    if (!menuRoot) { problems.push('คลิกขวาแล้วเมนูไม่เปิด'); await closeMenu(); continue; }
 
-      const res = await downloadFromMenu(menuRoot);
-      if (res !== true) { problems.push(res); await closeMenu(); continue; }
-
-      ok++;
-      log(`ดาวน์โหลดแล้ว ${ok} ไฟล์`);
-      say(`⚙️ กำลังไล่โหลด… <b>${ok}/${Math.min(total, MAX_PER_RUN)}</b>`);
-      await waitFor(() => !document.body.contains(menuRoot), 1500);
-      await closeMenu();
-      await humanDelay();   // หน่วงแบบคน — กันยิงถี่
-    }
-  } else {
-
-  say(IDLE_MSG(0));
-  log(`พร้อมแล้ว — ชี้เมาส์ที่คลิปได้เลย (สูงสุด ${MAX_PER_RUN} ไฟล์ต่อรอบ)`);
-
-  while (ok < MAX_PER_RUN && !stopped) {
-    // รอปุ่ม ⋮ ที่ยังไม่เคยทำ — ผู้ใช้ต้องชี้เมาส์ก่อน สคริปต์สร้าง :hover เองไม่ได้
-    const btn = await waitFor(
-      () => { const b = cardMenuButton(); return b && posKey(b) !== lastKey ? b : null; },
-      60000);
-    if (!btn) {
-      if (stopped) break;
-      say('รอนานเกินไป — ปิดแล้วกดใหม่ได้เลย' + `<br><b>โหลดแล้ว ${ok}</b>`);
-      break;
-    }
-
-    lastKey = posKey(btn);
-    say(`⏳ เจอแล้ว — กำลังกดดาวน์โหลด…<br><b>โหลดแล้ว ${ok}/${MAX_PER_RUN}</b>`);
-
-    const before = new Set(document.body.children);
-    await hover(btn);
-    btn.click();
-
-    const menuRoot = await waitFor(
-      () => [...document.body.children].find(
-        (n) => !before.has(n) && (n.textContent || '').trim()), 2500);
-    if (!menuRoot) {
-      problems.push('กด ⋮ แล้วเมนูไม่เปิด');
-      await closeMenu();
-      continue;
-    }
-
+    setStep(`กดดาวน์โหลดคลิปที่ ${i + 1}`);
     const res = await downloadFromMenu(menuRoot);
     if (res !== true) { problems.push(res); await closeMenu(); continue; }
 
     ok++;
     log(`ดาวน์โหลดแล้ว ${ok} ไฟล์`);
+    setStep('รอเมนูปิด');
     await waitFor(() => !document.body.contains(menuRoot), 1500);
     await closeMenu();
-    say(`✅ โหลดใบนี้แล้ว — เลื่อนเมาส์ไปใบถัดไป<br><b>โหลดแล้ว ${ok}/${MAX_PER_RUN}</b>`);
+    setStep('พักก่อนไฟล์ถัดไป');
     await humanDelay();   // หน่วงแบบคน — กันยิงถี่
-    if (ok < MAX_PER_RUN && !stopped) say(IDLE_MSG(ok));
-  }
   }
   } catch (e) {
+    clearInterval(ticker);
     console.error('[flow-helper] พัง:', e);
     say(`<b style="color:#f87171">สคริปต์พัง</b><br>${String(e).slice(0, 200)}`
       + `<br><b>โหลดไปแล้ว ${ok}</b>`);
@@ -373,12 +309,17 @@
     return;
   }
 
+  clearInterval(ticker);
   const note = problems.length
     ? `<br><span style="color:#fbbf24">มีบางใบไม่สำเร็จ: `
       + [...new Set(problems)].join(' · ') + '</span>'
     : '';
-  say(`<b>เสร็จ — ดาวน์โหลด ${ok} ชิ้น</b>${note}`
+  const stuckNote = stuckAt
+    ? `<br><span style="color:#f87171">หยุดเองเพราะค้างที่ขั้น: ${stuckAt}</span>`
+    : '';
+  say(`<b>เสร็จ — ดาวน์โหลด ${ok} ชิ้น</b>${stuckNote}${note}`
     + (ok >= MAX_PER_RUN ? '<br>ครบเพดานต่อรอบแล้ว กดบุ๊กมาร์กใหม่ได้ถ้ายังเหลือ' : ''));
+  if (stuckAt) console.warn('[flow-helper] ค้างที่ขั้น: ' + stuckAt);
   hud.querySelector('#fdh-stop').textContent = 'ปิด';
   hud.querySelector('#fdh-stop').onclick = () => hud.remove();
   log('เสร็จแล้ว ไฟล์จะไปอยู่ในโฟลเดอร์ดาวน์โหลดของ Chrome');
