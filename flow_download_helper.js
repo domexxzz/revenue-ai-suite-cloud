@@ -163,15 +163,55 @@
   // เป็นทางที่ใช้ได้จริงถ้า Flow ดัก contextmenu เอง เพราะนั่นคือ JS event ที่
   // สคริปต์ยิงได้ ต่างจาก :hover ที่เบราว์เซอร์ปิดตายไม่ให้ปลอม
   // (การยิง contextmenu แบบสังเคราะห์ไม่ทำให้เมนูของ Chrome เด้งขึ้นมาด้วย)
-  async function rightClick(el) {
+  async function rightClick(el, corner) {
     const r = el.getBoundingClientRect();
+    const p = corner === 'ซ้ายบน' ? { x: r.left + 8, y: r.top + 8 }
+      : corner === 'ขวาล่าง' ? { x: r.right - 8, y: r.bottom - 8 }
+      : { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     const at = { bubbles: true, cancelable: true, button: 2, buttons: 2,
-                 clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+                 clientX: p.x, clientY: p.y };
     el.dispatchEvent(new MouseEvent('pointerdown', at));
     el.dispatchEvent(new MouseEvent('mousedown', at));
     el.dispatchEvent(new MouseEvent('contextmenu', at));
     el.dispatchEvent(new MouseEvent('mouseup', at));
     await sleep(250);
+  }
+
+  // มุมที่จะลองคลิกขวา เรียงจากที่น่าจะเป็นการ์ดจริงที่สุด
+  //
+  // คลิกขวาที่ตัวรูปตรง ๆ ได้เมนูสั้นที่มีแค่ "ลบ" — Flow ไม่ถือว่ากำลังพูดถึงคลิปใบนั้น
+  // แต่มุมอื่นของการ์ดอาจได้เมนูเต็ม จึงไล่ลองจนกว่าจะเจอเมนูที่มี "ดาวน์โหลด"
+  // ระหว่างไล่ลองจะไม่กดรายการใดในเมนูเลย ปิดด้วย Escape อย่างเดียว
+  function menuTargets(tile) {
+    const out = [{ el: tile, corner: 'กลาง', ชื่อ: 'ไทล์ กลาง' },
+                 { el: tile, corner: 'ซ้ายบน', ชื่อ: 'ไทล์ ซ้ายบน' },
+                 { el: tile, corner: 'ขวาล่าง', ชื่อ: 'ไทล์ ขวาล่าง' }];
+    let up = tile;
+    for (let i = 0; i < 2 && up.parentElement && up.parentElement !== document.body; i++) {
+      up = up.parentElement;
+      out.push({ el: up, corner: 'กลาง', ชื่อ: `ชั้นเหนือไทล์ +${i + 1}` });
+    }
+    const media = tile.querySelector('img, video');
+    if (media) out.push({ el: media, corner: 'กลาง', ชื่อ: 'ตัวรูป' });
+    return out;
+  }
+
+  // เปิดเมนูของการ์ดใบนี้ให้ได้เมนูที่มี "ดาวน์โหลด" — คืน {menuRoot, ชื่อมุม}
+  async function openCardMenu(tile, onStep) {
+    let lastSeen = '';
+    for (const t of menuTargets(tile)) {
+      if (stopped || !t.el.isConnected) continue;
+      if (onStep) onStep(t.ชื่อ);
+      const before = bodyKids();
+      await rightClick(t.el, t.corner);
+      const menu = await waitFor(() => newMenu(before), 1200);
+      if (!menu) continue;
+      if (findByText(menu, DOWNLOAD_LABELS)) return { menuRoot: menu, via: t.ชื่อ };
+      lastSeen = (menu.innerText || '').split('\n')
+        .map((s) => s.trim()).filter(Boolean).join(' | ');
+      await closeMenu();   // เมนูไม่ใช่อันที่ต้องการ ปิดทิ้ง ไม่กดอะไรในนั้น
+    }
+    return { menuRoot: null, lastSeen };
   }
 
   // หาไทล์สื่อ — การ์ดที่หุ้ม media ชิ้นเดียว ไม่ใช่ทั้ง grid
@@ -286,6 +326,7 @@
   //
   // จำด้วย src ของสื่อ เพราะ node จะหลุดเมื่อ Flow เรนเดอร์รายการใหม่หลังโหลดเสร็จ
   const seen = new Set();
+  let workingCorner = '';
   const keyOf = (t) => {
     const m = t.querySelector('img, video');
     return m ? (m.currentSrc || m.src || m.getAttribute('poster') || '') : '';
@@ -311,22 +352,24 @@
     tile.scrollIntoView({ block: 'center', behavior: 'smooth' });
     await sleep(500);
 
+    // มุมที่ใช้ได้เจอแล้วครั้งแรก ก็ใช้มุมนั้นซ้ำกับใบที่เหลือ ไม่ต้องไล่ลองใหม่ทุกใบ
     setStep(`คลิกขวาคลิปที่ ${i + 1}`);
-    const before = bodyKids();
-    await rightClick(tile);
-
-    setStep(`รอเมนูของคลิปที่ ${i + 1}`);
-    const menuRoot = await waitFor(() => newMenu(before), 2500);
-    if (!menuRoot) { problems.push('คลิกขวาแล้วเมนูไม่เปิด'); await closeMenu(); continue; }
+    const { menuRoot, via, lastSeen } = await openCardMenu(
+      tile, (name) => setStep(`คลิกขวาคลิปที่ ${i + 1} — ลอง${name}`));
+    if (!menuRoot) {
+      if (lastSeen) { menuDump = lastSeen; problems.push('ทุกมุมได้เมนูที่ไม่มี "ดาวน์โหลด"'); }
+      else problems.push('คลิกขวาแล้วเมนูไม่เปิด');
+      await closeMenu();
+      if (menuDump) stopped = true;   // ใบอื่นก็จะเหมือนกัน ไม่ต้องไล่ต่อ
+      continue;
+    }
+    if (via && !workingCorner) { workingCorner = via; log(`มุมที่ใช้ได้: ${via}`); }
 
     setStep(`กดดาวน์โหลดคลิปที่ ${i + 1}`);
     const res = await downloadFromMenu(menuRoot);
     if (res !== true) {
       problems.push(res);
       await closeMenu();
-      // เมนูที่คลิกขวาเปิดได้ไม่มี "ดาวน์โหลด" — ใบอื่นก็จะเหมือนกันทั้งหมด
-      // การคลิกขวาต่ออีก 14 ครั้งไม่ได้อะไรเพิ่ม นอกจากเปิดเมนูที่มีแต่ "ลบ" ซ้ำ ๆ
-      if (menuDump) { stopped = true; }
       continue;
     }
 

@@ -131,6 +131,68 @@
     report.ไอคอนทั้งหน้า = [...new Set([...document.querySelectorAll('span, i')]
       .map((s) => (s.textContent || '').trim())
       .filter((t) => t && t.length < 24 && /^[a-z_]+$/.test(t)))];
+
+    // ── ลองคลิกขวาหลายมุม ────────────────────────────────────────────────
+    // คลิกขวาที่ตัวรูปได้เมนูสั้นที่มีแค่ "ลบ" ส่วนตอนคนคลิกเองได้เมนูเต็ม
+    // ความต่างอาจอยู่ที่ว่าคลิกโดน element ไหน หรือโดนตรงพิกัดไหนของการ์ด
+    // ลองให้ครบแล้วรายงานว่าแต่ละมุมได้เมนูอะไร จะได้เลือกมุมที่ถูกได้เลย
+    //
+    // อ่านอย่างเดียวเหมือนเดิม — เปิดเมนูแล้วอ่านข้อความ ปิดด้วย Escape
+    // ไม่กดรายการใดในเมนูทั้งสิ้น จึงไม่มีทางเผลอลบ
+    const media = tile.querySelector('img, video');
+    const targets = [
+      { ชื่อ: 'ตัวรูป/วิดีโอ', el: media, มุม: 'กลาง' },
+      { ชื่อ: 'ไทล์', el: tile, มุม: 'กลาง' },
+      { ชื่อ: 'ไทล์', el: tile, มุม: 'ซ้ายบน' },
+      { ชื่อ: 'ไทล์', el: tile, มุม: 'ขวาล่าง' },
+    ];
+    let up = tile;
+    for (let i = 0; i < 3 && up.parentElement; i++) {
+      up = up.parentElement;
+      targets.push({ ชื่อ: `ชั้นเหนือไทล์ +${i + 1} (${up.tagName})`, el: up, มุม: 'กลาง' });
+    }
+    const link = tile.closest('a') || tile.querySelector('a');
+    if (link) targets.push({ ชื่อ: 'ลิงก์ <a>', el: link, มุม: 'กลาง' });
+
+    const pointIn = (r, corner) => corner === 'ซ้ายบน'
+      ? { x: r.left + 8, y: r.top + 8 }
+      : corner === 'ขวาล่าง'
+        ? { x: r.right - 8, y: r.bottom - 8 }
+        : { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+
+    report.ลองคลิกขวา = [];
+    for (const t of targets) {
+      if (!t.el) continue;
+      say(`ลองคลิกขวา: ${t.ชื่อ} (${t.มุม})…`);
+      const kids = new Set(document.body.children);
+      const r = t.el.getBoundingClientRect();
+      const p = pointIn(r, t.มุม);
+      const at = { bubbles: true, cancelable: true, button: 2, buttons: 2,
+                   clientX: p.x, clientY: p.y };
+      t.el.dispatchEvent(new MouseEvent('pointerdown', at));
+      t.el.dispatchEvent(new MouseEvent('mousedown', at));
+      t.el.dispatchEvent(new MouseEvent('contextmenu', at));
+      t.el.dispatchEvent(new MouseEvent('mouseup', at));
+      await sleep(800);
+
+      const menu = [...document.body.children].find(
+        (n) => !kids.has(n) && (n.innerText || '').trim());
+      const items = menu
+        ? (menu.innerText || '').split('\n').map((s) => s.trim()).filter(Boolean)
+        : [];
+      report.ลองคลิกขวา.push({
+        ที่: `${t.ชื่อ} · ${t.มุม}`,
+        เมนูเปิด: !!menu,
+        จำนวนรายการ: items.length,
+        มีดาวน์โหลด: items.some((s) => s.includes('ดาวน์โหลด') || /download/i.test(s)),
+        รายการ: items.slice(0, 14),
+      });
+
+      // ปิดเมนู — Escape อย่างเดียว ไม่กดอะไรในเมนู
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+      await sleep(500);
+    }
   }
 
   const text = JSON.stringify(report, null, 1);
