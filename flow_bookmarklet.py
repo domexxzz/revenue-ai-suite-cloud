@@ -22,8 +22,14 @@ from pathlib import Path
 from urllib.parse import quote
 
 BASE_DIR = Path(__file__).parent
-HELPER = BASE_DIR / "flow_download_helper.js"
 HTML_OUT = BASE_DIR / "flow_bookmarklet.html"
+
+# ตัวโหลดคือของหลัก ตัวตรวจมีไว้ตอนที่ Flow เปลี่ยนชื่อปุ่มแล้วตัวโหลดหาไม่เจอ
+SOURCES = {
+    "download": BASE_DIR / "flow_download_helper.js",
+    "inspect": BASE_DIR / "flow_inspect_helper.js",
+}
+HELPER = SOURCES["download"]
 
 
 def _strip_comments(src: str) -> str:
@@ -79,11 +85,14 @@ def _strip_comments(src: str) -> str:
     return "\n".join(ln for ln in lines if ln)
 
 
-def build() -> str:
+def build(kind: str = "download") -> str:
     """The whole helper as one javascript: URI, ready to be a bookmark."""
-    if not HELPER.exists():
-        raise FileNotFoundError(f"ไม่เจอ {HELPER}")
-    body = _strip_comments(HELPER.read_text(encoding="utf-8"))
+    src = SOURCES.get(kind)
+    if src is None:
+        raise ValueError(f"ไม่รู้จัก kind={kind!r} — มีแค่ {sorted(SOURCES)}")
+    if not src.exists():
+        raise FileNotFoundError(f"ไม่เจอ {src}")
+    body = _strip_comments(src.read_text(encoding="utf-8"))
     # void(0) so the page is not replaced by the expression's return value —
     # without it the browser navigates away to whatever the script evaluated to.
     return "javascript:" + quote(f"(function(){{{body}}})();void 0;", safe="")
@@ -112,7 +121,10 @@ def write_html(path: Path = HTML_OUT) -> Path:
   <li><b>ลาก</b>ปุ่มส้มนี้ขึ้นไปวางบนแถบบุ๊กมาร์ก (ลากนะ อย่ากด)</li>
   <li>เปิดโปรเจกต์ใน Google Flow แล้วกดบุ๊กมาร์กนั้น</li>
 </ol>
-<p><a class="bm" href="{uri}">⬇️ โหลดคลิปจาก Flow</a></p>
+<p><a class="bm" href="{uri}">⬇️ โหลดคลิปจาก Flow</a>
+   <a class="bm" style="background:#E5E7EB" href="{build("inspect")}">🔎 ตรวจปุ่มในหน้า Flow</a></p>
+<p>ปุ่มสีเทาใช้ตอนตัวโหลดขึ้นว่า “หาปุ่ม ⋮ ไม่เจอ” — มันอ่านอย่างเดียว
+ไม่กดอะไร แล้วให้ข้อความที่คัดลอกส่งมาได้เลย</p>
 <p class="warn">ตั้งโฟลเดอร์ดาวน์โหลดของ Chrome เป็น
 <code>G:\\My Drive\\Lemed</code> และปิด “ถามที่จัดเก็บทุกครั้ง” ก่อน
 แล้ว <code>flow_watch.py</code> จะจัดไฟล์เข้าโฟลเดอร์แพลตฟอร์มให้เอง</p>
@@ -126,14 +138,16 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="สร้างบุ๊กมาร์กเล็ตกดโหลดคลิปจาก Flow")
     ap.add_argument("--html", action="store_true",
                     help="เขียนหน้าเว็บที่มีลิงก์ให้ลากเก็บ")
+    ap.add_argument("--kind", choices=sorted(SOURCES), default="download",
+                    help="download = ตัวโหลด · inspect = ตัวตรวจปุ่ม")
     args = ap.parse_args()
 
     if args.html:
         print("เขียนแล้ว:", write_html())
     else:
-        uri = build()
+        uri = build(args.kind)
         print(uri)
-        print(f"\n({len(uri):,} ตัวอักษร)")
+        print(f"\n({len(uri):,} ตัวอักษร · {args.kind})")
 
 
 if __name__ == "__main__":

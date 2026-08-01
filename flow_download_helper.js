@@ -26,7 +26,10 @@
 
   // ข้อความบนเมนู — Flow เป็น Labs ปรับ UI บ่อย ถ้าหาไม่เจอให้แก้ตรงนี้
   const DOWNLOAD_LABELS = ['ดาวน์โหลด', 'Download'];
-  const MENU_LABELS = ['more_vert', 'ตัวเลือกเพิ่มเติม', 'More options', 'เพิ่มเติม'];
+  // Material ใช้ ligature เป็นข้อความในปุ่มไอคอน จึงจับได้ทั้ง more_vert (⋮) และ
+  // more_horiz (⋯) ส่วน overflow/menu ใช้จับ data-testid ที่มักตั้งชื่อแบบนั้น
+  const MENU_LABELS = ['more_vert', 'more_horiz', 'ตัวเลือกเพิ่มเติม', 'More options',
+                       'เพิ่มเติม', 'ตัวเลือก', 'Options', 'overflow'];
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const humanDelay = () =>

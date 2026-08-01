@@ -2535,9 +2535,10 @@ def _render_flow_sync(authed: bool = True) -> None:
                    "แล้วกดบุ๊กมาร์กอันนั้น มันจะไล่กดดาวน์โหลดให้เอง")
         try:
             import flow_bookmarklet
-            uri = flow_bookmarklet.build()
+            uri = flow_bookmarklet.build("download")
+            uri_inspect = flow_bookmarklet.build("inspect")
         except Exception as e:  # noqa: BLE001 — helper file may be missing
-            uri = ""
+            uri = uri_inspect = ""
             st.caption(f"⚠️ สร้างบุ๊กมาร์กเล็ตไม่ได้: {e}")
 
         if uri:
@@ -2550,12 +2551,21 @@ def _render_flow_sync(authed: bool = True) -> None:
                           font-weight:700;padding:.6rem 1.2rem;border-radius:10px;
                           text-decoration:none;cursor:grab"
                    title="ลากขึ้นแถบบุ๊กมาร์ก — กดตรงนี้ไม่ทำงาน">⬇️ โหลดคลิปจาก Flow</a>
-                <span style="color:#6B7280;margin-left:.6rem">👈 <b>ลาก</b>ขึ้นแถบบุ๊กมาร์ก
-                (เปิดแถบด้วย Ctrl+Shift+B) — กดตรงนี้ไม่ทำงาน</span></div>''',
-                height=60,
+                <a href="{html_lib.escape(uri_inspect, quote=True)}"
+                   style="display:inline-block;background:#E5E7EB;color:#374151;
+                          font-weight:700;padding:.6rem 1.2rem;border-radius:10px;
+                          text-decoration:none;cursor:grab;margin-left:.5rem"
+                   title="ลากขึ้นแถบบุ๊กมาร์ก — ใช้ตอนตัวโหลดหาปุ่ม ⋮ ไม่เจอ"
+                   >🔎 ตรวจปุ่มในหน้า Flow</a>
+                <div style="color:#6B7280;margin-top:.5rem">👆 <b>ลาก</b>ทั้งสองปุ่มขึ้น
+                แถบบุ๊กมาร์ก (เปิดแถบด้วย Ctrl+Shift+B) — กดตรงนี้ไม่ทำงาน</div></div>''',
+                height=105,
             )
             st.caption("ทำงานในเบราว์เซอร์ปกติที่คุณล็อกอินอยู่แล้ว · หน่วง 3-5 วิต่อไฟล์ · "
                        "สูงสุด 15 ไฟล์ต่อรอบ · กดซ้ำได้ถ้ายังเหลือ")
+            st.caption("🔎 ปุ่มสีเทาใช้ตอนตัวโหลดขึ้นว่า **หาปุ่ม ⋮ ไม่เจอ** — มันอ่านอย่างเดียว "
+                       "ไม่กดอะไรเลย แล้วขึ้นกล่องข้อความให้กดคัดลอกส่งมาได้ทันที "
+                       "ไม่ต้องเปิด Console")
 
         helper = Path(__file__).parent / "flow_download_helper.js"
         if helper.exists():
