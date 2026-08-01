@@ -2819,44 +2819,36 @@ def _copilot_examples() -> list[str]:
 
 
 def _copilot_send_to_queue(pid: str, content: str, brief: dict) -> None:
-    """Save an approved-pending draft to Google Drive, routed to the matching
-    per-platform subfolder (e.g. "Instragram Post", "TikTok VDO")."""
-    queue = st.session_state.setdefault("copilot_queue", [])
+    """Write a pending draft into its per-platform Drive folder.
+
+    Drive is the queue — the ✋ คิวอนุมัติ page reads straight from those folders,
+    so there is no second list to keep in sync here.
+    """
+    if not GDRIVE_AVAILABLE or needs_auth():
+        st.warning("ยังไม่ได้ต่อ Google Drive — ไปที่หน้า ✋ คิวอนุมัติ เพื่อ authorize ก่อน")
+        return
+
     # Copilot drafts are captions/scripts. TikTok & YouTube live in VDO folders;
     # the rest go to their Post folder.
     is_video = pid in ("tiktok", "youtube")
-    entry = {
-        "เวลา": dt.datetime.now().strftime("%d/%m %H:%M"),
-        "แพลตฟอร์ม": PLATFORM_THAI_NAMES.get(pid, pid),
-        "campaign": CAMPAIGN_TYPES.get(brief.get("campaign", ""), {}).get("label", brief.get("campaign", "")),
-        "สถานะ": "🕓 รออนุมัติ",
-        "โฟลเดอร์": "—",
-    }
-    link = None
-    if GDRIVE_AVAILABLE and not needs_auth():
-        target_folder = QUEUE_ROOT_FOLDER_ID
-        routed = False
-        try:
-            from google_drive import resolve_platform_folder
-            sub = resolve_platform_folder(QUEUE_ROOT_FOLDER_ID, pid, is_video)
-            if sub:
-                target_folder = sub
-                routed = True
-        except Exception:
-            pass
-        fname = f"PENDING_{pid}_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        link = upload_text(content, fname, target_folder)
-        entry["โฟลเดอร์"] = ("ตรงแพลตฟอร์ม ✅" if routed else "โฟลเดอร์รวม (ยังไม่ route)")
+    target_folder, routed = QUEUE_ROOT_FOLDER_ID, False
+    try:
+        from google_drive import resolve_platform_folder
+        sub = resolve_platform_folder(QUEUE_ROOT_FOLDER_ID, pid, is_video)
+        if sub:
+            target_folder, routed = sub, True
+    except Exception:  # noqa: BLE001 — routing is a nicety; the root still works
+        pass
 
-    if link:
-        entry["ลิงก์"] = link
-        if entry["โฟลเดอร์"].startswith("ตรง"):
-            st.toast(f"ส่งเข้าคิว → {PLATFORM_THAI_NAMES.get(pid, pid)} แล้ว 📁", icon="✅")
-        else:
-            st.toast("ส่งเข้าคิว (โฟลเดอร์รวม — re-authorize Drive เพื่อแยกโฟลเดอร์)", icon="📁")
-    else:
-        st.toast("บันทึกเข้าคิวในเซสชันนี้ (ยังไม่ได้ต่อ Google Drive)", icon="🗂️")
-    queue.append(entry)
+    fname = f"PENDING_{pid}_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    link = upload_text(content, fname, target_folder)
+    if not link:
+        st.error("ส่งเข้าคิวไม่สำเร็จ — ลองใหม่อีกครั้ง")
+        return
+
+    where = PLATFORM_THAI_NAMES.get(pid, pid) if routed else "โฟลเดอร์รวม"
+    st.success(f"ส่งเข้าคิว → {where} แล้ว · ไปตรวจที่หน้า **✋ คิวอนุมัติ**")
+    st.markdown(f"[🔗 เปิดไฟล์ใน Drive]({link})")
 
 
 def _render_copilot_image(mi: int, image_prompt: str, gemini_key: str) -> bytes | None:
@@ -3188,14 +3180,6 @@ def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
             except Exception as e:  # noqa: BLE001 — surface any failure in-chat
                 msgs.append({"role": "assistant", "error": str(e)})
         st.rerun()
-
-    queue = st.session_state.get("copilot_queue", [])
-    if queue:
-        with st.expander(f"📁 คิวที่รออนุมัติ ({len(queue)})", expanded=False):
-            st.dataframe(pd.DataFrame(reversed(queue)), use_container_width=True, hide_index=True)
-            if st.button("🗑️ ล้างคิว", key="copilot_clear_queue"):
-                st.session_state["copilot_queue"] = []
-                st.rerun()
 
     if msgs and st.button("🗑️ เริ่มแชทใหม่", key="copilot_clear"):
         st.session_state["copilot_msgs"] = []
