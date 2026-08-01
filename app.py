@@ -2228,8 +2228,8 @@ def _cached_child_folders(root_id: str) -> dict:
 
 
 @st.cache_data(ttl=QUEUE_CACHE_TTL, show_spinner=False)
-def _cached_files(folder_id: str) -> list[dict]:
-    return list_files_in_folder(folder_id, oldest_first=True)
+def _cached_files(folder_id: str, oldest_first: bool) -> list[dict]:
+    return list_files_in_folder(folder_id, oldest_first=oldest_first)
 
 
 def _clear_queue_cache() -> None:
@@ -2509,6 +2509,14 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
 
     pick = st.multiselect("เลือกโฟลเดอร์ที่จะตรวจ", options=sorted(review),
                           default=sorted(review))
+
+    # Newest first by default: the usual reason to open this page is to review
+    # something just generated. Oldest first is for working down a backlog.
+    sort_label = st.radio(
+        "เรียงลำดับ", ["🆕 ใหม่สุดก่อน", "⏳ เก่าสุดก่อน (ค้างนานสุด)"],
+        horizontal=True, label_visibility="collapsed", key="queue_sort",
+    )
+    oldest_first = sort_label.startswith("⏳")
     if st.button("🔄 โหลดใหม่"):
         # Drop cached previews and collapse every folder back to one page.
         for k in list(st.session_state):
@@ -2519,8 +2527,7 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
 
     total = 0
     for folder_name in pick:
-        # Oldest first — whatever has waited longest deserves review first.
-        files = _cached_files(review[folder_name])
+        files = _cached_files(review[folder_name], oldest_first)
         if not files:
             continue
         platform = _platform_from_folder(folder_name)
@@ -2539,7 +2546,8 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
 
         st.subheader(f"{icon} {folder_name} ({len(files)})")
         if len(files) > shown:
-            st.caption(f"แสดง {shown} จาก {len(files)} ไฟล์ · เรียงไฟล์เก่าสุดก่อน")
+            order = "เก่าสุดก่อน" if oldest_first else "ใหม่สุดก่อน"
+            st.caption(f"แสดง {shown} จาก {len(files)} ไฟล์ · เรียง{order}")
         if not platform:
             st.caption("⚠️ เดาแพลตฟอร์มจากชื่อโฟลเดอร์ไม่ได้ — อนุมัติแล้วจะโพสต์ไม่ได้")
 
