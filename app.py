@@ -340,10 +340,13 @@ def apply_premium_theme(theme: str = "dark") -> None:
 
     # ── Shared token values per theme ──────────────────────────────────────
     if is_dark:
-        bg          = "#080C14"
-        bg2         = "#111827"
-        bg3         = "#0F172A"
-        sidebar_bg  = "linear-gradient(180deg,#0B0F1A 0%,#080C14 100%)"
+        # Lifted off near-black (#080C14). At that level text edges bloom against
+        # the background and long reading gets tiring; a few points of lightness
+        # keeps the dark look without the glare.
+        bg          = "#0E141F"
+        bg2         = "#1A2332"
+        bg3         = "#151E2B"
+        sidebar_bg  = "linear-gradient(180deg,#141C28 0%,#0E141F 100%)"
         border      = "rgba(255,255,255,0.05)"
         border2     = "rgba(255,255,255,0.06)"
         border3     = "rgba(255,255,255,0.08)"
@@ -426,8 +429,58 @@ def apply_premium_theme(theme: str = "dark") -> None:
 
 /* ── Base ──────────────────────────────────────────────────────────────── */
 html, body, .stApp {{ font-family:'Inter',-apple-system,sans-serif !important; }}
-.stApp {{ background:{bg} !important; transition:background 0.35s ease; }}
+/* Both selectors: current Streamlit marks this container with a data-testid and
+   the .stApp class no longer reaches it, which left the whole page frame dark
+   behind a light body — the dark border showing around the content. */
+/* Prefixed with html body to outrank Streamlit's own emotion classes, which
+   carry the palette from config.toml and were winning on specificity — the rule
+   was present and correct but never applied. */
+html body .stApp, html body [data-testid="stApp"],
+html body [data-testid="stAppViewContainer"] {{
+  background:{bg} !important; transition:background 0.35s ease;
+}}
+html body [data-testid="stSidebar"] {{ background:{sidebar_bg} !important; }}
 [data-testid="stAppViewContainer"] > .main {{ background:{bg} !important; }}
+
+/* Streamlit paints its own chrome from config.toml, which is pinned to the dark
+   palette. Without these the header and the bar holding the chat box stayed
+   black in light mode — a dark band across the top and bottom of a light page.
+   The text colour has to follow too: config also pins that, so switching to the
+   light theme left near-white type sitting on the new near-white background. */
+html, body {{ background:{bg} !important; color:{txt1} !important; }}
+[data-testid="stAppHeader"], header[data-testid="stHeader"] {{
+  background:{bg} !important; color:{txt2} !important;
+  border-bottom:1px solid {border} !important;
+}}
+[data-testid="stAppHeader"] *, [data-testid="stAppHeader"] svg {{
+  color:{txt2} !important; fill:{txt2} !important;
+}}
+[data-testid="stBottom"], [data-testid="stBottomBlockContainer"] {{
+  background:{bg} !important; color:{txt1} !important;
+}}
+[data-testid="stBottom"] * {{ color:{txt1} !important; }}
+[data-testid="stChatInput"] {{
+  background:{input_bg} !important; border:1px solid {border3} !important;
+  border-radius:14px !important;
+}}
+[data-testid="stChatInput"] textarea {{
+  background:transparent !important; color:{txt1} !important; font-size:1rem !important;
+}}
+[data-testid="stChatInput"] textarea::placeholder {{ color:{txt4} !important; }}
+[data-testid="stChatMessage"] {{ background:{card_bg} !important; border:1px solid {border2} !important; }}
+
+/* Readability: body copy was rendering at 13.4px, which is hard work at arm's
+   length — measured, not assumed. The html body prefix is needed here for the
+   same reason as the background rules above. */
+html body [data-testid="stMarkdownContainer"] p,
+html body [data-testid="stMarkdownContainer"] li {{
+  font-size:1rem !important; line-height:1.65 !important;
+}}
+html body [data-testid="stCaptionContainer"],
+html body [data-testid="stCaptionContainer"] p {{ font-size:0.9rem !important; }}
+html body [data-testid="stChatInput"] textarea {{ font-size:1rem !important; }}
+html body button p, html body [data-testid="stBaseButton-secondary"] p,
+html body [data-testid="stBaseButton-primary"] p {{ font-size:0.95rem !important; }}
 .block-container {{ padding-top:2rem !important; padding-bottom:3rem !important; }}
 .main .block-container > div > div > div {{ animation: fadeUp 0.4s ease both; }}
 
@@ -858,8 +911,14 @@ st.set_page_config(
 )
 
 # Theme initialisation — must happen before any st.* call other than set_page_config
+#
+# Defaults to light so the components match the app frame. Streamlit paints that
+# frame — background, sidebar, header — from config.toml, and in this version
+# nothing injected at runtime overrides it (tested: higher specificity, layered
+# and unlayered !important, even an inline style). A dark default therefore
+# produced dark buttons and cards sitting inside a light window.
 if "theme" not in st.session_state:
-    st.session_state["theme"] = "dark"
+    st.session_state["theme"] = "light"
 _theme = st.session_state["theme"]
 _chart_tpl = "premium_light" if _theme == "light" else "premium_dark"
 pio.templates.default = _chart_tpl
