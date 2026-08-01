@@ -615,21 +615,46 @@ def _video_angle(key: str) -> dict:
         return {}
     try:
         import scene_presets
-        return scene_presets.VIDEO_ANGLES.get(key, {})
+        return scene_presets.ANGLES.get(key, {})
     except Exception:  # noqa: BLE001 — scene library is optional
         return {}
 
 
-def build_master_image_prompt(brief: dict, scene: str = "") -> str:
+def _still_angle(key: str) -> dict:
+    """Single-frame overrides for an angle; empty means shoot the scene as-is."""
+    if not key:
+        return {}
+    try:
+        import scene_presets
+        return scene_presets.still_for(key)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _carousel_arc(key: str) -> list:
+    """Five-slide arc for an angle; empty means the default Hook→Problem→… arc."""
+    if not key:
+        return []
+    try:
+        import scene_presets
+        return scene_presets.carousel_arc(key)
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def build_master_image_prompt(brief: dict, scene: str = "", angle: str = "") -> str:
     """Structured master prompt for image generation — ready to paste into Flow.
 
     `scene` selects a preset from scene_presets (lab, student, UGC, …); without
     one the prompt falls back to a clean studio treatment derived from the brief.
+    `angle` reframes that scene into a different single shot — a macro texture
+    proof, a split before/after, an arm's-length phone photo.
     """
     tone = brief.get("tone", "friendly")
     subject, setting, styling = _master_scene(brief)
     aspect = video_aspect_for(brief)
     preset = _scene_preset(scene) if scene else {}
+    still = _still_angle(angle)
 
     lighting = preset.get("lighting") or _TONE_LIGHT.get(tone, _TONE_LIGHT["friendly"])
     camera = preset.get("camera") or (
@@ -646,8 +671,13 @@ def build_master_image_prompt(brief: dict, scene: str = "") -> str:
     item = english_item(brief.get("top_item") or "the product")
     named = lambda t: name_the_product(t, item)  # noqa: E731
 
+    fields = {"item": item, "brand": brief.get("brand_name") or "the brand"}
     lines = [
-        "[SUBJECT]", named(subject), "",
+        # The angle decides what the frame is of; the scene still decides where it
+        # is and what it looks like, so setting, lighting and styling carry through.
+        "[SUBJECT]",
+        named(still["subject"].format(**fields)) if still.get("subject") else named(subject),
+        "",
         "[SCENE & SETTING]", named(preset.get("setting") or setting), "",
         "[STYLING & PROPS]", named(preset.get("styling") or styling), "",
     ]
@@ -659,8 +689,9 @@ def build_master_image_prompt(brief: dict, scene: str = "") -> str:
         "[LIGHTING]", lighting, "",
         "[CAMERA & LENS]", named(camera), "",
         "[COMPOSITION]",
-        f"hero composition with generous negative space for caption overlay, "
-        f"framed for {aspect}", "",
+        named(f"{still['composition']}, framed for {aspect}") if still.get("composition")
+        else f"hero composition with generous negative space for caption overlay, "
+             f"framed for {aspect}", "",
         "[COLOUR & MOOD]", mood, "",
         "[PHYSICS & PLAUSIBILITY]",
         named(form["physics"] + ". Shadows fall away from the light source and match "
@@ -874,6 +905,16 @@ def build_master_video_prompt(brief: dict, scene: str = "", seconds: int = 10,
 
 # ── Carousel / poster set ───────────────────────────────────────────────────────
 
+# Slide roles that put the product in frame. The others — the scroll-stopping
+# headline, the pain being named — deliberately keep it small or absent, so their
+# prompts describe a brand visual instead of a hero shot.
+_CAROUSEL_HERO_ROLES = {
+    "SOLUTION", "PROOF", "CTA",
+    "REASON1", "REASON2", "REASON3", "STEP1", "STEP2", "STEP3",
+    "TRUTH", "WHY", "DURING", "AFTER", "TURN", "RESULT",
+    "SURFACE", "FOAM", "SHADOW", "REVEAL", "DETAIL",
+}
+
 _CAROUSEL_ROLES = [
     ("HOOK", "🪝 สะดุดตา",
      "ข้อความใหญ่เต็มเฟรม ตั้งคำถามหรือชี้ปัญหา ภาพเรียบ ไม่แย่งความสนใจจากตัวหนังสือ",
@@ -898,13 +939,16 @@ _CAROUSEL_ROLES = [
 ]
 
 
-def build_carousel(brief: dict, scene: str = "", slides: int = 5) -> list[dict]:
+def build_carousel(brief: dict, scene: str = "", slides: int = 5,
+                   angle: str = "") -> list[dict]:
     """Poster carousel: one master prompt + Thai on-slide copy per slide.
 
     Follows the same Hook → Decision → CTA arc as the video, expanded across
-    slides so the set reads as one story.
+    slides so the set reads as one story. `angle` swaps that arc for another
+    argument told over the same five slides — three reasons, a how-to, a myth
+    corrected — while the scene keeps deciding how every slide looks.
     """
-    vo = build_voiceover(brief)
+    vo = build_voiceover(brief, _video_angle(angle))
     preset = _scene_preset(scene) if scene else {}
     tone = brief.get("tone", "friendly")
     subject, setting, styling = _master_scene(brief)
@@ -912,6 +956,12 @@ def build_carousel(brief: dict, scene: str = "", slides: int = 5) -> list[dict]:
     item = brief.get("top_item") or "สินค้าของเรา"
     discount = brief.get("discount", 20)
     aspect = "4:5"  # the carousel ratio that performs best on IG/Facebook
+
+    # Visual direction is English so the model does not phonetically misread a
+    # Thai noun; the on-slide copy is Thai because a human reads it.
+    en_item = english_item(item)
+    named = lambda t: name_the_product(t, en_item)  # noqa: E731
+    fields = {"item": item, "brand": brand, "discount": discount}
 
     copy_map = {
         "HOOK": (vo["hook"], "เลื่อนดูต่อ →"),
@@ -923,23 +973,36 @@ def build_carousel(brief: dict, scene: str = "", slides: int = 5) -> list[dict]:
         "CTA": (f"ลด {discount}%", vo["cta"]),
     }
 
+    # An angle brings its own five slides, copy included. Roles the default arc
+    # never had — REASON2, MYTH, STEP3 — carry their text with them.
+    arc = _carousel_arc(angle) or [(*r, None, None) for r in _CAROUSEL_ROLES]
+
     out: list[dict] = []
-    for i, (role, th_label, purpose, comp) in enumerate(_CAROUSEL_ROLES[:slides], 1):
-        headline, sub = copy_map.get(role, ("", ""))
+    for i, row in enumerate(arc[:slides], 1):
+        role, th_label, purpose, comp = row[:4]
+        head, sub_t = (row[4], row[5]) if len(row) > 5 else (None, None)
+        if head is None:
+            headline, sub = copy_map.get(role, ("", ""))
+        else:
+            headline = head.format(**fields)
+            # An arc slide may leave its sub blank to inherit the campaign line —
+            # that is how the shared CTA slide keeps a flash sale's deadline.
+            sub = sub_t.format(**fields) if sub_t else copy_map.get(role, ("", ""))[1]
+
         lines = [
             "[SUBJECT]",
-            subject if role in ("SOLUTION", "PROOF", "CTA")
+            named(subject) if role in _CAROUSEL_HERO_ROLES
             else f"Brand visual for {brand}, product not the focus of this slide", "",
-            "[SCENE & SETTING]", preset.get("setting") or setting, "",
-            "[STYLING & PROPS]", preset.get("styling") or styling, "",
+            "[SCENE & SETTING]", named(preset.get("setting") or setting), "",
+            "[STYLING & PROPS]", named(preset.get("styling") or styling), "",
         ]
-        lines += ["[CAST]", preset.get("cast") or _NO_CAST, ""]
+        lines += ["[CAST]", named(preset.get("cast") or _NO_CAST), ""]
         lines += [
             "[LIGHTING]",
             preset.get("lighting") or _TONE_LIGHT.get(tone, _TONE_LIGHT["friendly"]), "",
             "[CAMERA & LENS]",
-            preset.get("camera") or "50mm lens, f/4, straight-on angle", "",
-            "[COMPOSITION]", comp, "",
+            named(preset.get("camera") or "50mm lens, f/4, straight-on angle"), "",
+            "[COMPOSITION]", named(comp), "",
             "[COLOUR & MOOD]", _TONE_GRADE.get(tone, _TONE_GRADE["friendly"]), "",
             "[STYLE]",
             "photorealistic commercial advertising photography, cohesive with the other "

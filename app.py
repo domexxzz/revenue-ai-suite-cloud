@@ -3017,13 +3017,32 @@ def _copilot_send_to_queue(pid: str, content: str, brief: dict) -> None:
     st.markdown(f"[🔗 เปิดไฟล์ใน Drive]({link})")
 
 
-def _render_copilot_image(mi: int, image_prompt: str, gemini_key: str) -> bytes | None:
+def _angle_picker(mi: int, scene: str, medium: str, label: str) -> str:
+    """Let the user pick how the scene is told, for one medium.
+
+    The list is medium-specific: an angle only appears where it has material, so
+    "3 เหตุผล" is offered for a clip and a carousel but not for a single frame.
+    """
+    if not SCENES_AVAILABLE:
+        return ""
+    options = scene_presets.angles_for(scene, medium)
+    chosen = st.radio(label, options=options,
+                      format_func=scene_presets.angle_label, horizontal=True,
+                      key=f"copilot_angle_{medium}_{mi}")
+    st.caption(f"🎯 {scene_presets.angle_goal(chosen)}")
+    return chosen
+
+
+def _render_copilot_image(mi: int, brief: dict, scene: str,
+                          gemini_key: str) -> bytes | None:
     """Image block: show the prompt, and let Gemini actually render it.
 
     Returns the generated image bytes (if any) so posting can attach them.
     """
     img_key = f"copilot_img_{mi}"
     with st.expander("🖼️ ภาพประกอบ — Master Prompt", expanded=bool(st.session_state.get(img_key))):
+        angle = _angle_picker(mi, scene, "image", "🖼️ แบบของภาพ — เลือกได้หลายแบบในหมวดเดียวกัน")
+        image_prompt = content_copilot.build_master_image_prompt(brief, scene, angle)
         st.caption("📋 คัดลอกไปวางใน Google Flow / Midjourney ได้เลย (กดไอคอนคัดลอกมุมขวาบน)")
         st.code(image_prompt, language=None)
         st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้", FLOW_PROJECT_URL,
@@ -3076,20 +3095,11 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
     with st.expander("🎬 วิดีโอ — Master Prompt", expanded=bool(st.session_state.get(vid_key))):
         # The scene fixes where the clip is shot; the angle picks how it is told,
         # so the same scene yields several genuinely different videos.
-        angle = ""
-        if SCENES_AVAILABLE:
-            angles = scene_presets.angles_for(scene)
-            angle = st.radio(
-                "🎞️ แนวการเล่าเรื่อง — เลือกได้หลายแบบในหมวดเดียวกัน",
-                options=angles,
-                format_func=scene_presets.angle_label,
-                horizontal=True,
-                key=f"copilot_angle_{mi}",
-            )
-            st.caption(f"🎯 {scene_presets.angle_goal(angle)}")
-            if not scene_presets.has_people(scene):
-                st.caption("📦 หมวดนี้ไม่มีคนในภาพ แนวที่ต้องมีตัวแสดง (รีวิว, สาธิต, "
-                           "ก่อน-หลัง) จึงไม่ขึ้นให้เลือก")
+        angle = _angle_picker(mi, scene, "video",
+                              "🎞️ แนวการเล่าเรื่อง — เลือกได้หลายแบบในหมวดเดียวกัน")
+        if SCENES_AVAILABLE and not scene_presets.has_people(scene):
+            st.caption("📦 หมวดนี้ไม่มีคนในภาพ แนวที่ต้องมีตัวแสดง (รีวิว, สาธิต, "
+                       "ก่อน-หลัง) จึงไม่ขึ้นให้เลือก")
 
         st.caption(f"📋 คัดลอกไปวางใน Google Flow ได้เลย · สัดส่วน {aspect} · "
                    "10 วินาที · Hook → Decision → CTA · เสียงพากย์ไทย")
@@ -3157,11 +3167,17 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
 
 def _render_copilot_carousel(mi: int, brief: dict, scene: str, gemini_key: str) -> None:
     """Poster carousel: per-slide Thai copy + master prompt, optional batch render."""
-    slides = content_copilot.build_carousel(brief, scene)
     key_all = f"copilot_car_{mi}"
 
-    with st.expander(f"🖼️ โปสเตอร์ Carousel ({len(slides)} สไลด์) — Master Prompt"):
-        st.caption("เล่าเรื่องต่อกันเป็นชุด: Hook → ปัญหา → ทางออก → ข้อพิสูจน์ → CTA · สัดส่วน 4:5")
+    with st.expander("🖼️ โปสเตอร์ Carousel (5 สไลด์) — Master Prompt"):
+        angle = _angle_picker(mi, scene, "carousel",
+                              "📑 โครงเรื่องของชุดสไลด์ — เลือกได้หลายแบบในหมวดเดียวกัน")
+        slides = content_copilot.build_carousel(brief, scene, 5, angle)
+        # Name the arc from the slides themselves, so a different angle does not
+        # keep advertising the default Hook → ปัญหา → ทางออก shape.
+        st.caption("เล่าเรื่องต่อกันเป็นชุด: "
+                   + " → ".join(s["label"].split(" ", 1)[-1] for s in slides)
+                   + " · สัดส่วน 4:5")
 
         if gemini_key:
             if st.button(f"✨ สร้างรูปทั้ง {len(slides)} สไลด์ด้วย Gemini",
@@ -3262,8 +3278,7 @@ def _render_copilot_draft(mi: int, brief: dict, package: dict,
                 "พูดถึงมุมนี้บ่อยแค่ไหน (ไม่ใช่การทำนายยอด engagement)"
             )
 
-    img_bytes = _render_copilot_image(
-        mi, content_copilot.build_master_image_prompt(brief, scene), gemini_key)
+    img_bytes = _render_copilot_image(mi, brief, scene, gemini_key)
 
     _render_copilot_carousel(mi, brief, scene, gemini_key)
 

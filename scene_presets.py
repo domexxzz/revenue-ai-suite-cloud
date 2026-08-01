@@ -456,12 +456,16 @@ def goal_for(key: str) -> str:
     return get(key).get("goal", "")
 
 
-# ── Video angles ────────────────────────────────────────────────────────────────
+# ── Angles ──────────────────────────────────────────────────────────────────────
 
-# A scene says *where* the clip is shot; an angle says *how it is told*. The same
+# A scene says *where* the shot is taken; an angle says *how it is told*. The same
 # gym locker room can carry a problem-first spot, a how-to, or a phone review, and
 # those are three different videos. Angles sit on top of any scene so the two
 # choices multiply instead of forcing one combined list of a hundred presets.
+#
+# The keys below drive video. STILLS and CAROUSEL_ARCS further down carry the same
+# angles for a single frame and for a five-slide set — an angle only appears for a
+# medium it has material for, since "3 เหตุผล" cannot be told in one photograph.
 #
 # `hook` and `decision` replace the scene's first two shots. The third — the
 # scene's own payoff — always survives, because that is what a before/after or a
@@ -471,7 +475,7 @@ def goal_for(key: str) -> str:
 # `vo` overrides only the hook and decision narration. The CTA line stays with the
 # campaign, since that is where a discount and its deadline live and an angle has
 # no business dropping them.
-VIDEO_ANGLES: dict[str, dict] = {
+ANGLES: dict[str, dict] = {
     "hero": {
         "label": "✨ โชว์สินค้าเด่น",
         "goal": "ให้สินค้าเป็นพระเอก — ใช้ได้กับทุกหมวด ปลอดภัยที่สุด",
@@ -633,20 +637,239 @@ VIDEO_ANGLES: dict[str, dict] = {
 DEFAULT_ANGLE = "hero"
 
 
-def angles_for(scene: str) -> list[str]:
-    """Angles that make sense for this scene, default first.
+# ── The same angles, told in one frame ──────────────────────────────────────────
 
-    An angle needing a cast is dropped from a product-only scene: there is nobody
-    to notice a problem or hold a phone, and offering it would produce a prompt
-    that asks for a person the [CAST] block forbids.
+# A still has no second beat, so an angle earns a place here only if its idea
+# survives in a single photograph. "ปัญหา → ทางออก" needs two moments and "3
+# เหตุผล" needs three, so neither is offered for images — better a shorter list
+# than an angle that quietly collapses into the default.
+#
+# `subject` replaces what the frame is of; `composition` replaces how it is laid
+# out. Both are English and take {item}, for the reason the video templates are.
+STILLS: dict[str, dict] = {
+    "hero": {},  # the scene's own framing, unchanged
+    "demo": {
+        "subject": ("hands mid-lather with the {item} — dense fresh foam between "
+                    "wet palms, the bar itself still recognisable in the grip"),
+        "composition": ("close crop on the hands and foam filling two thirds of the "
+                        "frame, clear space above for a short headline"),
+    },
+    "pov": {
+        "subject": ("the {item} held up towards the lens at arm's length, the "
+                    "person's face partly in frame behind it, slightly soft"),
+        "composition": ("off-centre phone-camera framing, imperfect and unstaged, "
+                        "product sharp and closest to the lens"),
+    },
+    "transformation": {
+        "subject": ("one frame split cleanly down the middle: the same face on "
+                    "both sides, congested and shiny on the left, calm and even on "
+                    "the right, with the {item} resting in the lower corner"),
+        "composition": ("perfectly symmetrical split with an identical crop, "
+                        "distance and expression on each half, so only the skin "
+                        "differs; a thin gap divides them, no text"),
+    },
+    "myth_bust": {
+        "subject": ("one frame split down the middle: the {item} kept the wrong way "
+                    "on the left, visibly the worse for it, and kept properly on "
+                    "the right"),
+        "composition": ("symmetrical split with identical framing on both halves so "
+                        "the difference is in the object's condition alone, no text "
+                        "and no marks labelling either side"),
+    },
+    "texture": {
+        "subject": ("extreme macro of the {item} surface — every ridge, pore and "
+                    "sheen, with fine foam just beginning to build at one edge"),
+        "composition": ("the surface fills the entire frame edge to edge, one "
+                        "sharp plane with the rest falling away, no negative space"),
+    },
+    "reveal": {
+        "subject": ("the {item} emerging from near darkness, a single hard edge of "
+                    "light along its silhouette and the label just readable"),
+        "composition": ("product small in a large dark frame, lit from one side, "
+                        "deep shadow occupying most of the image"),
+    },
+}
+
+
+# ── The same angles, told across five slides ────────────────────────────────────
+
+# Each arc is five slides of (role, label, purpose, composition, headline, sub).
+# The Thai copy takes {item}, {brand} and {discount}. An angle without an arc is
+# simply not offered for a carousel.
+#
+# The first and last slide of every arc do the same job — stop the scroll, then
+# ask for the action — because that is what a carousel is. What changes in
+# between is the argument being made.
+_CTA_SLIDE = ("CTA", "🎯 ลงมือ", "บอกสิ่งที่ต้องทำต่อ พร้อมข้อเสนอ",
+              "product with a bold offer banner area, strong colour block reserved "
+              "for the price and call-to-action button, centred and unmissable",
+              "ลด {discount}%", "")  # empty sub → filled with the campaign CTA line
+
+CAROUSEL_ARCS: dict[str, list[tuple]] = {
+    # hero keeps the original arc, so an existing carousel is unchanged.
+    "hero": [],
+    "three_reasons": [
+        ("HOOK", "🪝 สะดุดตา", "ตั้งประเด็นให้อยากเลื่อนดูต่อ",
+         "bold minimal composition with a very large clear area for a single big "
+         "headline, product small or absent, high contrast background",
+         "3 เหตุผลที่คนเปลี่ยนมาใช้{item}", "เลื่อนดูต่อ →"),
+        ("REASON1", "1️⃣ เหตุผลแรก", "ข้อดีที่จับต้องได้ที่สุดขึ้นก่อน",
+         "clean product shot with generous space on one side for a number and one "
+         "short line of text",
+         "ใช้ง่าย ไม่ต้องเปลี่ยนทั้งกิจวัตร", "แค่เปลี่ยนสิ่งที่ใช้อยู่ทุกวัน"),
+        ("REASON2", "2️⃣ เหตุผลที่สอง", "ลดความกังวลเรื่องความอ่อนโยน",
+         "detail shot showing texture or ingredients, same lighting as the previous "
+         "slide, space kept clear in the same place",
+         "อ่อนโยนพอสำหรับทุกวัน", "ไม่ทิ้งความแห้งตึงหลังล้าง"),
+        ("REASON3", "3️⃣ เหตุผลที่สาม", "ปิดด้วยความคุ้มค่า ต่อเข้าข้อเสนอได้พอดี",
+         "wider shot of the product in its setting, same palette, space kept clear "
+         "in the same place",
+         "คุ้มกว่าที่คิด", "ก้อนเดียวใช้ได้นาน"),
+        _CTA_SLIDE,
+    ],
+    "demo": [
+        ("HOOK", "🪝 สะดุดตา", "ตั้งคำถามที่คนไม่เคยใช้สบู่ก้อนสงสัย",
+         "bold minimal composition with a very large clear area for a single big "
+         "headline, product small or absent, high contrast background",
+         "ใช้{item}ยังไงให้ได้ผลจริง?", "3 ขั้นตอน เลื่อนดูเลย →"),
+        ("STEP1", "1️⃣ ขั้นที่หนึ่ง", "เริ่มจากสิ่งที่ทำได้ทันที",
+         "close crop on wet hands and the product, clear space above for one line",
+         "ล้างหน้าด้วยน้ำสะอาดก่อน", "ให้ผิวพร้อมรับสิ่งที่ตามมา"),
+        ("STEP2", "2️⃣ ขั้นที่สอง", "ขั้นที่คนทำผิดบ่อยที่สุด",
+         "close crop on dense foam building between the palms, same lighting and "
+         "crop as the previous slide",
+         "ถูให้เกิดฟองก่อนแตะหน้า", "อย่าถูก้อนกับผิวโดยตรง"),
+        ("STEP3", "3️⃣ ขั้นที่สาม", "จบขั้นตอนให้เห็นภาพผลลัพธ์",
+         "clean shot of the finished routine with the product set down, brighter "
+         "optimistic grade",
+         "นวดเบาๆ แล้วล้างออก", "เช้า-เย็น ทุกวัน"),
+        _CTA_SLIDE,
+    ],
+    "myth_bust": [
+        ("HOOK", "🪝 สะดุดตา", "ชี้ว่ามีเรื่องที่เข้าใจผิดกันอยู่",
+         "bold minimal composition with a very large clear area for a single big "
+         "headline, product small or absent, high contrast background",
+         "เรื่องนี้หลายคนยังเข้าใจผิดอยู่", "เลื่อนดูต่อ →"),
+        ("MYTH", "❌ ความเชื่อเดิม", "พูดความเชื่อนั้นออกมาตรงๆ ให้คนดูพยักหน้าตาม",
+         "muted desaturated frame illustrating the mistaken habit, space at the "
+         "bottom for two lines of text",
+         "\"ล้างหน้าบ่อยๆ สิวจะได้ยุบ\"", "เป็นความเชื่อที่ได้ยินกันบ่อยที่สุด"),
+        ("TRUTH", "✅ ความจริง", "แก้ความเชื่อด้วยเหตุผล ไม่ใช่แค่บอกว่าผิด",
+         "bright clean frame of the product in use, identical framing to the "
+         "previous slide so the contrast reads",
+         "ล้างมากเกินไปทำให้ผิวขาดน้ำ", "ผิวยิ่งผลิตน้ำมันชดเชย"),
+        ("WHY", "🔬 เพราะอะไร", "ให้เหตุผลที่ทำให้เชื่อ แล้วโยงมาที่สินค้า",
+         "detail shot showing texture or ingredients, informative layout with room "
+         "for three short bullet labels",
+         "{item}จึงเน้นอ่อนโยน", "• ทำความสะอาดพอดี  • ไม่ทิ้งความแห้งตึง"),
+        _CTA_SLIDE,
+    ],
+    "transformation": [
+        ("HOOK", "🪝 สะดุดตา", "ตั้งกรอบเวลาให้ชัด คนจะอยากรู้ผล",
+         "bold minimal composition with a very large clear area for a single big "
+         "headline, product small or absent, high contrast background",
+         "สองอาทิตย์ ต่างกันแค่ไหน", "เลื่อนดูต่อ →"),
+        ("BEFORE", "📅 วันแรก", "แสดงจุดเริ่มต้นแบบไม่แต่งเติม",
+         "plain honest portrait under unflattering even light, muted grade, space "
+         "at the bottom for two lines",
+         "วันแรก", "ผิวมัน สิวขึ้นซ้ำที่เดิม"),
+        ("DURING", "🔁 ระหว่างทาง", "ย้ำว่าไม่ต้องทำอะไรพิเศษ ทำให้รู้สึกว่าทำตามได้",
+         "the product in daily use, warm natural light, identical crop to the "
+         "previous slide",
+         "ใช้ทุกวัน ไม่ได้ทำอะไรเพิ่ม", "แค่เปลี่ยนสิ่งที่ใช้ล้างหน้า"),
+        ("AFTER", "✨ วันนี้", "ผลลัพธ์ที่สมจริง ไม่เกินจริง",
+         "same portrait, same crop, distance and expression as the BEFORE slide, "
+         "brighter grade, skin visibly calmer but recognisably the same person",
+         "วันนี้", "ผลลัพธ์แต่ละคนต่างกัน"),
+        _CTA_SLIDE,
+    ],
+    "pov": [
+        ("HOOK", "🪝 สะดุดตา", "เปิดแบบคนจริงเล่า ไม่ใช่แบรนด์พูด",
+         "off-centre phone-camera framing, unstaged, large clear area for one big "
+         "handwritten-feeling headline",
+         "ใช้มาสองอาทิตย์ ขอรีวิวจริงๆ", "เลื่อนดูต่อ →"),
+        ("STORY", "💬 เล่าที่มา", "บอกว่าเคยเจออะไรมาก่อน คนที่เจอเหมือนกันจะหยุดอ่าน",
+         "candid phone-style shot in a real everyday setting, space at the bottom "
+         "for two lines of text",
+         "ลองมาหลายอย่างแล้วไม่ตรงจุด", "ไม่ก็แห้งตึง ไม่ก็ไม่เห็นผล"),
+        ("TURN", "🔀 จุดที่เปลี่ยน", "ระบุสิ่งที่ทำให้ต่างจากของเดิม",
+         "the product held towards the lens at arm's length, sharp and closest to "
+         "the camera, background softly out of focus",
+         "จุดที่ต่างคือ{item}", "ล้างสะอาดแต่ไม่ทิ้งความแห้ง"),
+        ("RESULT", "📈 ผลที่ได้", "ผลลัพธ์แบบที่คนพูดกันเองจริงๆ ไม่ใช่ภาษาโฆษณา",
+         "relaxed candid portrait in natural daylight, honest unretouched feel, "
+         "room for two lines",
+         "ตอนนี้ไม่ต้องแต่งหน้าหนักแล้ว", "สิวยุบเร็วขึ้นกว่าเดิม"),
+        _CTA_SLIDE,
+    ],
+    "texture": [
+        ("HOOK", "🪝 สะดุดตา", "ใช้ภาพมาโครหยุดนิ้ว ไม่ต้องพึ่งตัวหนังสือใหญ่",
+         "extreme macro filling the frame, one sharp plane, small clear area in a "
+         "corner for a short headline",
+         "เนื้อสัมผัสบอกได้มากกว่าที่คิด", "เลื่อนดูต่อ →"),
+        ("SURFACE", "🔬 เนื้อสัมผัส", "ให้เห็นว่าผลิตภัณฑ์เป็นอะไรจริงๆ",
+         "extreme macro of the product surface, raking side light exposing every "
+         "ridge, no negative space",
+         "เนื้อแน่น ไม่หยาบ", "ผิวสัมผัสจริงแบบไม่ปรุงแต่ง"),
+        ("FOAM", "🫧 ฟอง", "ตอบคนที่กลัวว่าจะแรงเกินไป",
+         "macro of dense fine foam building in real contact with water, same "
+         "lighting and magnification as the previous slide",
+         "ฟองละเอียด อ่อนโยนกับผิว", "ทำความสะอาดได้โดยไม่ต้องแรง"),
+        ("AFTER", "💧 หลังล้าง", "ปิดด้วยความรู้สึกหลังใช้ ซึ่งเป็นสิ่งที่คนตัดสินใจจาก",
+         "clean skin detail in soft daylight, calm and hydrated looking, room for "
+         "two short lines",
+         "ไม่ตึงหลังล้าง", "ผิวยังรู้สึกนุ่มอยู่"),
+        _CTA_SLIDE,
+    ],
+    "reveal": [
+        ("HOOK", "🪝 สะดุดตา", "เปิดด้วยความมืดและความอยากรู้",
+         "near-black frame with one hard edge of light, very large clear dark area "
+         "for a single short headline",
+         "สิ่งที่ผิวคุณรออยู่", "เลื่อนดูต่อ →"),
+        ("SHADOW", "🌑 เงา", "ยังไม่เผยทั้งหมด ให้คนเลื่อนต่อ",
+         "the product mostly in shadow, silhouette just readable, deep shadow "
+         "occupying most of the frame",
+         "ใหม่จาก{brand}", ""),
+        ("REVEAL", "💡 เผยตัว", "จังหวะที่สินค้าปรากฏเต็มตา",
+         "the product fully lit and centred, label sharp and readable, the setting "
+         "resolving around it, clear space beside it for a headline",
+         "{item}", ""),
+        ("DETAIL", "🔎 รายละเอียด", "ให้เหตุผลรองรับความรู้สึกพรีเมียมที่เพิ่งสร้าง",
+         "detail shot showing ingredients or texture evidence, informative layout "
+         "with room for three short bullet labels",
+         "ทำไมถึงต่าง", "• ส่วนผสมที่อ่อนโยน  • ใช้ได้ทุกวัน  • ไม่ทิ้งความแห้งตึง"),
+        _CTA_SLIDE,
+    ],
+}
+
+
+def angles_for(scene: str, medium: str = "video") -> list[str]:
+    """Angles that make sense for this scene and medium, default first.
+
+    Two filters. An angle needing a cast is dropped from a product-only scene:
+    there is nobody to notice a problem or hold a phone, and offering it would
+    produce a prompt asking for a person the [CAST] block forbids. And an angle is
+    dropped from a medium it has no material for — a still cannot carry "3
+    เหตุผล", so it is not listed rather than silently falling back to the default.
     """
+    have = {"video": ANGLES, "image": STILLS, "carousel": CAROUSEL_ARCS}.get(medium, ANGLES)
     people = has_people(scene)
-    keys = [k for k, a in VIDEO_ANGLES.items() if people or not a["needs_cast"]]
-    return sorted(keys, key=lambda k: (k != DEFAULT_ANGLE, VIDEO_ANGLES[k]["label"]))
+    keys = [k for k in ANGLES if k in have and (people or not ANGLES[k]["needs_cast"])]
+    return sorted(keys, key=lambda k: (k != DEFAULT_ANGLE, ANGLES[k]["label"]))
+
+
+def still_for(key: str) -> dict:
+    """Single-frame overrides for an angle; empty means use the scene as-is."""
+    return STILLS.get(key) or {}
+
+
+def carousel_arc(key: str) -> list[tuple]:
+    """Five-slide arc for an angle; empty means use the default arc."""
+    return CAROUSEL_ARCS.get(key) or []
 
 
 def angle(key: str) -> dict:
-    return VIDEO_ANGLES.get(key) or VIDEO_ANGLES[DEFAULT_ANGLE]
+    return ANGLES.get(key) or ANGLES[DEFAULT_ANGLE]
 
 
 def angle_label(key: str) -> str:
