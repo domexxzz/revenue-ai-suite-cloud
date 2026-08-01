@@ -880,6 +880,60 @@ def angle_goal(key: str) -> str:
     return angle(key)["goal"]
 
 
+# ── Reading a scene back out of a finished file ─────────────────────────────────
+
+# Google Flow names a download after the prompt it came from, so a clip shot with
+# the student scene arrives as Soap_bar_commercial_student_deci…_202608020150.mp4.
+# The scene key is usually right there in the filename, which is enough to look up
+# what that scene was for and how well it fits the brand.
+#
+# Extra words per scene for the cases where the key itself will not appear —
+# "beforeafter" is written "before_after" in a filename, "vanity" shows up as
+# "mirror". Matching is on the lowercased filename with separators normalised.
+_FILENAME_HINTS: dict[str, tuple[str, ...]] = {
+    "lab": ("lab", "laboratory", "research"),
+    "ingredient": ("ingredient", "botanical", "extract"),
+    "clinic": ("clinic", "dermatolog", "doctor"),
+    "teen": ("teen", "teenager"),
+    "student": ("student", "campus", "university", "school"),
+    "office": ("office", "workday", "professional", "desk"),
+    "male": ("male", "man ", "men ", "guy"),
+    "friends": ("friends", "group of"),
+    "vanity": ("vanity", "mirror", "bathroom"),
+    "morning": ("morning", "bedroom", "wake"),
+    "cafe": ("cafe", "coffee"),
+    "outdoor": ("outdoor", "sunlight", "sunny", "outside"),
+    "gym": ("gym", "workout", "fitness", "sweat"),
+    "studio": ("studio", "seamless", "hero shot"),
+    "flatlay": ("flatlay", "flat lay", "top down", "topdown"),
+    "beforeafter": ("beforeafter", "before after", "before and after", "transformation"),
+    "ugc": ("ugc", "review", "selfie", "handheld"),
+    "macro": ("macro", "texture", "closeup", "close up"),
+    "promo": ("promo", "sale", "discount", "offer"),
+    "gift": ("gift", "festive", "holiday", "present"),
+}
+
+
+def match_scene(filename: str) -> str:
+    """Best guess at which scene a downloaded file came from. "" when unclear.
+
+    Deliberately returns nothing rather than a default: labelling every unmatched
+    clip "studio" would put a confident wrong scene — and a wrong score — on files
+    that simply were not made from a preset.
+    """
+    if not filename:
+        return ""
+    low = filename.lower().replace("_", " ").replace("-", " ")
+    best, best_at = "", len(low) + 1
+    for key, hints in _FILENAME_HINTS.items():
+        for h in (key, *hints):
+            at = low.find(h.lower())
+            # ตัวที่โผล่ก่อนชนะ — ชื่อไฟล์ของ Flow เอาคำสำคัญไว้ต้น ๆ
+            if at >= 0 and at < best_at:
+                best, best_at = key, at
+    return best
+
+
 # ── Relevance scoring ───────────────────────────────────────────────────────────
 
 def score_scenes(brand_text: str) -> dict[str, int]:

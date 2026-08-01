@@ -2351,6 +2351,28 @@ def _queue_caption_for(file: dict) -> str:
         return ""
 
 
+def _render_scene_score(filename: str) -> None:
+    """What this file was shot for, and how well that angle fits the brand.
+
+    Flow names each download after the prompt behind it, so the scene is usually
+    recoverable from the filename. Says nothing at all when the scene cannot be
+    read or there is no Mandala context to score against — an invented number on
+    a file you are about to approve is worse than no number.
+    """
+    if not SCENES_AVAILABLE:
+        return
+    key = scene_presets.match_scene(filename)
+    if not key:
+        return
+    goal = scene_presets.goal_for(key)
+    score = _scene_scores().get(key, 0)
+    stars = f"{'★' * score}{'·' * (5 - score)} " if score else ""
+    st.caption(f"{stars}{scene_presets.label_for(key)} — {goal}")
+    if score:
+        st.caption("ดาวคือความเข้ากับแบรนด์จากบริบทใน Mandala AI "
+                   "ไม่ใช่การทำนายยอด engagement")
+
+
 def _render_queue_file(folder_name: str, platform: str, file: dict,
                        line_token: str, fb_token: str, fb_page_id: str,
                        ig_business_id: str) -> None:
@@ -2366,6 +2388,7 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
             st.caption(f"{PLATFORM_THAI_NAMES.get(platform, folder_name)} · "
                        f"{mime.split('/')[-1]} · {size_mb:.1f} MB · "
                        f"{file.get('createdTime', '')[:16].replace('T', ' ')}")
+            _render_scene_score(file["name"])
         with act:
             if file.get("webViewLink"):
                 st.markdown(f"[🔗 เปิดใน Drive]({file['webViewLink']})")
