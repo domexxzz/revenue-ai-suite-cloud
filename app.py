@@ -2269,6 +2269,30 @@ def _mandala_badge() -> None:
         st.caption("🔗 เจอ mandala-bot แต่ยังไม่มี context.txt")
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def _scene_scores() -> dict:
+    """How well each scene angle fits this brand, scored off Mandala's own material.
+
+    Reading the context files costs a disk hit per rerun and the answer only
+    changes when Mandala produces a new run, so it is cached. Returns an empty
+    dict when there is nothing to score against — callers then show no stars
+    rather than an invented number.
+    """
+    if not SCENES_AVAILABLE:
+        return {}
+    try:
+        import mandala_client
+        text = mandala_client.build_context_block(include_samples=4, max_chars=20000)
+    except Exception:  # noqa: BLE001
+        return {}
+    if not text:
+        return {}
+    try:
+        return scene_presets.score_scenes(text)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 # ── Approval queue (reads back from Google Drive) ────────────────────────────────
 
 # How many files to draw per folder before offering "show more".
@@ -3180,21 +3204,45 @@ def _render_copilot_draft(mi: int, brief: dict, package: dict,
     # a campaign's stills and clip stay visually consistent.
     scene = scene_presets.DEFAULT_SCENE
     if SCENES_AVAILABLE:
+        # Order by how well each angle fits this brand's own material, so the
+        # most relevant scenes are the ones read first.
+        scores = _scene_scores()
         choices = scene_presets.scene_choices()
+        if scores:
+            choices = sorted(choices, key=lambda k: (-scores[k], scene_presets.label_for(k)))
+            default_index = 0
+        else:
+            default_index = (choices.index(scene_presets.DEFAULT_SCENE)
+                             if scene_presets.DEFAULT_SCENE in choices else 0)
+
+        def _scene_label(k: str) -> str:
+            n = scores.get(k, 0)
+            stars = f"{'★' * n}{'·' * (5 - n)} " if n else ""
+            return f"{stars}{scene_presets.label_for(k)}"
+
         sc_col, sc_info = st.columns([2, 1])
         with sc_col:
             scene = st.selectbox(
                 "🎯 หมวด / ฉากของภาพและวิดีโอ",
                 options=choices,
-                index=choices.index(scene_presets.DEFAULT_SCENE)
-                if scene_presets.DEFAULT_SCENE in choices else 0,
-                format_func=scene_presets.label_for,
+                index=default_index,
+                format_func=_scene_label,
                 key=f"copilot_scene_{mi}",
             )
         with sc_info:
             st.caption(scene_presets.group_for(scene))
             if scene_presets.has_people(scene):
                 st.caption("👤 มีคนในภาพ")
+
+        goal = scene_presets.goal_for(scene)
+        if goal:
+            st.info(f"**เป้าหมายของหมวดนี้:** {goal}")
+        if scores.get(scene):
+            st.caption(
+                f"{'★' * scores[scene]}{'·' * (5 - scores[scene])} "
+                "ความเข้ากับแบรนด์ — วัดจากที่บริบทและคอนเทนต์เดิมใน Mandala AI "
+                "พูดถึงมุมนี้บ่อยแค่ไหน (ไม่ใช่การทำนายยอด engagement)"
+            )
 
     img_bytes = _render_copilot_image(
         mi, content_copilot.build_master_image_prompt(brief, scene), gemini_key)

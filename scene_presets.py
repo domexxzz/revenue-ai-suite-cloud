@@ -25,6 +25,8 @@ PRESETS: dict[str, dict] = {
 
     # ── 🧪 ความน่าเชื่อถือ / วิทยาศาสตร์ ──────────────────────────────────────
     "lab": {
+        "goal": "🔬 สร้างความน่าเชื่อถือ — ตอกย้ำว่ามีงานวิจัยรองรับ ลดความกลัวว่าจะแพ้",
+        "signals": ["วิจัย", "เวชสำอาง", "ผู้เชี่ยวชาญ", "ทดสอบ", "มาตรฐาน", "ปลอดภัย"],
         "label": "🧪 ห้องแล็บ / งานวิจัย",
         "group": "🧪 ความน่าเชื่อถือ / วิทยาศาสตร์",
         "setting": "a clean modern research laboratory, white surfaces, subtle glassware "
@@ -41,6 +43,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "ingredient": {
+        "goal": "🌿 ให้ความรู้ — อธิบายว่าสารสกัดแต่ละตัวทำอะไร",
+        "signals": ["สารสกัด", "ไนอะซินาไมด์", "BHA", "ใบบัวบก", "ชะเอมเทศ", "วิตามิน", "ส่วนผสม"],
         "label": "🌿 สารสกัดเด่น",
         "group": "🧪 ความน่าเชื่อถือ / วิทยาศาสตร์",
         "setting": "a clean neutral surface surrounded by the raw botanical ingredients "
@@ -58,6 +62,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "clinic": {
+        "goal": "🩺 สร้างความมั่นใจ — วางแบรนด์ให้ดูเป็นมืออาชีพด้านผิว",
+        "signals": ["เวชสำอาง", "ผู้เชี่ยวชาญ", "ผิวแพ้ง่าย", "อ่อนโยน", "แนะนำ"],
         "label": "🩺 คลินิกผิวหนัง",
         "group": "🧪 ความน่าเชื่อถือ / วิทยาศาสตร์",
         "setting": "a calm dermatology clinic consultation room, soft white and pale "
@@ -80,6 +86,8 @@ PRESETS: dict[str, dict] = {
 
     # ── 👤 คน / ไลฟ์สไตล์ ─────────────────────────────────────────────────────
     "teen": {
+        "goal": "🧒 เข้าถึงวัยรุ่นผิวมัน — กลุ่มที่สิวขึ้นง่ายและกังวลเรื่องความมั่นใจ",
+        "signals": ["วัยรุ่น", "สิว", "ผิวมัน", "มั่นใจ", "T-Zone", "รูขุมขน"],
         "label": "🧒 วัยรุ่น",
         "group": "👤 คน / ไลฟ์สไตล์",
         "setting": "a bright casual bedroom corner with soft colourful accents",
@@ -98,6 +106,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "student": {
+        "goal": "🎓 เข้าถึงนักเรียนนักศึกษา — ชีวิตเร่งรีบ พักผ่อนน้อย สิวขึ้นง่าย",
+        "signals": ["วัยรุ่น", "นักศึกษา", "สิว", "ผิวมัน", "มั่นใจ"],
         "label": "🎓 นักเรียน / นักศึกษา",
         "group": "👤 คน / ไลฟ์สไตล์",
         "setting": "a university study desk or campus corner, books and a laptop nearby",
@@ -116,6 +126,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "office": {
+        "goal": "💼 เข้าถึงวัยทำงาน — หน้ามันระหว่างวัน เครื่องสำอางไหล",
+        "signals": ["วัยทำงาน", "หน้ามัน", "T-Zone", "เครื่องสำอาง", "มลภาวะ", "PM2.5"],
         "label": "💼 วัยทำงาน / ออฟฟิศ",
         "group": "👤 คน / ไลฟ์สไตล์",
         "setting": "a modern minimal office desk or office washroom mirror",
@@ -132,6 +144,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "male": {
+        "goal": "🧔 ขยายกลุ่มผู้ชาย — ตลาดที่แบรนด์สกินแคร์ไทยยังแข่งกันน้อย",
+        "signals": ["ผู้ชาย", "ผิวมัน", "สิว", "ล้างหน้า"],
         "label": "🧔 ผู้ชาย",
         "group": "👤 คน / ไลฟ์สไตล์",
         "setting": "a clean modern bathroom with dark stone or concrete tones",
@@ -147,6 +161,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "friends": {
+        "goal": "👯 กระตุ้นการบอกต่อ — ใช้แรงเพื่อนแนะนำเพื่อน",
+        "signals": ["บอกต่อ", "รีวิว", "แนะนำ", "เพื่อน", "ลูกค้า"],
         "label": "👯 กลุ่มเพื่อน",
         "group": "👤 คน / ไลฟ์สไตล์",
         "setting": "a bright relaxed room or cafe table where friends are hanging out",
@@ -167,6 +183,8 @@ PRESETS: dict[str, dict] = {
 
     # ── 🏠 สถานที่ / บรรยากาศ ─────────────────────────────────────────────────
     "vanity": {
+        "goal": "🪞 สอนวิธีใช้ — ทำให้เห็นว่าแทรกเข้ากิจวัตรได้ง่าย",
+        "signals": ["ล้างหน้า", "กิจวัตร", "ใช้ทุกวัน", "routine", "ดูแลผิว"],
         "label": "🪞 โต๊ะเครื่องแป้ง / ห้องน้ำ",
         "group": "🏠 สถานที่ / บรรยากาศ",
         "setting": "a tidy vanity counter with a soft-lit mirror, pale marble surface",
@@ -187,6 +205,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "morning": {
+        "goal": "🌅 ย้ำความต่อเนื่อง — การดูแลผิวต้องทำสม่ำเสมอ",
+        "signals": ["ทุกวัน", "ต่อเนื่อง", "เช้า", "กิจวัตร", "ดูแลผิว"],
         "label": "🌅 เช้าในห้องนอน",
         "group": "🏠 สถานที่ / บรรยากาศ",
         "setting": "a serene bedroom in early morning, rumpled white linen, window nearby",
@@ -203,6 +223,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "cafe": {
+        "goal": "☕ สร้างการรับรู้ — วางแบรนด์ให้อยู่ในไลฟ์สไตล์คนเมือง",
+        "signals": ["คนเมือง", "ไลฟ์สไตล์", "วัยทำงาน", "มั่นใจ"],
         "label": "☕ คาเฟ่",
         "group": "🏠 สถานที่ / บรรยากาศ",
         "setting": "a stylish minimal cafe table by a large window, city softly blurred outside",
@@ -218,6 +240,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "outdoor": {
+        "goal": "☀️ ชูการปกป้อง — แดดและมลภาวะเป็นตัวกระตุ้นสิว",
+        "signals": ["มลภาวะ", "PM2.5", "แดด", "ปกป้อง", "วิตามิน E"],
         "label": "☀️ กลางแจ้ง / แดด",
         "group": "🏠 สถานที่ / บรรยากาศ",
         "setting": "bright outdoors — a sunny terrace or greenery-lined path",
@@ -233,6 +257,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "gym": {
+        "goal": "🏋️ จับจังหวะเหงื่อ/หน้ามัน — ช่วงที่คนรู้สึกถึงปัญหาชัดที่สุด",
+        "signals": ["หน้ามัน", "เหงื่อ", "คุมมัน", "รูขุมขน", "อุดตัน"],
         "label": "🏋️ ยิม / ออกกำลังกาย",
         "group": "🏠 สถานที่ / บรรยากาศ",
         "setting": "a modern gym locker area or training floor, dark tones with accent light",
@@ -255,6 +281,8 @@ PRESETS: dict[str, dict] = {
 
     # ── 📸 สไตล์ภาพ ────────────────────────────────────────────────────────────
     "studio": {
+        "goal": "🎞️ ภาพสินค้ามาตรฐาน — ใช้ซ้ำได้ทุกที่ ทั้งเว็บและโฆษณา",
+        "signals": ["สินค้า", "สบู่", "แพ็กเกจ", "ราคา"],
         "label": "🎞️ สตูดิโอ สินค้าเดี่ยว",
         "group": "📸 สไตล์ภาพ",
         "setting": "a seamless studio backdrop in a soft neutral tone with a subtle "
@@ -271,6 +299,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "flatlay": {
+        "goal": "📐 เล่าองค์ประกอบ — โชว์ของครบชุดในภาพเดียว",
+        "signals": ["ส่วนผสม", "เซ็ต", "สินค้า", "5-FREE"],
         "label": "📐 Flat lay จัดวาง",
         "group": "📸 สไตล์ภาพ",
         "setting": "a perfectly top-down flat lay on a textured neutral surface",
@@ -290,6 +320,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "beforeafter": {
+        "goal": "↔️ พิสูจน์ผลลัพธ์ — หลักฐานที่คนลังเลอยากเห็นที่สุด",
+        "signals": ["ก่อน", "หลัง", "ผลลัพธ์", "รีวิว", "รอยสิว", "รอยดำ"],
         "label": "↔️ Before / After",
         "group": "📸 สไตล์ภาพ",
         "setting": "a clean neutral background split into two matched halves",
@@ -309,6 +341,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "ugc": {
+        "goal": "📱 ใช้เสียงผู้ใช้จริง — น่าเชื่อกว่าโฆษณาที่แบรนด์พูดเอง",
+        "signals": ["รีวิว", "ผู้ใช้จริง", "บอกต่อ", "ลูกค้า", "10,000"],
         "label": "📱 UGC รีวิวจริง",
         "group": "📸 สไตล์ภาพ",
         "setting": "an ordinary home room, genuinely un-styled and lived-in",
@@ -329,6 +363,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "macro": {
+        "goal": "🔬 โชว์เนื้อสัมผัส — ตอบคนที่กลัวว่าจะแรงเกินจนผิวแห้ง",
+        "signals": ["เนื้อสัมผัส", "ฟอง", "อ่อนโยน", "ไม่แห้งตึง", "ชุ่มชื้น"],
         "label": "🔬 Macro เนื้อสัมผัส",
         "group": "📸 สไตล์ภาพ",
         "setting": "an extreme close-up of the product's own surface texture filling "
@@ -351,6 +387,8 @@ PRESETS: dict[str, dict] = {
 
     # ── 🎁 โปรโมชัน / เทศกาล ──────────────────────────────────────────────────
     "promo": {
+        "goal": "🏷️ ปิดการขาย — เร่งการตัดสินใจด้วยราคา",
+        "signals": ["ลด", "ราคา", "โปร", "แถม", "229", "350"],
         "label": "🏷️ โปรโมชัน / ลดราคา",
         "group": "🎁 โปรโมชัน / เทศกาล",
         "setting": "a bold graphic promotional backdrop with strong colour blocking and "
@@ -368,6 +406,8 @@ PRESETS: dict[str, dict] = {
         ],
     },
     "gift": {
+        "goal": "🎁 จับเทศกาล — ขยายโอกาสขายเป็นของฝาก",
+        "signals": ["ของขวัญ", "เทศกาล", "เซ็ต", "แถม"],
         "label": "🎁 เซ็ตของขวัญ / เทศกาล",
         "group": "🎁 โปรโมชัน / เทศกาล",
         "setting": "a festive gifting scene with an elegant open gift box and ribbon",
@@ -409,3 +449,45 @@ def get(key: str) -> dict:
 
 def has_people(key: str) -> bool:
     return bool(get(key).get("cast"))
+
+
+def goal_for(key: str) -> str:
+    """What this scene is trying to achieve, in one line."""
+    return get(key).get("goal", "")
+
+
+# ── Relevance scoring ───────────────────────────────────────────────────────────
+
+def score_scenes(brand_text: str) -> dict[str, int]:
+    """Score each scene 0-5 on how well it fits this brand's own material.
+
+    This is a *fit* score, not a performance prediction: it counts how often the
+    angle a scene takes shows up in the brand brief and the content already
+    written for it (via Mandala AI). A scene about oily skin scores high for a
+    brand whose personas are built around oily, acne-prone skin — it says nothing
+    about how any post will perform.
+
+    With no brand text there is nothing to measure against, so everything comes
+    back 0 and callers should hide the score rather than show a fake one.
+    """
+    if not brand_text:
+        return {k: 0 for k in PRESETS}
+
+    low = brand_text.lower()
+    raw = {k: sum(low.count(s.lower()) for s in p.get("signals", []))
+           for k, p in PRESETS.items()}
+
+    top = max(raw.values()) if raw else 0
+    if top <= 0:
+        return {k: 0 for k in PRESETS}
+
+    # Log scale rather than linear. A handful of terms — "สิว", "ผิวมัน" — run away
+    # with the count because the personas are written around them, and on a linear
+    # scale that pinned three scenes at 5 and flattened every other one to 1,
+    # which tells the user nothing. Compressing the top spreads the middle out.
+    import math
+    denom = math.log1p(top)
+    return {
+        k: (0 if v == 0 else max(1, min(5, round(1 + 4 * math.log1p(v) / denom))))
+        for k, v in raw.items()
+    }
