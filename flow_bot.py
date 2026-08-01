@@ -1,6 +1,21 @@
 """flow_bot.py — drive the Google Flow UI to download generated media.
 
-⚠️  อ่านก่อนใช้ — ความเสี่ยง
+🛑 สถานะ: ใช้งานไม่ได้ — Google บล็อกการล็อกอินจากเบราว์เซอร์ที่ถูกโปรแกรมควบคุม
+    ทดสอบเมื่อ 2026-08-01 ด้วย Chrome จริง (channel="chrome") หน้าล็อกอินขึ้นว่า
+    "ลงชื่อเข้าใช้ให้คุณไม่ได้ — เบราว์เซอร์หรือแอปนี้อาจไม่ปลอดภัย"
+    คือระบบตรวจจับ automation ของ Google ปฏิเสธตั้งแต่ประตูแรก
+
+    มีเทคนิคหลบ (stealth plugin, ดูดคุกกี้จากโปรไฟล์จริง, ต่อ CDP เข้าเบราว์เซอร์
+    ที่ล็อกอินไว้) แต่ทั้งหมดคือการหลบระบบตรวจจับบอทที่ Google ตั้งใจวางไว้
+    **จงใจไม่ทำ** — บัญชีนี้ผูกกับ Drive/YouTube/Gmail ทั้งหมด
+
+    ✅ วิธีที่ใช้จริง: ตั้ง Chrome ให้ดาวน์โหลดลง G:\\My Drive\\Lemed\\ (Drive for
+    Desktop) แล้วกดดาวน์โหลดใน Flow เอง — ไฟล์ขึ้น Drive ทันที จากนั้น flow_sync.py
+    จัดเข้าโฟลเดอร์ย่อยให้ ต่างจากบอทแค่คลิกเดียวต่อคลิปที่เลือกจะเอา
+
+    เก็บไฟล์นี้ไว้เผื่อ Flow เปิด public API ในอนาคต — โครงเดินหน้าต่อได้ทันที
+
+⚠️  ความเสี่ยงเดิม (ถ้าจะรื้อมาใช้)
     Google Flow ไม่มี public API บอทนี้จึงทำงานโดย "กดปุ่มแทนคน" บนหน้าเว็บจริง
     ด้วย session ที่คุณล็อกอินเอง ซึ่ง **มักผิด ToS ของ Google** และบัญชีนี้ผูกกับ
     Drive / YouTube / Gmail ทั้งหมด — ถ้าโดนระงับคือเสียทั้งบัญชี
@@ -83,15 +98,25 @@ def dest_for(filename: str, dest_root: Path) -> Path:
 
 
 def _launch(pw, headless: bool):
-    """เปิดเบราว์เซอร์ด้วยโปรไฟล์ถาวร เพื่อคง session ที่ผู้ใช้ล็อกอินไว้"""
+    """เปิดเบราว์เซอร์ด้วยโปรไฟล์ถาวร เพื่อคง session ที่ผู้ใช้ล็อกอินไว้
+
+    ใช้ Chrome ที่ติดตั้งในเครื่องก่อน เพราะ Windows Smart App Control บล็อก
+    Chromium ที่ Playwright โหลดมาเอง (เจอ `spawn UNKNOWN`) ส่วน Chrome ของ Google
+    มีลายเซ็นถูกต้องจึงผ่าน — และยังเหมือนเบราว์เซอร์ที่คนใช้จริงมากกว่าด้วย
+    """
     PROFILE_DIR.mkdir(exist_ok=True)
-    return pw.chromium.launch_persistent_context(
+    common = dict(
         user_data_dir=str(PROFILE_DIR),
         headless=headless,
         accept_downloads=True,
         viewport={"width": 1500, "height": 950},
         locale="th-TH",
     )
+    try:
+        return pw.chromium.launch_persistent_context(channel="chrome", **common)
+    except Exception as e:
+        print(f"! เปิด Chrome ไม่ได้ ({str(e)[:60]}) — ลอง Chromium ของ Playwright แทน")
+        return pw.chromium.launch_persistent_context(**common)
 
 
 def cmd_login(project_url: str) -> None:
