@@ -3198,23 +3198,26 @@ def _render_copilot_carousel(mi: int, brief: dict, scene: str, gemini_key: str) 
         else:
             st.caption("💡 ใส่ Gemini API key เพื่อสร้างรูปทุกสไลด์รวดเดียว")
 
+        # Tabs, not a popover per slide. Each prompt is 32 lines, which rendered a
+        # ~500px floating panel anchored to a button already near the bottom of an
+        # open expander — it opened below the fold, moved with the page as you
+        # scrolled after it, and left its own close target off screen. Tabs put the
+        # same content in the page flow, where there is nothing to chase or close.
         made = st.session_state.get(key_all, {})
-        for s in slides:
-            st.markdown(f"**สไลด์ {s['n']} · {s['label']}**")
-            st.caption(s["purpose"])
-            st.markdown(f"> **{s['headline_th']}**  \n> {s['sub_th']}")
-            img = made.get(s["n"])
-            if img:
-                st.image(img, width="stretch")
-                st.download_button(
-                    f"📥 ดาวน์โหลดสไลด์ {s['n']}", data=img,
-                    file_name=f"carousel_{mi}_{s['n']}.png", mime="image/png",
-                    key=f"copilot_cardl_{mi}_{s['n']}", width="stretch")
-            with st.popover(f"📋 ดู Master Prompt สไลด์ {s['n']}", width="stretch"):
+        for tab, s in zip(st.tabs([f"{s['n']}. {s['label']}" for s in slides]), slides):
+            with tab:
+                st.caption(s["purpose"])
+                st.markdown(f"> **{s['headline_th']}**  \n> {s['sub_th']}")
+                img = made.get(s["n"])
+                if img:
+                    st.image(img, width="stretch")
+                    st.download_button(
+                        f"📥 ดาวน์โหลดสไลด์ {s['n']}", data=img,
+                        file_name=f"carousel_{mi}_{s['n']}.png", mime="image/png",
+                        key=f"copilot_cardl_{mi}_{s['n']}", width="stretch")
                 st.code(s["prompt"], language=None)
-                st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL,
-                               width="stretch")
-            st.divider()
+                st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้",
+                               FLOW_PROJECT_URL, width="stretch")
 
 
 def _render_copilot_draft(mi: int, brief: dict, package: dict,
