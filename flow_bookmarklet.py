@@ -108,6 +108,17 @@ def build(kind: str = "download", max_per_run: int | None = None) -> str:
         body, hits = re.subn(r"MAX_PER_RUN = \d+", f"MAX_PER_RUN = {n}", body)
         if not hits:
             raise RuntimeError("ไม่เจอ MAX_PER_RUN ในสคริปต์ — เปลี่ยนเพดานไม่ได้")
+    # ยามกันโค้ดพังเงียบ ๆ
+    #
+    # _strip_comments ไม่รู้จัก regex literal — รูปแบบที่ลงท้ายด้วย \// มี // ติดกัน
+    # มันจึงอ่านเป็นคอมเมนต์แล้วกินโค้ดที่เหลือทั้งบรรทัด บุ๊กมาร์กที่ได้พังแบบไม่มี
+    # อาการบอกจนกว่าจะเอาไปกดจริง ตรวจวงเล็บก่อนส่งออก ให้ดังตั้งแต่ตอนสร้าง
+    for open_ch, close_ch in (("{", "}"), ("(", ")"), ("[", "]")):
+        if body.count(open_ch) != body.count(close_ch):
+            raise RuntimeError(
+                f"โค้ดที่ตัดคอมเมนต์แล้ววงเล็บไม่สมดุล ({open_ch}{close_ch}) — "
+                f"น่าจะมี regex literal ที่มี // อยู่ข้างใน ให้เลี่ยงไปใช้ indexOf แทน")
+
     # void(0) so the page is not replaced by the expression's return value —
     # without it the browser navigates away to whatever the script evaluated to.
     return "javascript:" + quote(f"(function(){{{body}}})();void 0;", safe="")

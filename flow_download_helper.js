@@ -146,6 +146,14 @@
   //
   // ลอง fetch เป็น blob ก่อน เพราะข้าม origin ได้ถ้าเซิร์ฟเวอร์เปิด CORS และได้ชื่อ
   // ไฟล์ตามที่เราตั้ง ถ้า fetch ไม่ผ่านค่อยชี้ href ตรง ๆ ซึ่งได้ผลเมื่อ same-origin
+  // ห้าม fallback ไปชี้ href ตรง ๆ เด็ดขาด
+  //
+  // ไฟล์จริงอยู่ที่ flow-content.google ซึ่งคนละ origin กับ labs.google พอข้าม origin
+  // เบราว์เซอร์จะเมินแอตทริบิวต์ download แล้ว "เปิด" ไฟล์แทนที่จะโหลด — ผลคือหน้า
+  // Flow ถูกพาออกไปหน้าวิดีโอ งานที่เหลือหยุดหมด (เจอมาแล้ว)
+  //
+  // ถ้า fetch ไม่ผ่านก็ยอมรับว่าโหลดจากในหน้าไม่ได้ แล้วส่ง URL ออกไปให้ฝั่ง Python
+  // โหลดแทน — URL ที่ CDN เซ็นมาใช้ได้โดยไม่ต้องมีคุกกี้
   async function directDownload(url, name) {
     try {
       const res = await fetch(url, { credentials: 'include' });
@@ -161,14 +169,7 @@
       setTimeout(() => URL.revokeObjectURL(obj), 60000);
       return { ok: true, how: 'blob', bytes: blob.size };
     } catch (e) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      a.rel = 'noopener';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      return { ok: true, how: 'ตรง', note: String(e).slice(0, 60) };
+      return { ok: false, why: String(e).slice(0, 80) };
     }
   }
 
@@ -196,7 +197,13 @@
     for (const v of document.querySelectorAll('video')) add(v.currentSrc || v.src, 'flow');
     try {
       for (const e of performance.getEntriesByType('resource')) {
-        if (/\.(mp4|webm|mov)(\?|$)/i.test(e.name)) add(e.name, 'flow');
+        // ไฟล์จริงของ Flow ไม่มีนามสกุล — เป็น flow-content.google/video/<uuid>?Signature=…
+        // เกณฑ์เดิมบังคับ .mp4 จึงไม่เคยเจอ URL ที่ต้องการเลยสักอัน
+        // ใช้ indexOf ไม่ใช่ regex — ตัวตัดคอมเมนต์ตอนสร้างบุ๊กมาร์กไม่รู้จัก regex
+        // literal พอเจอ \// ท้ายรูปแบบก็อ่านเป็นคอมเมนต์แล้วกินโค้ดที่เหลือทั้งบรรทัด
+        if (/\.(mp4|webm|mov)(\?|$)/i.test(e.name) || e.name.indexOf('/video/') >= 0) {
+          add(e.name, 'flow');
+        }
       }
     } catch (e) { /* ไม่มีก็ข้าม */ }
     return [...out.entries()].map(([url, name]) => ({ url, name }));
@@ -566,17 +573,49 @@
   const urls = mediaUrls();
   log(`เจอ URL วิดีโอในหน้า ${urls.length} รายการ`);
   if (urls.length) {
+    const failed = [];
     for (const m of urls.slice(0, MAX_PER_RUN)) {
       if (stopped) break;
       setStep(`โหลดตรงจาก URL (${ok + 1})`);
       const r = await directDownload(m.url, m.name);
-      log(`โหลดตรง: ${m.name} — ${r.how}${r.bytes ? ` ${(r.bytes/1048576).toFixed(1)}MB` : ''}`);
-      ok++;
+      if (r.ok) {
+        ok++;
+        log(`โหลดตรง: ${m.name} — ${(r.bytes / 1048576).toFixed(1)}MB`);
+      } else {
+        failed.push(m.url);
+        log(`โหลดตรงไม่ได้: ${m.name} — ${r.why}`);
+      }
       await humanDelay();
     }
     clearInterval(ticker);
-    say(`<b>สั่งโหลดตรงจาก URL ${ok} ไฟล์</b>`
-      + '<br><span style="color:#9aa5a2">ไปดูของที่มาถึงจริงที่หน้า “คิวอนุมัติ”</span>');
+
+    // ที่โหลดจากในหน้าไม่ได้ = ไฟล์อยู่คนละ origin ซึ่งเบราว์เซอร์ไม่ให้อ่าน
+    // แต่ URL พวกนี้ CDN เซ็นมาแล้ว ใช้ได้โดยไม่ต้องมีคุกกี้ — ส่งให้ฝั่ง Python
+    // ในแอปโหลดแทนได้เลย จึงเอามาวางในกล่องให้คัดลอกทีเดียว
+    if (failed.length) {
+      hud.querySelector('#fdh-msg').innerHTML =
+        `<b>โหลดจากในหน้าได้ ${ok} ไฟล์ · ต้องให้แอปช่วยอีก ${failed.length}</b>`
+        + '<br><span style="color:#9aa5a2">ไฟล์อยู่คนละโดเมน เบราว์เซอร์เลยไม่ให้โหลดตรง '
+        + 'แต่ลิงก์พวกนี้ใช้ได้เอง — กดคัดลอกแล้วเอาไปวางในแอป หน้า “คิวอนุมัติ” '
+        + '→ ช่อง “วางลิงก์จาก Flow”</span>'
+        + '<textarea id="fdh-urls" readonly style="width:100%;height:110px;margin-top:8px;'
+        + 'background:#0b0f12;color:#cfe;border:1px solid #2b3a36;border-radius:8px;'
+        + 'padding:6px;font:11px/1.4 ui-monospace,monospace"></textarea>'
+        + '<button id="fdh-copy" style="width:100%;margin-top:6px;padding:6px;'
+        + 'border-radius:8px;border:1px solid #3d4f4a;background:#1b2724;color:#e8f0ee;'
+        + 'cursor:pointer">📋 คัดลอกลิงก์ทั้งหมด</button>';
+      const ta = hud.querySelector('#fdh-urls');
+      ta.value = failed.join('\n');
+      hud.querySelector('#fdh-copy').onclick = async () => {
+        ta.select();
+        try { await navigator.clipboard.writeText(ta.value); }
+        catch (e) { document.execCommand('copy'); }
+        hud.querySelector('#fdh-copy').textContent = '✅ คัดลอกแล้ว';
+      };
+    } else {
+      say(`<b>โหลดตรงจาก URL ${ok} ไฟล์</b>`
+        + '<br><span style="color:#9aa5a2">ไปดูของที่มาถึงจริงที่หน้า “คิวอนุมัติ”</span>');
+    }
     hud.querySelector('#fdh-stop').textContent = 'ปิด';
     hud.querySelector('#fdh-stop').onclick = () => hud.remove();
     log('เสร็จแล้ว');

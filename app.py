@@ -2351,6 +2351,49 @@ def _queue_caption_for(file: dict) -> str:
         return ""
 
 
+def _render_flow_paste_links() -> None:
+    """วางลิงก์ที่บุ๊กมาร์กเล็ตคัดลอกมา แล้วให้ Python โหลดไฟล์ลง Drive
+
+    ไฟล์จริงของ Flow อยู่คนละโดเมนกับหน้าเว็บ เบราว์เซอร์จึงไม่ยอมให้สคริปต์ในหน้า
+    โหลดมาเซฟเอง แต่ลิงก์ที่ CDN เซ็นมาใช้ได้โดยไม่ต้องมีคุกกี้ ฝั่งนี้จึงโหลดได้ตรง ๆ
+    """
+    st.markdown("**📥 วางลิงก์จาก Flow**")
+    st.caption("กดบุ๊กมาร์กในหน้า Flow → กด “คัดลอกลิงก์ทั้งหมด” → วางที่นี่ → กดโหลด "
+               "· ไฟล์จะลงโฟลเดอร์ที่ watcher เฝ้าอยู่ แล้วถูกจัดเข้าโฟลเดอร์แพลตฟอร์มเอง")
+
+    text = st.text_area("ลิงก์ (บรรทัดละอัน)", height=110, key="flow_paste_links",
+                        placeholder="https://flow-content.google/video/…")
+    try:
+        import flow_fetch
+    except Exception as e:  # noqa: BLE001
+        st.caption(f"⚠️ โหลดโมดูลไม่ได้: {e}")
+        return
+
+    urls = flow_fetch.parse_urls(text)
+    if text and not urls:
+        st.caption("ยังไม่เจอลิงก์ในข้อความที่วางมา")
+    if urls:
+        st.caption(f"เจอ {len(urls)} ลิงก์ (ตัดซ้ำแล้ว)")
+
+    if st.button(f"⬇️ โหลด {len(urls)} ไฟล์ลง Drive", disabled=not urls,
+                 width="stretch", key="flow_paste_go"):
+        prog = st.progress(0.0, text="กำลังเริ่ม…")
+        results = flow_fetch.fetch_all(
+            urls, on_progress=lambda i, n, u: prog.progress(
+                (i - 1) / n, text=f"ไฟล์ {i}/{n}"))
+        prog.progress(1.0, text="เสร็จแล้ว")
+        ok = [r for r in results if r.ok]
+        (st.success if len(ok) == len(results) else st.warning)(
+            f"โหลดสำเร็จ {len(ok)}/{len(results)} ไฟล์")
+        for r in results:
+            if r.ok:
+                st.markdown(f"✅ **{r.path.name}** — {r.bytes / 1048576:.1f} MB")
+            else:
+                st.markdown(f"❌ {r.url[:60]}… — {r.error}")
+        if ok:
+            _clear_queue_cache()   # ให้ไฟล์ใหม่โผล่ในคิวทันที
+
+
 def _render_scene_score(filename: str) -> None:
     """What this file was shot for, and how well that angle fits the brand.
 
@@ -2546,6 +2589,9 @@ def _render_flow_sync(authed: bool = True) -> None:
                             f"{r['folder'] if r['ok'] else r['error']}")
             _clear_queue_cache()   # newly filed files must show up straight away
             st.rerun()
+
+        st.divider()
+        _render_flow_paste_links()
 
         st.divider()
         st.markdown("**⚡ ทำให้อัตโนมัติเต็มรูปแบบ**")
