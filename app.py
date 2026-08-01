@@ -867,7 +867,7 @@ px.defaults.template = _chart_tpl
 apply_premium_theme(_theme)
 
 
-def _chart(fig: go.Figure, use_container_width: bool = True, **kw) -> None:
+def _chart(fig: go.Figure, stretch: bool = True, **kw) -> None:
     """Render a Plotly chart with correct theme colours, bypassing Streamlit's override."""
     if _theme == "light":
         fig.update_layout(
@@ -880,7 +880,7 @@ def _chart(fig: go.Figure, use_container_width: bool = True, **kw) -> None:
             hoverlabel=dict(bgcolor="#FFFFFF", font=dict(color="#111827")),
             title=dict(font=dict(color="#111827")),
         )
-    st.plotly_chart(fig, use_container_width=use_container_width, theme=None, **kw)
+    st.plotly_chart(fig, width="stretch" if stretch else "content", theme=None, **kw)
 
 DATA_PATH = Path("data/sample_transactions.csv")
 YENTAFO_DIR = Path("data/client-yentafo")
@@ -1400,7 +1400,7 @@ Token จะถูกใช้เฉพาะในเซสชั่นนี�
             data=generate_excel_report(df),
             file_name=f"loyverse_{merchant_name}_{dt.datetime.now().strftime('%Y%m%d')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width="stretch",
         )
 
 
@@ -1899,7 +1899,7 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
             st.session_state["cs_image_name"] = uploaded_image.name
             st.image(uploaded_image, caption="✅ ภาพพร้อมโพสต์", width=200)
         elif "cs_image_bytes" in st.session_state:
-            if st.button("🗑️ ลบรูป", use_container_width=True, key="del_img"):
+            if st.button("🗑️ ลบรูป", width="stretch", key="del_img"):
                 del st.session_state["cs_image_bytes"]
                 del st.session_state["cs_image_name"]
                 st.rerun()
@@ -1918,7 +1918,7 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
             size_mb = len(st.session_state["cs_video_bytes"]) / 1024 / 1024
             st.success(f"✅ วิดีโอพร้อม ({size_mb:.1f} MB)")
         elif "cs_video_bytes" in st.session_state:
-            if st.button("🗑️ ลบวิดีโอ", use_container_width=True, key="del_vid"):
+            if st.button("🗑️ ลบวิดีโอ", width="stretch", key="del_vid"):
                 del st.session_state["cs_video_bytes"]
                 del st.session_state["cs_video_name"]
                 st.rerun()
@@ -1929,7 +1929,7 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
     use_claude = ai_mode == "Claude API" and api_key.strip() and ANTHROPIC_AVAILABLE
     btn_label = "🤖 Generate with Claude AI" if use_claude else "⚡ Generate with Local AI"
 
-    if st.button(btn_label, type="primary", use_container_width=True):
+    if st.button(btn_label, type="primary", width="stretch"):
         # Keys must match placeholders in content_studio.py templates
         _brand = biz_name or "ร้านของคุณ"
         _hero = hero_product or "เมนูเด็ด"
@@ -2040,13 +2040,13 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
                         data=edited.encode("utf-8"),
                         file_name=f"{pid}_content.txt",
                         mime="text/plain",
-                        use_container_width=True,
+                        width="stretch",
                         key=f"dl_{pid}",
                     )
                 with col_post:
                     if st.button(
                         f"🚀 Post",
-                        use_container_width=True,
+                        width="stretch",
                         key=f"post_{pid}",
                         type="primary",
                     ):
@@ -2067,7 +2067,7 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
                             file_name=st.session_state.get("cs_video_name", "video.mp4"),
                             mime="video/mp4",
                             key=f"dl_tiktok_{pid}",
-                            use_container_width=True,
+                            width="stretch",
                         )
                         st.markdown("[🔗 เปิด TikTok เพื่ออัปโหลด](https://www.tiktok.com/upload)")
 
@@ -2078,7 +2078,7 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
         st.markdown("**⚡ โพสต์ทุกแพลตฟอร์มในคลิกเดียว**")
         st.caption("ใช้คอนเทนต์ของแต่ละ tab (รวมที่แก้ไขแล้ว) — TikTok จะเตรียมไฟล์ให้ดาวน์โหลด")
     with pa_right:
-        post_all_clicked = st.button("🚀 Post All", type="primary", use_container_width=True, key="post_all")
+        post_all_clicked = st.button("🚀 Post All", type="primary", width="stretch", key="post_all")
 
     if post_all_clicked:
         results = []
@@ -2119,7 +2119,7 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
         )
         sched_display["เวลาโพสต์"] = sched_display["date"].astype(str) + " " + sched_display["time"]
         sched_display["สถานะ"] = sched_display["status"]
-        st.dataframe(sched_display[["แพลตฟอร์ม", "เวลาโพสต์", "สถานะ"]], use_container_width=True, hide_index=True)
+        st.dataframe(sched_display[["แพลตฟอร์ม", "เวลาโพสต์", "สถานะ"]], width="stretch", hide_index=True)
     else:
         st.info("เลือกแพลตฟอร์มอย่างน้อย 1 แพลตฟอร์มเพื่อดูตารางโพสต์")
 
@@ -2138,13 +2138,13 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
         if GDRIVE_AVAILABLE:
             if needs_auth():
                 st.warning("ยังไม่ได้ authorize Google Drive")
-                if st.button("🔐 Authorize Google Drive", use_container_width=True):
+                if st.button("🔐 Authorize Google Drive", width="stretch"):
                     with st.spinner("กำลังเปิด browser..."):
                         run_first_time_auth()
                     st.success("Authorized แล้ว! กด Upload ได้เลย")
                     st.rerun()
             else:
-                if st.button("☁️ Upload ไป Google Drive", type="primary", use_container_width=True):
+                if st.button("☁️ Upload ไป Google Drive", type="primary", width="stretch"):
                     with st.spinner("กำลัง upload..."):
                         link = upload_text(all_content, filename, GDRIVE_FOLDER_ID)
                     if link:
@@ -2164,7 +2164,7 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
             data=all_content.encode("utf-8"),
             file_name=filename,
             mime="text/plain",
-            use_container_width=True,
+            width="stretch",
         )
 
     # ── Post history ───────────────────────────────────────────────────────────
@@ -2172,7 +2172,7 @@ def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "",
     if history:
         st.divider()
         st.subheader("🕐 ประวัติการโพสต์ (เซสชันนี้)")
-        st.dataframe(pd.DataFrame(reversed(history)), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(reversed(history)), width="stretch", hide_index=True)
         if st.button("🗑️ ล้างประวัติ", key="clear_history"):
             st.session_state["post_history"] = []
             st.rerun()
@@ -2266,14 +2266,14 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
         caption = ""
 
         if mime.startswith("image/"):
-            if st.button("👁️ ดูรูป", key=f"q_prev_{fid}", use_container_width=True):
+            if st.button("👁️ ดูรูป", key=f"q_prev_{fid}", width="stretch"):
                 st.session_state[f"q_data_{fid}"] = download_file(fid)
             media_bytes = st.session_state.get(f"q_data_{fid}")
             if media_bytes:
-                st.image(media_bytes, use_container_width=True)
+                st.image(media_bytes, width="stretch")
         elif mime.startswith("video/"):
             st.caption("วิดีโอไฟล์ใหญ่ — กดโหลดเมื่อต้องการดู")
-            if st.button("▶️ โหลดวิดีโอมาดู", key=f"q_prev_{fid}", use_container_width=True):
+            if st.button("▶️ โหลดวิดีโอมาดู", key=f"q_prev_{fid}", width="stretch"):
                 st.session_state[f"q_data_{fid}"] = download_file(fid)
             media_bytes = st.session_state.get(f"q_data_{fid}")
             if media_bytes:
@@ -2287,7 +2287,7 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
         c1, c2 = st.columns(2)
         with c1:
             if st.button("✅ อนุมัติ + โพสต์", key=f"q_ok_{fid}",
-                         type="primary", use_container_width=True):
+                         type="primary", width="stretch"):
                 if not platform:
                     st.error("ไม่รู้ว่าไฟล์นี้ควรลงแพลตฟอร์มไหน — "
                              "ตั้งชื่อโฟลเดอร์ให้มีชื่อแพลตฟอร์ม")
@@ -2313,7 +2313,7 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
                 else:
                     st.error(msg)
         with c2:
-            if st.button("❌ ไม่อนุมัติ", key=f"q_no_{fid}", use_container_width=True):
+            if st.button("❌ ไม่อนุมัติ", key=f"q_no_{fid}", width="stretch"):
                 dest = ensure_subfolder(QUEUE_ROOT_FOLDER_ID, "REJECTED")
                 if dest and move_file(fid, dest):
                     st.info("ย้ายไปโฟลเดอร์ REJECTED แล้ว")
@@ -2333,7 +2333,7 @@ def _render_flow_sync(authed: bool = True) -> None:
             "แล้วระบบจะหยิบไฟล์ใหม่ในโฟลเดอร์นี้ไปเข้า Drive ให้เอง"
         )
         st.link_button("🎬 ไปดาวน์โหลดจาก Google Flow", FLOW_PROJECT_URL,
-                       use_container_width=True)
+                       width="stretch")
 
         local_root = flow_sync.default_local_root()
         if local_root:
@@ -2393,7 +2393,7 @@ def _render_flow_sync(authed: bool = True) -> None:
             st.caption("🔐 ต้อง authorize Google Drive ก่อนถึงจะซิงก์ได้ (ปุ่มอยู่ด้านล่าง)")
 
         if st.button("⬇️ ซิงก์เข้า Drive", type="primary",
-                     disabled=not pending or not can_sync, use_container_width=True):
+                     disabled=not pending or not can_sync, width="stretch"):
             prog = st.progress(0.0, text="เริ่มซิงก์...")
 
             def _tick(i: int, total: int, name: str) -> None:
@@ -2421,7 +2421,7 @@ def _render_flow_sync(authed: bool = True) -> None:
                    "แท็บ Console → วางสคริปต์นี้ → Enter")
         helper = Path(__file__).parent / "flow_download_helper.js"
         if helper.exists():
-            with st.popover("📋 เปิดสคริปต์เพื่อคัดลอก", use_container_width=True):
+            with st.popover("📋 เปิดสคริปต์เพื่อคัดลอก", width="stretch"):
                 st.code(helper.read_text(encoding="utf-8"), language="javascript")
             st.caption("สคริปต์ทำงานบนหน้าที่คุณเปิดเอง หน่วง 3-5 วิต่อไฟล์ "
                        "และจำกัด 15 ไฟล์ต่อรอบ")
@@ -2442,9 +2442,9 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
 
     lk1, lk2 = st.columns(2)
     with lk1:
-        st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL, use_container_width=True)
+        st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL, width="stretch")
     with lk2:
-        st.link_button("📁 เปิดโฟลเดอร์ Drive", DRIVE_FOLDER_URL, use_container_width=True)
+        st.link_button("📁 เปิดโฟลเดอร์ Drive", DRIVE_FOLDER_URL, width="stretch")
 
     if not GDRIVE_AVAILABLE:
         st.error("ไม่พบ google_drive.py")
@@ -2617,7 +2617,7 @@ def _render_canva_autofill(token: str, caps: dict) -> None:
 
     title = st.text_input("ชื่อดีไซน์", value=f"LEMED {dt.datetime.now():%d/%m %H:%M}")
 
-    if st.button("🎨 สร้างดีไซน์จากเทมเพลต", type="primary", use_container_width=True):
+    if st.button("🎨 สร้างดีไซน์จากเทมเพลต", type="primary", width="stretch"):
         with st.spinner("กำลังอัปโหลดรูป / สร้างดีไซน์..."):
             # Any image field needs a Canva asset id, so upload first.
             img = st.session_state.get("canva_pending_image")
@@ -2653,11 +2653,11 @@ def _render_canva_autofill(token: str, caps: dict) -> None:
                 for i, u in enumerate(urls, 1):
                     data_bytes = canva_client.download(u)
                     if data_bytes:
-                        st.image(data_bytes, caption=f"หน้า {i}", use_container_width=True)
+                        st.image(data_bytes, caption=f"หน้า {i}", width="stretch")
                         st.download_button(
                             f"📥 ดาวน์โหลดหน้า {i}", data=data_bytes,
                             file_name=f"canva_{design_id}_{i}.png", mime="image/png",
-                            key=f"canva_dl_{design_id}_{i}", use_container_width=True)
+                            key=f"canva_dl_{design_id}_{i}", width="stretch")
             else:
                 st.warning(emsg)
 
@@ -2693,7 +2693,7 @@ def render_canva_page() -> None:
             else "⚠️ ไม่ใช่ Enterprise (Autofill ใช้ไม่ได้)"
         st.success(f"เชื่อม Canva แล้ว — {badge}")
     with btn:
-        if st.button("ตัดการเชื่อมต่อ", use_container_width=True):
+        if st.button("ตัดการเชื่อมต่อ", width="stretch"):
             for k in ("canva_token", "canva_caps", "canva_pkce"):
                 st.session_state.pop(k, None)
             st.rerun()
@@ -2708,7 +2708,7 @@ def render_canva_page() -> None:
     img = st.session_state.get("canva_pending_image")
     if img:
         st.image(img, width=180, caption="รูปที่รอส่ง (จากหน้า Copilot)")
-        if st.button("📤 อัปโหลดเข้า Canva", use_container_width=True):
+        if st.button("📤 อัปโหลดเข้า Canva", width="stretch"):
             with st.spinner("กำลังอัปโหลด..."):
                 asset_id, msg = canva_client.upload_asset(
                     token, img, f"lemed_{dt.datetime.now():%Y%m%d_%H%M%S}.png")
@@ -2752,14 +2752,14 @@ def render_brainstorm_page(ai_mode: str, api_key: str) -> None:
 
     gen_col, clr_col = st.columns([3, 1])
     with gen_col:
-        if st.button("🧠 ร่าง Business Model Canvas", type="primary", use_container_width=True):
+        if st.button("🧠 ร่าง Business Model Canvas", type="primary", width="stretch"):
             with st.spinner("กำลังร่าง BMC..."):
                 st.session_state["bs_bmc"] = brainstorm.generate_bmc(
                     desc, _key, brand_ctx, _provider)
             st.session_state.pop("bs_ideas", None)
             st.rerun()
     with clr_col:
-        if "bs_bmc" in st.session_state and st.button("🗑️ ล้าง", use_container_width=True):
+        if "bs_bmc" in st.session_state and st.button("🗑️ ล้าง", width="stretch"):
             st.session_state.pop("bs_bmc", None)
             st.session_state.pop("bs_ideas", None)
             st.rerun()
@@ -2789,7 +2789,7 @@ def render_brainstorm_page(ai_mode: str, api_key: str) -> None:
     st.subheader("💡 ไอเดียคอนเทนต์")
 
     n_ideas = st.slider("จำนวนไอเดีย", 2, 6, 4, key="bs_n")
-    if st.button("✨ เสนอไอเดียจาก BMC", use_container_width=True):
+    if st.button("✨ เสนอไอเดียจาก BMC", width="stretch"):
         with st.spinner("กำลังคิดไอเดีย..."):
             st.session_state["bs_ideas"] = brainstorm.generate_ideas(
                 bmc, desc, _key, n_ideas, brand_ctx, _provider)
@@ -2815,7 +2815,7 @@ def render_brainstorm_page(ai_mode: str, api_key: str) -> None:
             st.button(
                 "🗨️ ส่งเข้า Copilot เพื่อร่างคอนเทนต์",
                 key=f"bs_send_{idx}",
-                use_container_width=True,
+                width="stretch",
                 on_click=_send_idea_to_copilot,
                 args=(idea["prompt"],),
             )
@@ -2875,11 +2875,11 @@ def _render_copilot_image(mi: int, image_prompt: str, gemini_key: str) -> bytes 
         st.caption("📋 คัดลอกไปวางใน Google Flow / Midjourney ได้เลย (กดไอคอนคัดลอกมุมขวาบน)")
         st.code(image_prompt, language=None)
         st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้", FLOW_PROJECT_URL,
-                       use_container_width=True)
+                       width="stretch")
 
         if gemini_key:
             if st.button("✨ สร้างรูปด้วย Gemini", key=f"copilot_genimg_{mi}",
-                         use_container_width=True):
+                         width="stretch"):
                 import ai_provider
                 with st.spinner("กำลังสร้างรูป... (10-30 วินาที)"):
                     img_bytes, msg = ai_provider.generate_image(image_prompt, gemini_key)
@@ -2894,21 +2894,21 @@ def _render_copilot_image(mi: int, image_prompt: str, gemini_key: str) -> bytes 
 
         img = st.session_state.get(img_key)
         if img:
-            st.image(img, caption="ภาพที่สร้างด้วย Gemini", use_container_width=True)
+            st.image(img, caption="ภาพที่สร้างด้วย Gemini", width="stretch")
             c1, c2, c3 = st.columns(3)
             with c1:
                 st.download_button("📥 ดาวน์โหลด", data=img,
                                    file_name=f"lemed_{mi}.png", mime="image/png",
-                                   key=f"copilot_dlimg_{mi}", use_container_width=True)
+                                   key=f"copilot_dlimg_{mi}", width="stretch")
             with c2:
                 if CANVA_AVAILABLE and st.button("🎨 ส่งไป Canva",
                                                  key=f"copilot_canva_{mi}",
-                                                 use_container_width=True):
+                                                 width="stretch"):
                     st.session_state["canva_pending_image"] = img
                     st.session_state["shop_menu"] = "🎨 Canva"
                     st.rerun()
             with c3:
-                if st.button("🗑️ ลบรูป", key=f"copilot_rmimg_{mi}", use_container_width=True):
+                if st.button("🗑️ ลบรูป", key=f"copilot_rmimg_{mi}", width="stretch"):
                     del st.session_state[img_key]
                     st.rerun()
         return img
@@ -2926,7 +2926,7 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
                    "10 วินาที · Hook → Decision → CTA · เสียงพากย์ไทย")
         st.code(content_copilot.build_master_video_prompt(brief, scene, 10), language=None)
         st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้", FLOW_PROJECT_URL,
-                       use_container_width=True)
+                       width="stretch")
 
         if gemini_key:
             st.info("ℹ️ Veo สร้างได้สูงสุด **8 วินาที** ต่อคลิป — ตัว Master Prompt ด้านบน "
@@ -2949,7 +2949,7 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
                        f"({secs} วิ · {tier}) — คิดเงินเฉพาะตอนสร้างสำเร็จ")
 
             if st.button("🎬 สร้างวิดีโอด้วย Veo", key=f"copilot_genvid_{mi}",
-                         use_container_width=True):
+                         width="stretch"):
                 status = st.empty()
                 with st.spinner("กำลังสร้างวิดีโอ... (ปกติ 1-3 นาที อย่าปิดหน้านี้)"):
                     vid, msg = ai_provider.generate_video(
@@ -2975,10 +2975,10 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
             with d1:
                 st.download_button("📥 ดาวน์โหลดวิดีโอ", data=vid,
                                    file_name=f"lemed_{mi}.mp4", mime="video/mp4",
-                                   key=f"copilot_dlvid_{mi}", use_container_width=True)
+                                   key=f"copilot_dlvid_{mi}", width="stretch")
             with d2:
                 if st.button("🗑️ ลบวิดีโอ", key=f"copilot_rmvid_{mi}",
-                             use_container_width=True):
+                             width="stretch"):
                     del st.session_state[vid_key]
                     st.rerun()
         return vid
@@ -2995,7 +2995,7 @@ def _render_copilot_carousel(mi: int, brief: dict, scene: str, gemini_key: str) 
 
         if gemini_key:
             if st.button(f"✨ สร้างรูปทั้ง {len(slides)} สไลด์ด้วย Gemini",
-                         key=f"copilot_genall_{mi}", use_container_width=True):
+                         key=f"copilot_genall_{mi}", width="stretch"):
                 import ai_provider
                 imgs, prog = {}, st.progress(0.0, text="เริ่มสร้าง...")
                 for idx, s in enumerate(slides):
@@ -3019,15 +3019,15 @@ def _render_copilot_carousel(mi: int, brief: dict, scene: str, gemini_key: str) 
             st.markdown(f"> **{s['headline_th']}**  \n> {s['sub_th']}")
             img = made.get(s["n"])
             if img:
-                st.image(img, use_container_width=True)
+                st.image(img, width="stretch")
                 st.download_button(
                     f"📥 ดาวน์โหลดสไลด์ {s['n']}", data=img,
                     file_name=f"carousel_{mi}_{s['n']}.png", mime="image/png",
-                    key=f"copilot_cardl_{mi}_{s['n']}", use_container_width=True)
-            with st.popover(f"📋 ดู Master Prompt สไลด์ {s['n']}", use_container_width=True):
+                    key=f"copilot_cardl_{mi}_{s['n']}", width="stretch")
+            with st.popover(f"📋 ดู Master Prompt สไลด์ {s['n']}", width="stretch"):
                 st.code(s["prompt"], language=None)
                 st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL,
-                               use_container_width=True)
+                               width="stretch")
             st.divider()
 
 
@@ -3094,7 +3094,7 @@ def _render_copilot_draft(mi: int, brief: dict, package: dict,
             act1, act2 = st.columns(2)
             with act1:
                 if st.button("✅ อนุมัติ + โพสต์", key=f"copilot_post_{mi}_{pid}",
-                             type="primary", use_container_width=True):
+                             type="primary", width="stretch"):
                     _do_post(pid, edited, line_token, fb_token, fb_page_id,
                              ig_business_id=ig_business_id,
                              image_bytes=img_bytes,
@@ -3103,11 +3103,11 @@ def _render_copilot_draft(mi: int, brief: dict, package: dict,
                              video_name=f"lemed_{mi}.mp4")
             with act2:
                 if st.button("📁 ส่งเข้าคิว (Drive)", key=f"copilot_queue_{mi}_{pid}",
-                             use_container_width=True):
+                             width="stretch"):
                     _copilot_send_to_queue(pid, edited, brief)
 
     if st.button("🚀 อนุมัติ + โพสต์ทั้งหมด", key=f"copilot_postall_{mi}",
-                 use_container_width=True):
+                 width="stretch"):
         for pid in plats:
             content_i = st.session_state.get(f"copilot_text_{mi}_{pid}") or package.get(pid, "")
             _do_post(pid, content_i, line_token, fb_token, fb_page_id,
@@ -3159,7 +3159,7 @@ def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
             ex_cols = st.columns(2)
             for i, ex in enumerate(_copilot_examples()):
                 with ex_cols[i % 2]:
-                    if st.button(ex, key=f"copilot_ex_{i}", use_container_width=True):
+                    if st.button(ex, key=f"copilot_ex_{i}", width="stretch"):
                         st.session_state["copilot_pending"] = ex
                         st.rerun()
 
@@ -3280,7 +3280,7 @@ LINE ไม่ให้ดึงแชทย้อนหลังผ่าน AP
         pending = [cv for cv in waiting if cv["messages"][-1]["id"] not in replied]
         if pending:
             if st.button(f"⚡ ให้ AI ตอบ {len(pending)} แชทที่รอ — อัตโนมัติทั้งหมด",
-                         type="primary", use_container_width=True):
+                         type="primary", width="stretch"):
                 prog = st.progress(0.0)
                 done = 0
                 for j, cv in enumerate(pending):
@@ -3387,14 +3387,14 @@ with st.sidebar:
     with tc1:
         st.button(
             "🌙 Dark" if _theme == "light" else "✓ Dark",
-            use_container_width=True,
+            width="stretch",
             type="secondary" if _theme == "light" else "primary",
             on_click=_set_theme, args=("dark",),
         )
     with tc2:
         st.button(
             "✓ Light" if _theme == "light" else "☀️ Light",
-            use_container_width=True,
+            width="stretch",
             type="primary" if _theme == "light" else "secondary",
             on_click=_set_theme, args=("light",),
         )
@@ -3445,8 +3445,8 @@ with st.sidebar:
     if mode == MODE_SHOP:
         st.divider()
         st.markdown("**🔗 ทางลัด**")
-        st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL, use_container_width=True)
-        st.link_button("📁 เปิดโฟลเดอร์ Drive", DRIVE_FOLDER_URL, use_container_width=True)
+        st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL, width="stretch")
+        st.link_button("📁 เปิดโฟลเดอร์ Drive", DRIVE_FOLDER_URL, width="stretch")
 
         st.divider()
         st.markdown("**⚙️ Settings**")
@@ -3582,7 +3582,7 @@ with st.sidebar:
                     format_func=lambda v: tiktok_poster.PRIVACY_LEVELS[v],
                     key="tiktok_privacy",
                 )
-                if st.button("ทดสอบ TikTok", use_container_width=True):
+                if st.button("ทดสอบ TikTok", width="stretch"):
                     info, m = tiktok_poster.creator_info(st.session_state["tiktok_token"])
                     (st.success if info else st.error)(m)
                     if info and info.get("creator_nickname"):
@@ -3635,7 +3635,7 @@ with st.sidebar:
 """)
 
         st.divider()
-        if st.button("🔌 เช็คการเชื่อมต่อทั้งหมด", use_container_width=True):
+        if st.button("🔌 เช็คการเชื่อมต่อทั้งหมด", width="stretch"):
             from platform_poster import test_line_token, test_facebook_token, test_instagram_account
             with st.spinner("กำลังเช็ค..."):
                 if line_token:
@@ -3863,7 +3863,7 @@ with dl_col:
         data=generate_excel_report(filtered),
         file_name=f"ai_revenue_{dt.datetime.now().strftime('%Y%m%d')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
+        width="stretch",
     )
 with info_col:
     st.caption("รายงานรวม 7 sheet: KPI Summary, Daily Sales, Top Items, Branch Performance, Customer Segments, Hourly Revenue, AI Insights")

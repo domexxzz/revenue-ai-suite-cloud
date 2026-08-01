@@ -168,23 +168,23 @@ def _system_controls() -> None:
     a, b, c, d = st.columns(4)
     with a:
         if enabled:
-            if st.button("⏸️ ปิดระบบอัตโนมัติ", use_container_width=True):
+            if st.button("⏸️ ปิดระบบอัตโนมัติ", width="stretch"):
                 ac.system_toggle(False); st.rerun()
         else:
-            if st.button("▶️ เปิดระบบอัตโนมัติ", use_container_width=True, type="primary"):
+            if st.button("▶️ เปิดระบบอัตโนมัติ", width="stretch", type="primary"):
                 ac.system_toggle(True); st.rerun()
     with b:
-        if st.button("🎲 จำลองผล (เดโม)", use_container_width=True,
+        if st.button("🎲 จำลองผล (เดโม)", width="stretch",
                      help="สุ่ม impressions/clicks ให้โพสต์ เพื่อเห็น A/B + auto-optimize ทำงาน"):
             ok, r = ac.simulate_metrics()
             st.toast(f"จำลองแล้ว {r.get('simulated', 0)} โพสต์" if ok else f"ผิดพลาด: {r}")
     with c:
-        if st.button("⚙️ Auto-optimize", use_container_width=True,
+        if st.button("⚙️ Auto-optimize", width="stretch",
                      help="หยุดร้านที่ CTR ต่ำติดต่อกันอัตโนมัติ"):
             ok, r = ac.auto_optimize()
             st.toast("รัน auto-optimize แล้ว" if ok else f"ผิดพลาด: {r}")
     with d:
-        if st.button("🔄 รีเฟรช", use_container_width=True):
+        if st.button("🔄 รีเฟรช", width="stretch"):
             st.rerun()
     st.caption(f"สถานะระบบ: {'🟢 เปิดอยู่' if enabled else '⚪ ปิดอยู่'}")
 
@@ -201,7 +201,7 @@ def _page_stores() -> None:
         cc1, cc2, cc3 = st.columns([2, 1, 1])
         kw = cc1.text_input("คำค้น", placeholder="เช่น ก๋วยเตี๋ยว, ชาบู, คาเฟ่", label_visibility="collapsed")
         limit = cc2.number_input("จำนวน", 1, 100, 20, label_visibility="collapsed")
-        if cc3.button("🔍 ดึงร้าน", use_container_width=True):
+        if cc3.button("🔍 ดึงร้าน", width="stretch"):
             ok, r = ac.scrape(kw or None, int(limit))
             st.toast("เริ่มดึงร้านแล้ว…" if ok else f"ผิดพลาด: {r}")
         if st.button("▶ รันครบวงร้านใหม่ทั้งหมด", type="primary"):
@@ -230,10 +230,10 @@ def _page_stores() -> None:
         sel = st.selectbox("เลือกร้านเพื่อรัน/ดูคอนเทนต์", ids,
                            format_func=lambda i: f"#{i} · {names.get(i, '')}")
         b1, b2 = st.columns(2)
-        if b1.button("▶ รันครบวงร้านนี้", use_container_width=True):
+        if b1.button("▶ รันครบวงร้านนี้", width="stretch"):
             ok, r = ac.run_store(int(sel))
             st.toast("เริ่มรันร้านนี้แล้ว (ทำเบื้องหลัง)" if ok else f"ผิดพลาด: {r}")
-        if b2.button("🎬 ดูคอนเทนต์ร้านนี้", use_container_width=True):
+        if b2.button("🎬 ดูคอนเทนต์ร้านนี้", width="stretch"):
             st.session_state["aff_view_store"] = int(sel)
             st.session_state["aff_menu"] = "🎬 คอนเทนต์ A/B"
             st.rerun()
@@ -296,7 +296,7 @@ def _page_content() -> None:
                 if v.get("media_type") == "video":
                     st.video(murl)
                 else:
-                    st.image(murl, use_container_width=True)
+                    st.image(murl, width="stretch")
             if v.get("video_title"):
                 st.markdown(f"🎯 **{v['video_title']}**")
             if v.get("hook"):
