@@ -2493,7 +2493,12 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
             continue
         platform = _platform_from_folder(folder_name)
         st.divider()
-        st.subheader(f"{PLATFORM_THAI_NAMES.get(platform, '📂')} {folder_name} ({len(files)})")
+        # Icon only — the folder name already says which platform it is, so the
+        # full label would read "🔵 Facebook Facebook VDO". Taken from the Thai
+        # label rather than content_studio so the queue works even if that
+        # module fails to import.
+        icon = PLATFORM_THAI_NAMES.get(platform, "📂").split()[0]
+        st.subheader(f"{icon} {folder_name} ({len(files)})")
         if not platform:
             st.caption("⚠️ เดาแพลตฟอร์มจากชื่อโฟลเดอร์ไม่ได้ — อนุมัติแล้วจะโพสต์ไม่ได้")
         for f in files:
