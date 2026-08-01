@@ -112,7 +112,10 @@
       for (const sel of CLICKABLE) {
         const hits = [...root.querySelectorAll(sel)].filter((n) => {
           const t = (n.textContent || '').trim();
-          return t === label || t.startsWith(label);
+          if (t === label || t.startsWith(label)) return true;
+          // ปุ่มไอคอนไม่มีข้อความ ชื่อจริงอยู่ใน aria-label
+          const aria = (n.getAttribute('aria-label') || '').trim();
+          return aria === label || aria.startsWith(label);
         });
         if (!hits.length) continue;
         const exact = hits.filter((n) => (n.textContent || '').trim() === label);
@@ -123,6 +126,58 @@
       }
     }
     return null;
+  }
+
+  // รอจนกว่าเงื่อนไขจะเป็นจริง แทนการเช็คครั้งเดียวแล้วยอมแพ้
+  //
+  // รอบแรกใช้ sleep คงที่ (400ms รอ hover, 700ms รอเมนู) แล้วเช็คทีเดียว รันบนหน้า
+  // Flow จริงได้ สำเร็จ 1 พลาด 9 — เพราะปุ่ม ⋮ กับเมนูใช้เวลาเรนเดอร์ไม่เท่ากันทุกครั้ง
+  // เช็คตอนที่ยังไม่ขึ้นก็คือพลาดทันทีทั้งที่อีก 200ms มันจะมา
+  async function waitFor(fn, ms) {
+    const until = Date.now() + ms;
+    for (;;) {
+      const v = fn();
+      if (v) return v;
+      if (Date.now() > until) return null;
+      await sleep(120);
+    }
+  }
+
+  // hover จริง ๆ ไม่ใช่แค่ mouseover
+  //
+  // ปุ่ม ⋮ ของ Flow โผล่เฉพาะตอนเมาส์อยู่บนการ์ด และ UI สมัยใหม่ฟัง pointer event
+  // ส่วน mouseenter/pointerenter ไม่ bubble จึงต้องยิงที่ตัวมันเองด้วย พร้อมพิกัด
+  // เมาส์ที่สมเหตุสมผล ไม่งั้นบางไลบรารีจะไม่ถือว่าเมาส์เข้ามาแล้ว
+  async function hover(el) {
+    const r = el.getBoundingClientRect();
+    const at = { bubbles: true, cancelable: true,
+                 clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    for (const type of ['pointerover', 'pointerenter', 'mouseover', 'mouseenter',
+                        'pointermove', 'mousemove']) {
+      const Ctor = type.startsWith('pointer') && window.PointerEvent
+        ? PointerEvent : MouseEvent;
+      el.dispatchEvent(new Ctor(type, at));
+    }
+    await sleep(200);
+  }
+
+  // ปุ่มเปิดเมนูของการ์ด — ดูจากข้อความ ไอคอน แล้วค่อยดู aria-label
+  function findMenuButton(tile) {
+    const byText = findByText(tile, MENU_LABELS);
+    if (byText) return byText;
+    const btns = [...tile.querySelectorAll('button, [role="button"]')];
+    const byLabel = btns.find((b) => MENU_LABELS.some((l) =>
+      (b.getAttribute('aria-label') || '').toLowerCase().includes(l.toLowerCase())));
+    // ตัวสุดท้ายคือเดาสุดท้าย — บนการ์ดมักเป็นปุ่มขวาบน
+    return byLabel || (btns.length ? btns[btns.length - 1] : null);
+  }
+
+  // ปิดเมนูที่ค้างอยู่ ไม่งั้นรอบถัดไปจะนับเมนูเดิมเป็นเมนูใหม่
+  async function closeMenu() {
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await sleep(400);
   }
 
   // ── เริ่มทำงาน ───────────────────────────────────────────────────────────
@@ -149,6 +204,7 @@
 
   let ok = 0;
   let fail = 0;
+  const why = { noMenuButton: 0, menuDidNotOpen: 0, noDownloadItem: 0 };
 
   for (let i = 0; i < tiles.length && ok < MAX_PER_RUN && !stopped; i++) {
     const tile = tiles[i];
@@ -156,32 +212,52 @@
 
     tile.scrollIntoView({ block: 'center', behavior: 'smooth' });
     await sleep(600);
-    tile.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    await sleep(400);
+    await hover(tile);
 
-    // เปิดเมนู ⋮ ของไทล์นี้
-    let menuBtn = findByText(tile, MENU_LABELS);
+    // เปิดเมนู ⋮ ของไทล์นี้ — ปุ่มโผล่ตอน hover เท่านั้น จึงต้องรอ ไม่ใช่เช็คครั้งเดียว
+    let menuBtn = await waitFor(() => findMenuButton(tile), 2000);
     if (!menuBtn) {
-      const btns = tile.querySelectorAll('button, [role="button"]');
-      menuBtn = btns.length ? btns[btns.length - 1] : null;
-    }
-    if (!menuBtn) { fail++; continue; }
-
-    menuBtn.click();
-    await sleep(700);
-
-    // กด "ดาวน์โหลด" ในเมนูที่เพิ่งเปิด (เมนูมัก render ที่ body)
-    const item = findByText(document.body, DOWNLOAD_LABELS);
-    if (!item) {
-      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      why.noMenuButton++;
       fail++;
-      await sleep(500);
+      continue;
+    }
+
+    // จำสิ่งที่อยู่ใต้ body ไว้ก่อน เพื่อให้รู้ว่าอันไหนคือเมนูที่เพิ่งเปิด — เดิมค้นทั้ง
+    // body ซึ่งอาจไปเจอเมนูค้างจากรอบก่อน หรือคำว่า "ดาวน์โหลด" ที่อื่นในหน้า
+    const before = new Set(document.body.children);
+    await hover(menuBtn);
+    menuBtn.click();
+
+    const menuRoot = await waitFor(
+      () => [...document.body.children].find(
+        (n) => !before.has(n) && (n.textContent || '').trim()), 2500);
+    if (!menuRoot) {
+      why.menuDidNotOpen++;
+      fail++;
+      await closeMenu();
+      continue;
+    }
+
+    const item = findByText(menuRoot, DOWNLOAD_LABELS);
+    if (!item) {
+      why.noDownloadItem++;
+      fail++;
+      console.warn('[flow-helper] เมนูเปิดแต่ไม่เจอ "ดาวน์โหลด" — เมนูมี:',
+                   (menuRoot.innerText || '').split('\n').filter(Boolean));
+      await closeMenu();
       continue;
     }
 
     item.click();
     ok++;
+    // รอให้เมนูปิดก่อนไปไทล์ถัดไป ไม่งั้นรอบหน้าจะมองเห็นเมนูเดิมเป็นของใหม่
+    await waitFor(() => !document.body.contains(menuRoot), 1500);
+    await closeMenu();
     await humanDelay();   // หน่วงแบบคน — กันยิงถี่
+  }
+
+  if (fail) {
+    console.warn('[flow-helper] สาเหตุที่พลาด:', why);
   }
 
   say(`เสร็จ — ดาวน์โหลด ${ok} ชิ้น${fail ? ` · ข้าม ${fail}` : ''}`);
