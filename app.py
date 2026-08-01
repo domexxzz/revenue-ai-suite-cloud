@@ -2212,6 +2212,30 @@ def _mandala_badge() -> None:
 
 # ── Approval queue (reads back from Google Drive) ────────────────────────────────
 
+# How many files to draw per folder before offering "show more".
+QUEUE_PAGE_SIZE = 15
+
+# Listing the queue costs one Drive round trip per folder — measured at 6.5s for
+# eight folders. Streamlit reruns the whole script on every click, so without a
+# cache each approve, each "show more", each checkbox pays that again. The TTL
+# keeps it fresh enough for a review queue; "โหลดใหม่" clears it outright.
+QUEUE_CACHE_TTL = 60
+
+
+@st.cache_data(ttl=QUEUE_CACHE_TTL, show_spinner=False)
+def _cached_child_folders(root_id: str) -> dict:
+    return list_child_folders(root_id)
+
+
+@st.cache_data(ttl=QUEUE_CACHE_TTL, show_spinner=False)
+def _cached_files(folder_id: str) -> list[dict]:
+    return list_files_in_folder(folder_id, oldest_first=True)
+
+
+def _clear_queue_cache() -> None:
+    _cached_child_folders.clear()
+    _cached_files.clear()
+
 # Folder name fragment → platform key, so a file's location decides where it posts.
 _FOLDER_PLATFORM_HINTS = [
     (("facebook", "fb"), "facebook"),
@@ -2309,6 +2333,9 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
                         st.success(f"{msg} — ย้ายไฟล์ไปโฟลเดอร์ POSTED แล้ว")
                     else:
                         st.warning(f"{msg} — แต่ย้ายไฟล์ไม่สำเร็จ")
+                    # The listing just changed; a stale cache would keep showing
+                    # a file that is no longer in the queue.
+                    _clear_queue_cache()
                     st.rerun()
                 else:
                     st.error(msg)
@@ -2317,6 +2344,7 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
                 dest = ensure_subfolder(QUEUE_ROOT_FOLDER_ID, "REJECTED")
                 if dest and move_file(fid, dest):
                     st.info("ย้ายไปโฟลเดอร์ REJECTED แล้ว")
+                    _clear_queue_cache()
                     st.rerun()
                 else:
                     st.error("ย้ายไฟล์ไม่สำเร็จ")
@@ -2409,6 +2437,7 @@ def _render_flow_sync(authed: bool = True) -> None:
             for r in results:
                 st.markdown(f"{'✅' if r['ok'] else '❌'} **{r['name']}** — "
                             f"{r['folder'] if r['ok'] else r['error']}")
+            _clear_queue_cache()   # newly filed files must show up straight away
             st.rerun()
 
         st.divider()
@@ -2462,7 +2491,7 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
             st.rerun()
         return
 
-    folders = list_child_folders(QUEUE_ROOT_FOLDER_ID)
+    folders = _cached_child_folders(QUEUE_ROOT_FOLDER_ID)
     if not folders:
         st.warning(
             "มองไม่เห็นโฟลเดอร์ย่อยเลย — น่าจะเป็นเพราะ **OAuth scope เดิม** "
@@ -2481,14 +2510,17 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
     pick = st.multiselect("เลือกโฟลเดอร์ที่จะตรวจ", options=sorted(review),
                           default=sorted(review))
     if st.button("🔄 โหลดใหม่"):
+        # Drop cached previews and collapse every folder back to one page.
         for k in list(st.session_state):
-            if k.startswith("q_data_"):
+            if k.startswith(("q_data_", "queue_shown_")):
                 del st.session_state[k]
+        _clear_queue_cache()
         st.rerun()
 
     total = 0
     for folder_name in pick:
-        files = list_files_in_folder(review[folder_name])
+        # Oldest first — whatever has waited longest deserves review first.
+        files = _cached_files(review[folder_name])
         if not files:
             continue
         platform = _platform_from_folder(folder_name)
@@ -2498,13 +2530,31 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
         # label rather than content_studio so the queue works even if that
         # module fails to import.
         icon = PLATFORM_THAI_NAMES.get(platform, "📂").split()[0]
+
+        # Render a page at a time. Streamlit reruns the whole script on every
+        # click, so drawing a hundred files means every approve costs a full
+        # redraw of all of them.
+        shown_key = f"queue_shown_{folder_name}"
+        shown = min(st.session_state.get(shown_key, QUEUE_PAGE_SIZE), len(files))
+
         st.subheader(f"{icon} {folder_name} ({len(files)})")
+        if len(files) > shown:
+            st.caption(f"แสดง {shown} จาก {len(files)} ไฟล์ · เรียงไฟล์เก่าสุดก่อน")
         if not platform:
             st.caption("⚠️ เดาแพลตฟอร์มจากชื่อโฟลเดอร์ไม่ได้ — อนุมัติแล้วจะโพสต์ไม่ได้")
-        for f in files:
+
+        for f in files[:shown]:
             total += 1
             _render_queue_file(folder_name, platform, f,
                                line_token, fb_token, fb_page_id, ig_business_id)
+
+        remaining = len(files) - shown
+        if remaining > 0:
+            more = min(QUEUE_PAGE_SIZE, remaining)
+            if st.button(f"⬇️ ดูเพิ่มอีก {more} ไฟล์ (เหลือ {remaining})",
+                         key=f"queue_more_{folder_name}", width="stretch"):
+                st.session_state[shown_key] = shown + QUEUE_PAGE_SIZE
+                st.rerun()
 
     if total == 0:
         st.success("🎉 ไม่มีงานค้างรออนุมัติ")

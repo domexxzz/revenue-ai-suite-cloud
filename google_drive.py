@@ -227,11 +227,16 @@ def list_child_folders(parent_id: str) -> dict:
         return {}
 
 
-def list_files_in_folder(folder_id: str, page_size: int = 100) -> list[dict]:
-    """Files directly inside a folder, newest first.
+def list_files_in_folder(folder_id: str, page_size: int = 100,
+                         oldest_first: bool = False) -> list[dict]:
+    """Files directly inside a folder.
 
     Returns dicts with id, name, mimeType, size, createdTime, webViewLink.
     Folders are excluded — this is for reviewing content, not navigating.
+
+    `oldest_first` matters for a review queue: sorting server-side means the
+    longest-waiting files come back first even when a folder holds more than one
+    page, which reversing the newest-first page locally would not achieve.
     """
     try:
         service = _build_service()
@@ -247,7 +252,7 @@ def list_files_in_folder(folder_id: str, page_size: int = 100) -> list[dict]:
             .list(
                 q=query,
                 fields="files(id,name,mimeType,size,createdTime,webViewLink)",
-                orderBy="createdTime desc",
+                orderBy="createdTime" if oldest_first else "createdTime desc",
                 pageSize=page_size,
                 includeItemsFromAllDrives=True,
                 supportsAllDrives=True,
