@@ -341,53 +341,55 @@ def apply_premium_theme(theme: str = "dark") -> None:
 
     # ── Shared token values per theme ──────────────────────────────────────
     if is_dark:
-        # Lifted off near-black (#080C14). At that level text edges bloom against
-        # the background and long reading gets tiring; a few points of lightness
-        # keeps the dark look without the glare.
-        bg          = "#0E141F"
-        bg2         = "#1A2332"
-        bg3         = "#151E2B"
-        sidebar_bg  = "linear-gradient(180deg,#141C28 0%,#0E141F 100%)"
-        border      = "rgba(255,255,255,0.05)"
-        border2     = "rgba(255,255,255,0.06)"
-        border3     = "rgba(255,255,255,0.08)"
-        txt1        = "#F9FAFB"
-        txt2        = "#E5E7EB"
-        txt3        = "#9CA3AF"
-        txt4        = "#6B7280"
-        txt5        = "#4B5563"
-        txt6        = "#374151"
-        h1_grad     = "linear-gradient(135deg,#FFFFFF 0%,#F59E0B 60%,#FBBF24 100%)"
-        card_bg     = "linear-gradient(145deg,#111827 0%,#0F172A 100%)"
-        card_hover  = "0 16px 48px rgba(0,0,0,0.5),0 0 0 1px rgba(245,158,11,0.18)"
-        tab_hover   = "#D1D5DB"
-        input_bg    = "#111827"
-        exp_bg      = "#111827"
-        alert_mult  = "0.07"
+        # Deep navy, not neutral grey. Every step is a named surface level, and
+        # every text token is checked against the surface it actually sits on —
+        # the previous scale bottomed out at #374151, which is 2.0:1 on this
+        # background. Dark grey type on dark navy is the one thing this palette
+        # must never produce, so the muted end stops at #8492A6 (5.3:1).
+        bg          = "#0B1220"   # page
+        bg2         = "#17243A"   # raised surface (hover, popover, nav rest)
+        bg3         = "#111C2E"   # surface / card
+        sidebar_bg  = "#0B1220"
+        border      = "#1B2740"
+        border2     = "#24324A"
+        border3     = "#2E3E58"
+        txt1        = "#F8FAFC"   # primary        15.9:1
+        txt2        = "#E2E8F0"   # strong body    12.6:1
+        txt3        = "#B6C2D2"   # secondary       8.5:1
+        txt4        = "#8492A6"   # muted           5.3:1
+        txt5        = "#8492A6"   # section labels  5.3:1
+        txt6        = "#8492A6"   # helper text     5.3:1
+        h1_color    = "#F8FAFC"
+        card_bg     = "#111C2E"
+        card_hover  = "0 0 0 1px rgba(245,158,11,0.28)"
+        tab_hover   = "#E2E8F0"
+        input_bg    = "#111C2E"
+        exp_bg      = "#111C2E"
+        alert_mult  = "0.10"
         alert_p_ok  = "#A7F3D0"; alert_p_info = "#BFDBFE"
-        alert_p_war = "#FEF3C7"; alert_p_err  = "#FEE2E2"
-        scroll_thumb= "rgba(255,255,255,0.08)"; scroll_thumbh="rgba(255,255,255,0.14)"
-        lbl_color   = "#9CA3AF"
-        hr_color    = "rgba(255,255,255,0.06)"
-        hover_label = "#1F2937"
-        chart_bg    = "rgba(17,24,39,0.5)"
+        alert_p_war = "#FDE68A"; alert_p_err  = "#FECACA"
+        scroll_thumb= "#24324A"; scroll_thumbh="#33456380"
+        lbl_color   = "#B6C2D2"
+        hr_color    = "#24324A"
+        hover_label = "#17243A"
+        chart_bg    = "rgba(17,28,46,0.5)"
     else:
         bg          = "#F8F7F4"
         bg2         = "#FFFFFF"
-        bg3         = "#F3F4F6"
-        sidebar_bg  = "linear-gradient(180deg,#FFFFFF 0%,#F9FAFB 100%)"
-        border      = "rgba(0,0,0,0.06)"
-        border2     = "rgba(0,0,0,0.07)"
-        border3     = "rgba(0,0,0,0.09)"
+        bg3         = "#F2F4F7"
+        sidebar_bg  = "#FFFFFF"
+        border      = "#E8E6E1"
+        border2     = "#E2E0DB"
+        border3     = "#D5D3CD"
         txt1        = "#111827"
         txt2        = "#1F2937"
         txt3        = "#374151"
-        txt4        = "#6B7280"
-        txt5        = "#9CA3AF"
-        txt6        = "#D1D5DB"
-        h1_grad     = "linear-gradient(135deg,#111827 0%,#B45309 60%,#F59E0B 100%)"
+        txt4        = "#5B6472"  # was #6B7280 — 4.3:1 on #F8F7F4, just under AA
+        txt5        = "#5B6472"  # was #9CA3AF — 2.3:1, unreadable as a label
+        txt6        = "#5B6472"  # was #D1D5DB — 1.4:1, effectively invisible
+        h1_color    = "#0F172A"
         card_bg     = "#FFFFFF"
-        card_hover  = "0 16px 48px rgba(0,0,0,0.1),0 0 0 1px rgba(245,158,11,0.2)"
+        card_hover  = "0 8px 28px rgba(15,23,42,0.08),0 0 0 1px rgba(245,158,11,0.22)"
         tab_hover   = "#374151"
         input_bg    = "#FFFFFF"
         exp_bg      = "#FFFFFF"
@@ -395,13 +397,24 @@ def apply_premium_theme(theme: str = "dark") -> None:
         alert_p_ok  = "#065F46"; alert_p_info = "#1E40AF"
         alert_p_war = "#92400E"; alert_p_err  = "#991B1B"
         scroll_thumb= "rgba(0,0,0,0.12)";  scroll_thumbh="rgba(0,0,0,0.2)"
-        lbl_color   = "#6B7280"
-        hr_color    = "rgba(0,0,0,0.07)"
+        lbl_color   = "#5B6472"
+        hr_color    = "#E8E6E1"
         hover_label = "#FFFFFF"
         chart_bg    = "rgba(248,247,244,0.6)"
 
+    # Brand orange is a fill colour, not a text colour. #F59E0B reads at 2.0:1 on
+    # the light page — measured on the sidebar's "1/5 ช่องทาง", the selected tab
+    # and the AI-mode chip, all of which failed. Fills, borders and the active
+    # nav stay #F59E0B; anything that is *type* uses the darker amber from the
+    # same ramp. amber-700 (#B45309) clears the plain page but lands at 4.31 on
+    # the chip's own 12% amber tint, so this steps to amber-800: 8.5:1 on the
+    # page, 7.4:1 inside a chip. On the dark page #F59E0B is already 8.6:1.
+    accent_txt = "#F59E0B" if is_dark else "#92400E"
+
+    # Shadows read as depth only against a light page. On a dark surface they add
+    # nothing but a smudge, so dark mode separates surfaces with a border instead.
     card_shadow = (
-        "0 1px 3px rgba(0,0,0,0.04),0 4px 16px rgba(0,0,0,0.04)"
+        "0 1px 2px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.05)"
         if not is_dark else "none"
     )
 
@@ -456,13 +469,19 @@ html, body {{ background:{bg} !important; color:{txt1} !important; }}
 [data-testid="stAppHeader"] *, [data-testid="stAppHeader"] svg {{
   color:{txt2} !important; fill:{txt2} !important;
 }}
+/* The "Stop" chip Streamlit shows while a script runs keeps its own light pill
+   background, so the inherited light text on it measured 1.06:1 in dark mode. */
+[data-testid="stStatusWidget"] {{ background:{bg3} !important; border-radius:999px !important; }}
+[data-testid="stStatusWidget"] *, [data-testid="stStatusWidget"] svg {{
+  color:{txt2} !important; fill:{txt2} !important;
+}}
 [data-testid="stBottom"], [data-testid="stBottomBlockContainer"] {{
   background:{bg} !important; color:{txt1} !important;
 }}
 [data-testid="stBottom"] * {{ color:{txt1} !important; }}
 [data-testid="stChatInput"] {{
   background:{input_bg} !important; border:1px solid {border3} !important;
-  border-radius:14px !important;
+  border-radius:12px !important;
 }}
 [data-testid="stChatInput"] textarea {{
   background:transparent !important; color:{txt1} !important; font-size:1rem !important;
@@ -482,7 +501,13 @@ html body [data-testid="stCaptionContainer"] p {{ font-size:0.9rem !important; }
 html body [data-testid="stChatInput"] textarea {{ font-size:1rem !important; }}
 html body button p, html body [data-testid="stBaseButton-secondary"] p,
 html body [data-testid="stBaseButton-primary"] p {{ font-size:0.95rem !important; }}
-.block-container {{ padding-top:2rem !important; padding-bottom:3rem !important; }}
+/* Measure. `layout="wide"` lets a paragraph run the full width of a 27" monitor,
+   which is roughly 200 characters a line — about three times the comfortable
+   reading limit. Cap it and centre it; the dashboard's charts still get room. */
+.block-container {{
+  padding-top:2rem !important; padding-bottom:3rem !important;
+  max-width:1180px !important; margin:0 auto !important;
+}}
 .main .block-container > div > div > div {{ animation: fadeUp 0.4s ease both; }}
 
 /* ── Sidebar ───────────────────────────────────────────────────────────── */
@@ -509,30 +534,57 @@ button[kind="secondary"] {{
   font-weight:500 !important; transition:all 0.18s ease !important;
 }}
 button[kind="secondary"]:hover {{
-  border-color:rgba(245,158,11,0.5) !important; color:#F59E0B !important;
+  border-color:rgba(245,158,11,0.5) !important; color:{accent_txt} !important;
   background:{bg2} !important;
 }}
 
 /* ── Typography ────────────────────────────────────────────────────────── */
+/* A page title is a label, not a light show. The animated gradient fill it used
+   to carry made the most important string on every page the least legible one
+   (transparent text over a moving background) — solid weight reads faster and
+   is what Linear/Stripe do. */
 h1 {{
-  font-family:'Plus Jakarta Sans',sans-serif !important; font-weight:800 !important;
-  letter-spacing:-0.04em !important; line-height:1.15 !important;
-  background:{h1_grad} !important; background-size:200% auto !important;
-  -webkit-background-clip:text !important; -webkit-text-fill-color:transparent !important;
-  background-clip:text !important;
-  animation: gradientFlow 6s ease infinite !important;
+  font-family:'Plus Jakarta Sans',sans-serif !important; font-weight:700 !important;
+  letter-spacing:-0.025em !important; line-height:1.2 !important;
+  font-size:1.75rem !important;
+  color:{h1_color} !important;
+  -webkit-text-fill-color:{h1_color} !important;
 }}
 h2 {{
-  font-family:'Plus Jakarta Sans',sans-serif !important; font-weight:700 !important;
-  color:{txt2} !important; letter-spacing:-0.02em !important;
+  font-family:'Plus Jakarta Sans',sans-serif !important; font-weight:650 !important;
+  color:{txt1} !important; letter-spacing:-0.018em !important; font-size:1.25rem !important;
 }}
 h3 {{
   font-family:'Plus Jakarta Sans',sans-serif !important; font-weight:600 !important;
+  color:{txt2} !important; font-size:1.05rem !important;
+}}
+/* h4-h6 had no rule at all, so they fell through to config.toml's textColor
+   (#111827) and rendered as near-black on the navy page — measured 1.04:1 on the
+   "ขั้นตอน" subheadings inside the connection guides. */
+h4, h5, h6 {{
+  font-family:'Plus Jakarta Sans',sans-serif !important; font-weight:600 !important;
   color:{txt2} !important;
 }}
-p, .stMarkdown p {{ color:{txt3} !important; font-size:0.875rem !important; line-height:1.6 !important; }}
+/* Links inherit Streamlit's light-theme blue (#0054A3), which is 2.3:1 on navy. */
+html body a, html body [data-testid="stMarkdownContainer"] a {{
+  color:{"#7DB8F0" if is_dark else "#0B57A4"} !important;
+  text-decoration-color:{"rgba(125,184,240,0.4)" if is_dark else "rgba(11,87,164,0.35)"} !important;
+}}
+/* …except link buttons, which are buttons and must match the secondary look.
+   Left alone they kept a near-white fill in dark mode with pale text on top. */
+html body [data-testid="stBaseLinkButton-secondary"] {{
+  background:{bg3} !important; border:1px solid {border2} !important;
+  border-radius:10px !important; color:{txt2} !important; text-decoration:none !important;
+}}
+html body [data-testid="stBaseLinkButton-secondary"] p,
+html body [data-testid="stBaseLinkButton-secondary"] div {{ color:{txt2} !important; }}
+html body [data-testid="stBaseLinkButton-secondary"]:hover {{
+  border-color:rgba(245,158,11,0.5) !important; background:{bg2} !important;
+}}
+html body [data-testid="stBaseLinkButton-secondary"]:hover p {{ color:{accent_txt} !important; }}
+p, .stMarkdown p {{ color:{txt3} !important; font-size:0.9375rem !important; line-height:1.65 !important; }}
 .stCaption p, [data-testid="stCaptionContainer"] p {{
-  color:{txt4} !important; font-size:0.775rem !important;
+  color:{txt4} !important; font-size:0.8125rem !important;
 }}
 
 /* ── Metric Cards ──────────────────────────────────────────────────────── */
@@ -540,7 +592,7 @@ p, .stMarkdown p {{ color:{txt3} !important; font-size:0.875rem !important; line
   background:{card_bg} !important;
   border:1px solid {border} !important;
   border-top:2px solid #F59E0B !important;
-  border-radius:16px !important;
+  border-radius:12px !important;
   padding:1.25rem 1.5rem !important;
   box-shadow:{card_shadow} !important;
   transition:transform 0.22s cubic-bezier(.34,1.56,.64,1), box-shadow 0.22s ease !important;
@@ -582,7 +634,7 @@ p, .stMarkdown p {{ color:{txt3} !important; font-size:0.875rem !important; line
   transition:color 0.15s ease !important;
 }}
 .stTabs [data-baseweb="tab"]:hover {{ color:{tab_hover} !important; }}
-.stTabs [aria-selected="true"] {{ color:#F59E0B !important; border-bottom-color:#F59E0B !important; font-weight:600 !important; }}
+.stTabs [aria-selected="true"] {{ color:{accent_txt} !important; border-bottom-color:#F59E0B !important; font-weight:600 !important; }}
 .stTabs [data-baseweb="tab-highlight"] {{ background:#F59E0B !important; height:2px !important; }}
 .stTabs [data-baseweb="tab-border"] {{ background:{border2} !important; }}
 
@@ -610,6 +662,33 @@ div.stWarning p,div.stWarning [data-testid="stMarkdownContainer"] p{{ color:{ale
 div.stError p,  div.stError [data-testid="stMarkdownContainer"] p  {{ color:{alert_p_err} !important; }}
 
 /* ── Buttons ───────────────────────────────────────────────────────────── */
+/* Primary buttons are amber-filled, so their label has to be dark — measured at
+   1.19:1 before this rule, because the generic `p {{ color:txt3 }}` above also
+   claims the <p> Streamlit puts inside every button. #0B1220 on #F59E0B is 9.4:1. */
+html body [data-testid="stBaseButton-primary"],
+html body [data-testid="stBaseButton-primary"] p,
+html body [data-testid="stBaseButton-primaryFormSubmit"],
+html body [data-testid="stBaseButton-primaryFormSubmit"] p,
+html body button[kind="primary"], html body button[kind="primary"] p,
+html body button[kind="primaryFormSubmit"], html body button[kind="primaryFormSubmit"] p {{
+  color:#0B1220 !important; font-weight:600 !important;
+}}
+html body [data-testid="stBaseButton-primary"],
+html body [data-testid="stBaseButton-primaryFormSubmit"],
+html body button[kind="primary"], html body button[kind="primaryFormSubmit"] {{
+  background:#F59E0B !important; border:1px solid #F59E0B !important;
+  border-radius:10px !important; box-shadow:none !important;
+}}
+html body [data-testid="stBaseButton-primary"]:hover,
+html body [data-testid="stBaseButton-primaryFormSubmit"]:hover,
+html body button[kind="primary"]:hover, html body button[kind="primaryFormSubmit"]:hover {{
+  background:#D97706 !important; border-color:#D97706 !important;
+}}
+/* Secondary form-submit buttons inherit the plain secondary look */
+html body [data-testid="stBaseButton-secondaryFormSubmit"] {{
+  background:{bg3} !important; border:1px solid {border2} !important;
+  color:{txt2} !important; border-radius:10px !important;
+}}
 [data-testid="stDownloadButton"] button {{
   background:linear-gradient(135deg,#B45309,#F59E0B) !important;
   color:#000 !important; font-weight:700 !important; font-size:0.8125rem !important;
@@ -629,7 +708,7 @@ div.stError p,  div.stError [data-testid="stMarkdownContainer"] p  {{ color:{ale
   border-radius:10px !important;
 }}
 [data-testid="stMultiSelect"] span[data-baseweb="tag"] {{
-  background:rgba(245,158,11,0.12) !important; color:#F59E0B !important;
+  background:rgba(245,158,11,0.12) !important; color:{accent_txt} !important;
   border:1px solid rgba(245,158,11,0.25) !important; border-radius:6px !important; font-weight:500 !important;
 }}
 [data-testid="stNumberInput"] input, [data-testid="stTextInput"] input {{
@@ -644,7 +723,7 @@ div.stError p,  div.stError [data-testid="stMarkdownContainer"] p  {{ color:{ale
 
 /* ── Charts ────────────────────────────────────────────────────────────── */
 .stPlotlyChart {{
-  border-radius:16px !important; overflow:hidden !important;
+  border-radius:12px !important; overflow:hidden !important;
   border:1px solid {border} !important;
   box-shadow:{card_shadow} !important;
   transition:box-shadow 0.22s ease !important;
@@ -655,14 +734,14 @@ div.stError p,  div.stError [data-testid="stMarkdownContainer"] p  {{ color:{ale
 
 /* ── Table ─────────────────────────────────────────────────────────────── */
 [data-testid="stDataFrame"] {{
-  border:1px solid {border} !important; border-radius:14px !important;
+  border:1px solid {border} !important; border-radius:12px !important;
   overflow:hidden !important; box-shadow:{card_shadow} !important;
 }}
 
 /* ── Expander ──────────────────────────────────────────────────────────── */
 [data-testid="stExpander"] {{
   background:{exp_bg} !important; border:1px solid {border2} !important;
-  border-radius:14px !important; overflow:hidden !important;
+  border-radius:12px !important; overflow:hidden !important;
   box-shadow:{card_shadow} !important;
   transition:box-shadow 0.2s ease !important;
 }}
@@ -673,7 +752,7 @@ div.stError p,  div.stError [data-testid="stMarkdownContainer"] p  {{ color:{ale
 /* ── File uploader ─────────────────────────────────────────────────────── */
 [data-testid="stFileUploader"] > div {{
   background:{bg2} !important; border:1.5px dashed {border3} !important;
-  border-radius:14px !important; transition:all 0.2s ease !important;
+  border-radius:12px !important; transition:all 0.2s ease !important;
 }}
 [data-testid="stFileUploader"] > div:hover {{
   border-color:rgba(245,158,11,0.45) !important;
@@ -734,8 +813,12 @@ section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > l
   background:{bg3} !important;
   transform:translateX(2px) !important;
 }}
-/* hide the tiny radio circle — the whole row is the click target */
-section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child {{
+/* hide the tiny radio circle — the whole row is the click target, and the amber
+   fill already says which one is active. Two selectors: Streamlit moved this
+   control from BaseWeb to React Aria, so the old data-baseweb hook silently
+   stopped matching and the dots came back. */
+section[data-testid="stSidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child,
+section[data-testid="stSidebar"] [data-testid="stRadioOption"] > div > div > div:first-child {{
   display:none !important;
 }}
 section[data-testid="stSidebar"] [data-testid="stRadio"] label p {{
@@ -897,9 +980,104 @@ section[data-testid="stSidebar"] .st-key-app_mode [data-testid="stRadio"] label 
 }}
 [data-testid="stCheckbox"] label p {{ color:{txt3} !important; }}
 
+/* ── Bordered containers (st.container(border=True)) ──────────────────── */
+[data-testid="stVerticalBlockBorderWrapper"] {{
+  border-radius:12px !important;
+}}
+[data-testid="stVerticalBlockBorderWrapper"] > div {{ border-color:{border2} !important; }}
+
 /* ── Main content area text ────────────────────────────────────────────── */
 .main [data-testid="stMarkdownContainer"] p {{ color:{txt3} !important; }}
 .main label {{ color:{lbl_color} !important; }}
+
+/* ── Toggle ────────────────────────────────────────────────────────────── */
+[data-testid="stToggle"] label p, [data-testid="stWidgetLabel"] p {{
+  color:{txt3} !important;
+}}
+[data-testid="stSidebar"] [data-testid="stToggle"] label p {{
+  font-size:0.85rem !important; color:{txt4} !important;
+}}
+
+/* ── Page header — level 1 of the hierarchy ────────────────────────────── */
+.rv-head {{ margin:0 0 20px; }}
+.rv-head h1 {{
+  font-family:'Plus Jakarta Sans',sans-serif; font-weight:700; font-size:1.75rem;
+  letter-spacing:-0.025em; line-height:1.2; color:{h1_color}; margin:0 0 6px;
+}}
+.rv-head .rv-sub {{ font-size:0.9375rem; color:{txt3}; margin:0; line-height:1.55; }}
+
+/* ── Status chips — level 3, quiet by design ───────────────────────────── */
+.rv-chips {{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 16px; }}
+.rv-chip {{
+  display:inline-flex; align-items:center; gap:6px;
+  background:{bg3}; border:1px solid {border2}; color:{txt3};
+  border-radius:999px; padding:5px 12px; font-size:0.8125rem;
+  font-weight:500; line-height:1.3; white-space:nowrap;
+}}
+.rv-chip.on  {{ background:rgba(245,158,11,0.12); border-color:rgba(245,158,11,0.38); color:{accent_txt}; }}
+.rv-chip.ok  {{ background:rgba(16,185,129,0.12); border-color:rgba(16,185,129,0.35);
+                color:{"#6EE7B7" if is_dark else "#047857"}; }}
+.rv-chip .rv-dot {{ width:6px; height:6px; border-radius:50%; background:currentColor; flex:none; }}
+
+/* ── Sidebar connection summary ────────────────────────────────────────── */
+.rv-conn {{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  background:{bg3}; border:1px solid {border2}; border-radius:10px;
+  padding:9px 12px; margin:0 0 4px;
+}}
+.rv-conn-l {{ font-size:0.8125rem; color:{txt3}; font-weight:500; }}
+.rv-conn-v {{ font-size:0.8125rem; font-weight:700; letter-spacing:-0.01em; }}
+
+/* ── Chat empty state ──────────────────────────────────────────────────── */
+.rv-hero {{ text-align:center; padding:48px 0 4px; }}
+@media (max-height: 700px) {{ .rv-hero {{ padding-top:16px; }} }}
+.rv-hero .rv-spark {{
+  width:52px; height:52px; margin:0 auto 16px; border-radius:14px;
+  display:flex; align-items:center; justify-content:center; font-size:24px;
+  background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3);
+}}
+.rv-hero h2 {{
+  font-family:'Plus Jakarta Sans',sans-serif; font-weight:700; font-size:1.5rem;
+  letter-spacing:-0.025em; color:{txt1}; margin:0 0 8px;
+}}
+.rv-hero p {{ font-size:0.9375rem; color:{txt3}; margin:0; line-height:1.6; }}
+.rv-ctx {{
+  font-size:0.8125rem; color:{txt4}; margin:0 0 8px; font-weight:500;
+}}
+
+/* Suggestion buttons under the composer — quiet until hovered, so they read as
+   optional shortcuts rather than four competing calls to action. */
+.st-key-rv_sugg [data-testid="stBaseButton-secondary"] {{
+  background:{bg3} !important; border:1px solid {border2} !important;
+  color:{txt3} !important; border-radius:999px !important;
+  font-weight:500 !important; padding:8px 16px !important;
+  box-shadow:none !important; min-height:40px !important;
+}}
+.st-key-rv_sugg [data-testid="stBaseButton-secondary"]:hover {{
+  border-color:rgba(245,158,11,0.5) !important; color:{accent_txt} !important;
+  background:{bg2} !important;
+}}
+
+/* Chat composer — the primary control on the page, so it gets the accent ring
+   on focus and enough height to read as an input rather than a search box. */
+[data-testid="stChatInput"] {{ box-shadow:{card_shadow} !important; }}
+[data-testid="stChatInput"]:focus-within {{
+  border-color:rgba(245,158,11,0.55) !important;
+  box-shadow:0 0 0 3px rgba(245,158,11,0.12) !important;
+}}
+[data-testid="stBottomBlockContainer"] {{
+  max-width:1180px !important; margin:0 auto !important; padding-bottom:1.25rem !important;
+}}
+
+/* Mobile: the sidebar overlays, so the content needs its own breathing room and
+   the suggestion row has to be allowed to wrap instead of squeezing to 3 columns
+   of 90px each. */
+@media (max-width: 640px) {{
+  .block-container {{ padding-left:1rem !important; padding-right:1rem !important; }}
+  .rv-head h1 {{ font-size:1.4rem !important; }}
+  .rv-hero h2 {{ font-size:1.25rem !important; }}
+  h1 {{ font-size:1.4rem !important; }}
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -941,6 +1119,105 @@ def _chart(fig: go.Figure, stretch: bool = True, **kw) -> None:
             title=dict(font=dict(color="#111827")),
         )
     st.plotly_chart(fig, width="stretch" if stretch else "content", theme=None, **kw)
+
+
+# ── Shared UI primitives ───────────────────────────────────────────────────────
+#
+# Three levels, applied on every page:
+#   1. _page_head   — what this page is, and what it is for
+#   2. the workspace itself
+#   3. _chips       — status and secondary detail, deliberately quiet
+#
+# Before this, each page invented its own header: some had a title and a caption,
+# some added a row of coloured pills that competed with the primary action, some
+# put the AI provider label in a right-hand column where it read as a heading.
+
+def _set_theme(t: str) -> None:
+    """Theme switch as an on_click callback, never `if st.button(): st.rerun()`.
+
+    A mid-run st.rerun() aborts before the widgets below it are instantiated, so
+    Streamlit drops their keyed state and the app jumps back to the first page.
+    A callback sets the theme before the natural rerun, keeping the page sticky.
+    """
+    st.session_state["theme"] = t
+
+
+def _esc(s: str) -> str:
+    """Minimal escape — these strings are ours, but they carry user brand names."""
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def _page_head(title: str, subtitle: str = "") -> None:
+    sub = f'<p class="rv-sub">{_esc(subtitle)}</p>' if subtitle else ""
+    st.markdown(f'<div class="rv-head"><h1>{_esc(title)}</h1>{sub}</div>',
+                unsafe_allow_html=True)
+
+
+def _chips(items: list[tuple[str, str]]) -> None:
+    """A row of status chips. Each item is (label, tone) — tone in "", "on", "ok"."""
+    if not items:
+        return
+    html = "".join(
+        f'<span class="rv-chip {tone}">{"<span class=rv-dot></span>" if tone else ""}'
+        f'{_esc(label)}</span>'
+        for label, tone in items
+    )
+    st.markdown(f'<div class="rv-chips">{html}</div>', unsafe_allow_html=True)
+
+
+# ── Settings storage ───────────────────────────────────────────────────────────
+#
+# Tokens used to live in sidebar widgets, so their values only existed while the
+# sidebar rendered them — which is why every page had to be handed six token
+# arguments. Keying them into session_state lets the Settings and Integrations
+# pages own the forms while every other page reads the same values.
+
+K_LINE   = "set_line_token"
+K_FB     = "set_fb_token"
+K_FB_PID = "set_fb_page_id"
+K_IG     = "set_ig_business_id"
+K_TIKTOK = "tiktok_token"      # pre-existing key — tiktok_poster reads it directly
+K_AI     = "set_ai_mode"
+K_GEMINI = "set_gemini_key"
+K_CLAUDE = "set_claude_key"
+K_LV     = "set_lv_token"
+K_LV_DAY = "set_lv_days"
+
+
+def _s(key: str, default: str = "") -> str:
+    return st.session_state.get(key, default) or default
+
+
+def _resolve_api_key(ai_mode: str) -> str:
+    if ai_mode == "Gemini API":
+        return _s(K_GEMINI)
+    if ai_mode == "Claude API":
+        return _s(K_CLAUDE)
+    return ""
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _drive_ready() -> bool:
+    """needs_auth() reads a token file and may refresh it over the network.
+
+    The sidebar asks on every rerun — including every keystroke-triggered one —
+    so the answer is cached. Five minutes is well inside a token's lifetime.
+    """
+    return bool(GDRIVE_AVAILABLE and not needs_auth())
+
+
+def _connection_status() -> list[tuple[str, bool]]:
+    """(channel name, connected) for every channel the app can post through."""
+    fb = bool(_s(K_FB) and _s(K_FB_PID))
+    drive = _drive_ready()
+    return [
+        ("LINE OA", bool(_s(K_LINE))),
+        ("Facebook", fb),
+        ("Instagram", bool(_s(K_FB) and _s(K_IG))),
+        ("TikTok", bool(_s(K_TIKTOK))),
+        ("Google Drive", drive),
+    ]
+
 
 DATA_PATH = Path("data/sample_transactions.csv")
 YENTAFO_DIR = Path("data/client-yentafo")
@@ -1355,8 +1632,7 @@ def generate_excel_report(df: pd.DataFrame) -> bytes:
 # ── Connect POS Page ───────────────────────────────────────────────────────────
 
 def render_connect_pos_page(lv_token: str, lv_days: int, ai_mode: str, api_key: str) -> None:
-    st.title("🔌 Connect POS — Loyverse")
-    st.caption("ดึงข้อมูลยอดขายจริงจาก Loyverse POS เข้าสู่ REVENUE AI")
+    _page_head("🔌 Connect POS — Loyverse", "ดึงข้อมูลยอดขายจริงจาก Loyverse POS เข้าสู่ REVENUE AI")
 
     with st.expander("วิธีรับ API Token จาก Loyverse", expanded=False):
         st.markdown("""
@@ -1541,8 +1817,7 @@ def _render_loyverse_demo_preview() -> None:
 # ── CSV Upload Page ─────────────────────────────────────────────────────────────
 
 def render_csv_upload_page(ai_mode: str, api_key: str) -> None:
-    st.title("📁 อัปโหลดข้อมูลของคุณ")
-    st.caption("ทดลองวิเคราะห์กับข้อมูล POS จริงของธุรกิจคุณ")
+    _page_head("📁 อัปโหลดข้อมูลของคุณ", "ทดลองวิเคราะห์กับข้อมูล POS จริงของธุรกิจคุณ")
 
     with st.expander("ดูรูปแบบ CSV ที่รองรับ", expanded=False):
         st.markdown("""
@@ -1632,8 +1907,7 @@ def _render_upload_analysis(df: pd.DataFrame, ai_mode: str, api_key: str) -> Non
 # ── ROI Calculator ──────────────────────────────────────────────────────────────
 
 def render_roi_calculator() -> None:
-    st.title("🧮 ROI Calculator")
-    st.caption("คำนวณผลตอบแทนที่คาดได้จากการใช้ระบบ AI for Business")
+    _page_head("🧮 ROI Calculator", "คำนวณผลตอบแทนที่คาดได้จากการใช้ระบบ AI for Business")
 
     col1, col2 = st.columns([1, 1], gap="large")
 
@@ -1803,8 +2077,7 @@ def render_yentafo_dashboard(y_data: dict[str, pd.DataFrame]) -> None:
 # ── Content Studio ──────────────────────────────────────────────────────────────
 
 def render_content_studio_page(ai_mode: str, api_key: str, line_token: str = "", fb_token: str = "", fb_page_id: str = "", ig_business_id: str = "") -> None:
-    st.title("📣 Content Studio")
-    st.caption("AI สร้างคอนเทนต์จากข้อมูลธุรกิจ → Google Drive → โพสต์ทุกแพลตฟอร์ม")
+    _page_head("📣 Content Studio", "AI สร้างคอนเทนต์จากข้อมูลธุรกิจ → Google Drive → โพสต์ทุกแพลตฟอร์ม")
 
     if not CONTENT_STUDIO_AVAILABLE:
         st.error("ไม่พบ content_studio.py — กรุณาตรวจสอบไฟล์ในโฟลเดอร์โปรเจกต์")
@@ -2718,8 +2991,7 @@ def _render_flow_sync(authed: bool = True) -> None:
 
 def render_queue_page(line_token: str = "", fb_token: str = "",
                       fb_page_id: str = "", ig_business_id: str = "") -> None:
-    st.title("📁 คิวอนุมัติ")
-    st.caption("อ่านไฟล์จาก Google Drive (รวมงานที่สร้างใน Google Flow) → ตรวจ → อนุมัติ → โพสต์")
+    _page_head("📁 คิวอนุมัติ", "อ่านไฟล์จาก Google Drive (รวมงานที่สร้างใน Google Flow) → ตรวจ → อนุมัติ → โพสต์")
 
     lk1, lk2 = st.columns(2)
     with lk1:
@@ -2979,8 +3251,7 @@ def _render_canva_autofill(token: str, caps: dict) -> None:
 
 
 def render_canva_page() -> None:
-    st.title("🎨 Canva")
-    st.caption("เชื่อม Canva Connect API — เติมข้อมูลลง Brand Template แล้ว export เป็นโปสเตอร์/carousel")
+    _page_head("🎨 Canva", "เชื่อม Canva Connect API — เติมข้อมูลลง Brand Template แล้ว export เป็นโปสเตอร์/carousel")
 
     if not CANVA_AVAILABLE:
         st.error("ไม่พบ canva_client.py — ตรวจสอบไฟล์ในโฟลเดอร์โปรเจกต์")
@@ -3046,8 +3317,7 @@ def _send_idea_to_copilot(prompt: str) -> None:
 
 
 def render_brainstorm_page(ai_mode: str, api_key: str) -> None:
-    st.title("🧠 Brain Storm")
-    st.caption("อธิบายธุรกิจ → ร่าง Business Model Canvas → ได้ไอเดียคอนเทนต์ ส่งเข้า Copilot ได้เลย")
+    _page_head("🧠 Brain Storm", "อธิบายธุรกิจ → ร่าง Business Model Canvas → ได้ไอเดียคอนเทนต์ ส่งเข้า Copilot ได้เลย")
 
     if not BRAINSTORM_AVAILABLE:
         st.error("ไม่พบ brainstorm.py — ตรวจสอบไฟล์ในโฟลเดอร์โปรเจกต์")
@@ -3139,19 +3409,40 @@ def render_brainstorm_page(ai_mode: str, api_key: str) -> None:
 
 # ── Chat Copilot ─────────────────────────────────────────────────────────────────
 
-def _copilot_examples() -> list[str]:
-    """Everyday phrasing, not marketing vocabulary.
+def _copilot_examples() -> list[tuple[str, str]]:
+    """(label, target) for the three suggestions under the composer.
 
-    Examples double as instructions here — someone unsure what to type copies
-    the shape of these. "Flash sale / โทนพรีเมียม" taught the wrong lesson: that
-    you need the jargon to be understood.
+    Everyday phrasing, not marketing vocabulary — examples double as
+    instructions here, and someone unsure what to type copies their shape.
+
+    Two of the three name jobs this page cannot do: replying to customers lives
+    in AI Inbox, sales analysis lives in the Dashboard. Rather than drop the
+    wording or let it produce a content draft that answers neither, `target`
+    routes the click to the page that actually does the work. Four suggestions
+    became three: past that, a shortcut row reads as a menu to be read rather
+    than an example to be copied.
     """
     return [
-        "อยากได้คลิปลง TikTok",
-        "ทำโปรลดราคาหน่อย",
-        "โพสต์ให้คนที่เป็นสิวง่าย",
-        "ขอบคุณลูกค้าเก่า",
+        ("เขียนโพสต์ขายสินค้า", ""),
+        ("ตอบแชทลูกค้า", "💬 AI Inbox"),
+        ("วิเคราะห์ยอดขาย", "📊 Dashboard"),
     ]
+
+
+def _run_suggestion(label: str, target: str) -> None:
+    """Send a suggestion to the copilot, or open the page that handles it.
+
+    Navigation goes through `nav_to` rather than writing `shop_menu` directly:
+    Streamlit refuses to let a widget's key be reassigned once that widget has
+    been instantiated this run, and the sidebar radio is always instantiated
+    before the page body renders. The sidebar drains `nav_to` on the next run,
+    before it builds the radio, where the assignment is legal.
+    """
+    if target:
+        st.session_state["nav_to"] = target
+    else:
+        st.session_state["copilot_pending"] = label
+    st.rerun()
 
 
 def _copilot_send_to_queue(pid: str, content: str, brief: dict) -> None:
@@ -3499,45 +3790,278 @@ def _render_copilot_draft(mi: int, brief: dict, package: dict,
         st.success("ส่งคำสั่งโพสต์ครบทุกแพลตฟอร์มแล้ว — ดูผลได้ที่ toast มุมขวาบน")
 
 
-def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
-                        fb_token: str = "", fb_page_id: str = "",
-                        ig_business_id: str = "") -> None:
-    st.title("🗨️ แชท AI")
-    st.caption("พิมพ์บอกว่าอยากได้คอนเทนต์อะไร — AI คิดแคปชัน ภาพ และคลิปให้")
+# ── Integrations ────────────────────────────────────────────────────────────────
 
-    # Someone opening this for the first time should not have to guess what
-    # happens after they type. Three steps, stated once, at the top.
-    st.markdown(
-        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 14px">'
-        '<span style="background:rgba(45,212,191,.12);border:1px solid rgba(45,212,191,.35);'
-        'border-radius:999px;padding:5px 13px;font-size:13px">1️⃣ พิมพ์บอกสิ่งที่อยากได้</span>'
-        '<span style="background:rgba(45,212,191,.12);border:1px solid rgba(45,212,191,.35);'
-        'border-radius:999px;padding:5px 13px;font-size:13px">2️⃣ AI ร่างแคปชัน + prompt ภาพ/คลิป</span>'
-        '<span style="background:rgba(45,212,191,.12);border:1px solid rgba(45,212,191,.35);'
-        'border-radius:999px;padding:5px 13px;font-size:13px">3️⃣ กดอนุมัติ แล้วโพสต์</span>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+_LINE_GUIDE = """
+##### ขั้นตอน
 
-    if not COPILOT_AVAILABLE:
-        st.error("ไม่พบ content_copilot.py — ตรวจสอบไฟล์ในโฟลเดอร์โปรเจกต์")
-        return
+**1.** เปิดเว็บ [developers.line.biz](https://developers.line.biz)
 
-    _key, _provider, _label = _resolve_ai(ai_mode, api_key)
-    can_image = _provider == "gemini"
+**2.** Login ด้วย LINE account
 
-    head_l, head_r = st.columns([3, 1])
-    with head_r:
-        st.caption(_label + (" · สร้างรูปได้" if can_image else ""))
-    _mandala_badge()
-    with st.expander("⚙️ ตั้งค่าแบรนด์เริ่มต้น (ไม่บังคับ)"):
-        st.text_input("ชื่อแบรนด์", value="LEMED", key="copilot_brand")
-        # Show what the brief locks the catalogue to, so a request naming
-        # something else doesn't look like it was silently ignored.
-        known = content_copilot.product_from_context(content_copilot.load_brand_context())
-        if known:
-            st.success(f"🔒 สินค้าของแบรนด์: **{known}** — คอนเทนต์จะอ้างถึงสินค้านี้เสมอ "
-                       "(อ่านจากบริบทแบรนด์ ไม่ใช่เดาจากคำที่พิมพ์)")
+**3.** กดปุ่ม `Create a new provider` (ทำครั้งแรกครั้งเดียว)
+
+**4.** กดปุ่ม `Create a new channel`
+
+**5.** เลือกประเภท `Messaging API`
+
+**6.** กรอกข้อมูล Channel ให้ครบ แล้วกด Create
+
+**7.** เปิด tab `Messaging API`
+
+**8.** เลื่อนลงล่างสุดหา `Channel access token`
+
+**9.** กดปุ่ม `Issue` เพื่อสร้าง token
+
+**10.** Copy token มาวางในช่อง LINE OA Token ด้านบน
+
+---
+
+⚠️ ต้องมี LINE Official Account ก่อน
+
+สมัครฟรีที่ [account.line.biz](https://account.line.biz)
+"""
+
+_FB_GUIDE = """
+##### ขั้นตอน
+
+**1.** เปิดเว็บ [developers.facebook.com](https://developers.facebook.com)
+
+**2.** Login ด้วย Facebook account
+
+**3.** ที่เมนูบน คลิก `My Apps`
+
+**4.** กดปุ่ม `Create App`
+
+**5.** เลือกประเภท `Business` แล้วกรอกชื่อ app
+
+**6.** ไปที่เมนู `Tools` แล้วเลือก `Graph API Explorer`
+
+**7.** ที่แถบขวา เลือก App ที่เพิ่งสร้าง
+
+**8.** คลิก `Generate Access Token`
+
+**9.** เลือก Facebook Page ที่ต้องการโพสต์
+
+**10.** ติ๊ก permissions ทั้ง 2 ตัว:
+- `pages_manage_posts`
+- `pages_read_engagement`
+
+**11.** กดปุ่ม `Generate Token` แล้ว Copy token
+
+---
+
+##### วิธีหา Page ID
+
+**1.** เปิด Facebook Page ของคุณ
+
+**2.** คลิกที่แถบ `About`
+
+**3.** เลื่อนลงล่างสุด จะเห็น `Page ID`
+
+---
+
+⚠️ ต้องเป็น Admin ของ Facebook Page
+"""
+
+_IG_GUIDE = """
+##### ขั้นตอน (ใช้ FB Token เดิม)
+
+**1.** ต้องเชื่อม Instagram กับ Facebook Page ก่อน
+
+**2.** เปิด [Graph API Explorer](https://developers.facebook.com/tools/explorer)
+
+**3.** Method: `GET`
+
+**4.** URL: `{PAGE_ID}?fields=instagram_business_account` (แทน PAGE_ID ด้วย Facebook Page ID)
+
+**5.** กด **ส่ง**
+
+**6.** Response จะมี:
+```
+"instagram_business_account": {
+  "id": "17841xxxxxxxxx"   ← copy เลขนี้
+}
+```
+
+**7.** วางในช่อง Instagram Business Account ID
+
+---
+
+⚠️ Instagram ต้องเป็น Business/Creator Account
+"""
+
+
+def _run_connection_test() -> None:
+    """Check every configured channel, one line of feedback each."""
+    from platform_poster import (test_line_token, test_facebook_token,
+                                 test_instagram_account)
+    line_token, fb_token = _s(K_LINE), _s(K_FB)
+    fb_page_id, ig_id = _s(K_FB_PID), _s(K_IG)
+
+    with st.spinner("กำลังเช็ค..."):
+        if line_token:
+            ok, m = test_line_token(line_token)
+            (st.success if ok else st.error)(m)
+        else:
+            st.caption("➖ LINE OA: ยังไม่ใส่ token")
+        if fb_token and fb_page_id:
+            ok, m = test_facebook_token(fb_token, fb_page_id)
+            (st.success if ok else st.error)(m)
+        else:
+            st.caption("➖ Facebook: ยังไม่ใส่ token/Page ID")
+        if fb_token and ig_id:
+            ok, m = test_instagram_account(ig_id, fb_token)
+            (st.success if ok else st.error)(m)
+        else:
+            st.caption("➖ Instagram: ยังไม่ใส่ IG ID")
+        _drive_ready.clear()
+        if _drive_ready():
+            st.success("Google Drive + YouTube: พร้อม")
+        else:
+            st.error("Google Drive: ยังไม่ได้ authorize")
+
+
+def render_integrations_page() -> None:
+    """Every posting channel in one place — status first, forms behind tabs.
+
+    These forms used to live in the chat page's sidebar, where four password
+    fields and three step-by-step guides sat permanently next to a chat box that
+    most sessions never needed them for.
+    """
+    _page_head("การเชื่อมต่อ",
+               "ต่อช่องทางที่จะใช้โพสต์ — ใส่ token ครั้งเดียว ใช้ได้ทุกหน้า")
+
+    status = _connection_status()
+    _chips([(f"{name} · {'เชื่อมแล้ว' if ok else 'ยังไม่เชื่อม'}", "ok" if ok else "")
+            for name, ok in status])
+
+    tabs = st.tabs(["LINE OA", "Facebook", "Instagram", "TikTok", "Google Drive"])
+
+    with tabs[0]:
+        st.text_input("LINE OA Token", type="password", key=K_LINE,
+                      placeholder="Channel Access Token",
+                      help="จาก LINE Developers → Messaging API → Channel Access Token")
+        if _s(K_LINE):
+            st.success("LINE OA พร้อมโพสต์")
+        with st.expander("📖 วิธีขอ LINE OA Token"):
+            st.markdown(_LINE_GUIDE)
+
+    with tabs[1]:
+        st.text_input("Facebook Page Token", type="password", key=K_FB,
+                      placeholder="Page Access Token",
+                      help="จาก Meta Developer → Graph API → Page Token")
+        if _s(K_FB):
+            st.text_input("Facebook Page ID", key=K_FB_PID, placeholder="เช่น 123456789")
+            if _s(K_FB_PID):
+                st.success("Facebook พร้อมโพสต์")
+        else:
+            st.caption("ใส่ Page Token ก่อน แล้วช่อง Page ID จะขึ้นมา")
+        with st.expander("📖 วิธีขอ Facebook Page Token"):
+            st.markdown(_FB_GUIDE)
+
+    with tabs[2]:
+        if not _s(K_FB):
+            st.info("Instagram ใช้ token เดียวกับ Facebook — ใส่ Page Token ในแท็บ Facebook ก่อน")
+        else:
+            st.text_input("Instagram Business Account ID", key=K_IG,
+                          placeholder="เช่น 17841...",
+                          help="ID ของ IG Business Account ที่ผูกกับ Facebook Page")
+            if _s(K_IG):
+                st.success("Instagram พร้อมโพสต์")
+        with st.expander("📖 วิธีหา IG Business ID"):
+            st.markdown(_IG_GUIDE)
+
+    with tabs[3]:
+        if not TIKTOK_AVAILABLE:
+            st.info("ยังไม่มีโมดูล tiktok_poster.py ในโปรเจกต์")
+        else:
+            st.text_input("TikTok Access Token", type="password", key=K_TIKTOK,
+                          placeholder="act....",
+                          help="ต้องมี scope video.publish — token อายุสั้น (~24 ชม.)")
+            if _s(K_TIKTOK):
+                st.selectbox(
+                    "การมองเห็นโพสต์ TikTok",
+                    options=list(tiktok_poster.PRIVACY_LEVELS.keys()),
+                    format_func=lambda v: tiktok_poster.PRIVACY_LEVELS[v],
+                    key="tiktok_privacy",
+                )
+                if st.button("ทดสอบ TikTok", width="stretch"):
+                    info, m = tiktok_poster.creator_info(_s(K_TIKTOK))
+                    (st.success if info else st.error)(m)
+                    if info and info.get("creator_nickname"):
+                        st.caption(f"บัญชี: {info['creator_nickname']}")
+            with st.expander("⚠️ ข้อจำกัด TikTok API"):
+                st.markdown(tiktok_poster.describe_limits())
+                st.caption("ขอ token ที่ [developers.tiktok.com](https://developers.tiktok.com/)")
+
+    with tabs[4]:
+        if _drive_ready():
+            st.success("Google Drive + YouTube: พร้อมใช้งาน")
+        else:
+            st.error("ยังไม่ได้ authorize Google Drive — คิวอนุมัติจะอ่านไฟล์ไม่ได้")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.link_button("📁 เปิดโฟลเดอร์ Drive", DRIVE_FOLDER_URL, width="stretch")
+        with c2:
+            st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL, width="stretch")
+
+    st.divider()
+    if st.button("🔌 เช็คการเชื่อมต่อทั้งหมด", type="primary", width="stretch"):
+        _run_connection_test()
+
+
+# ── Settings ────────────────────────────────────────────────────────────────────
+
+def render_settings_page() -> None:
+    """AI provider, brand defaults, appearance, POS — the things set once."""
+    _page_head("ตั้งค่า", "ตั้งครั้งเดียว ใช้กับทุกหน้า")
+
+    ai_mode = _s(K_AI, "Local Smart")
+    _chips([
+        (f"AI: {ai_mode}", "on"),
+        (f"ธีม: {'มืด' if _theme == 'dark' else 'สว่าง'}", ""),
+    ])
+
+    tabs = st.tabs(["AI", "แบรนด์", "หน้าตา", "POS"])
+
+    with tabs[0]:
+        st.radio(
+            "โมเดลที่ใช้",
+            ["Local Smart", "Gemini API", "Claude API"],
+            key=K_AI,
+            help="Local Smart ใช้ rule-based logic ทำงานได้ทันที | "
+                 "Gemini สร้างรูปได้ด้วย | Claude เน้นคุณภาพงานเขียน",
+        )
+        mode_now = _s(K_AI, "Local Smart")
+        if mode_now == "Gemini API":
+            st.text_input("Gemini API Key", type="password", key=K_GEMINI,
+                          placeholder="AIza...")
+            if _s(K_GEMINI):
+                st.success("พร้อมใช้ Gemini — สร้างข้อความ + รูปได้")
+            else:
+                st.caption("ขอฟรีที่ [aistudio.google.com/apikey](https://aistudio.google.com/apikey)")
+        elif mode_now == "Claude API":
+            if not ANTHROPIC_AVAILABLE:
+                st.warning("ติดตั้ง anthropic ก่อน:\n`pip install anthropic`")
+            st.text_input("Anthropic API Key", type="password", key=K_CLAUDE,
+                          placeholder="sk-ant-...")
+            if _s(K_CLAUDE):
+                st.success("พร้อมใช้ Claude API")
+        else:
+            st.caption("ไม่ต้องใส่ key — ทำงานในเครื่อง ไม่ส่งข้อมูลออก")
+
+    with tabs[1]:
+        # setdefault, not value= — passing both a value and a key that already
+        # holds state makes Streamlit warn and then ignore one of them.
+        st.session_state.setdefault("copilot_brand", "LEMED")
+        st.text_input("ชื่อแบรนด์", key="copilot_brand")
+        if COPILOT_AVAILABLE:
+            known = content_copilot.product_from_context(
+                content_copilot.load_brand_context())
+            if known:
+                st.success(f"🔒 สินค้าของแบรนด์: **{known}** — คอนเทนต์จะอ้างถึงสินค้านี้เสมอ "
+                           "(อ่านจากบริบทแบรนด์ ไม่ใช่เดาจากคำที่พิมพ์)")
         st.selectbox(
             "ประเภทธุรกิจ",
             options=["auto", "product", "fnb"],
@@ -3549,23 +4073,94 @@ def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
             key="copilot_vertical",
             help="กำหนดโทนคอนเทนต์ — ตั้งไว้ถ้าคำสั่งสั้นจนระบบเดาผิด",
         )
+        _mandala_badge()
 
+    with tabs[2]:
+        st.caption("ธีม")
+        tc1, tc2 = st.columns(2)
+        with tc1:
+            st.button("🌙 มืด" if _theme == "light" else "✓ มืด", width="stretch",
+                      type="secondary" if _theme == "light" else "primary",
+                      on_click=_set_theme, args=("dark",), key="set_theme_dark")
+        with tc2:
+            st.button("✓ สว่าง" if _theme == "light" else "☀️ สว่าง", width="stretch",
+                      type="primary" if _theme == "light" else "secondary",
+                      on_click=_set_theme, args=("light",), key="set_theme_light")
+        st.caption("Built with Streamlit + Claude AI")
+
+    with tabs[3]:
+        st.caption("Loyverse POS — ใช้กับหน้า 🔌 Connect POS")
+        st.text_input("API Token", type="password", key=K_LV,
+                      placeholder="ใส่ token จาก Loyverse Back Office")
+        st.session_state.setdefault(K_LV_DAY, 30)
+        st.slider("ดึงข้อมูลย้อนหลัง (วัน)", 7, 90, key=K_LV_DAY)
+
+
+def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
+                        fb_token: str = "", fb_page_id: str = "",
+                        ig_business_id: str = "") -> None:
+    if not COPILOT_AVAILABLE:
+        _page_head("แชท AI")
+        st.error("ไม่พบ content_copilot.py — ตรวจสอบไฟล์ในโฟลเดอร์โปรเจกต์")
+        return
+
+    _key, _provider, _label = _resolve_ai(ai_mode, api_key)
+    can_image = _provider == "gemini"
     msgs = st.session_state.setdefault("copilot_msgs", [])
 
+    # ── Empty state ────────────────────────────────────────────────────────
+    #
+    # The composer is the only thing this page asks anyone to do, so on a blank
+    # session it sits directly under the welcome line rather than pinned to the
+    # bottom of the window with three rows of chips, an expander and a provider
+    # label stacked above it. Streamlit's chat_input is always bottom-docked, so
+    # the empty state uses a form instead and hides the docked bar; both paths
+    # write to the same `copilot_pending` slot, so submission behaves identically.
     if not msgs:
-        with st.chat_message("assistant", avatar="🧴"):
+        st.markdown("<style>[data-testid='stBottom']{display:none !important}</style>",
+                    unsafe_allow_html=True)
+        _, mid, _r = st.columns([1, 6, 1])
+        with mid:
             st.markdown(
-                "สวัสดีค่ะ! อยากได้คอนเทนต์อะไรดีคะ 😊\n\n"
-                "พิมพ์บอกแบบพูดคุยได้เลย ไม่ต้องรู้ศัพท์เทคนิค เช่น "
-                "*“อยากได้คลิปลง TikTok”* หรือ *“ทำโปรลดราคาหน่อย”*\n\n"
-                "**หรือกดตัวอย่างด้านล่างนี้ได้เลย** 👇"
+                '<div class="rv-hero"><div class="rv-spark">✦</div>'
+                '<h2>วันนี้อยากให้ช่วยเรื่องอะไรดีคะ</h2>'
+                '<p>พิมพ์บอกแบบพูดคุยได้เลย ไม่ต้องรู้ศัพท์เทคนิค</p></div>',
+                unsafe_allow_html=True,
             )
-            ex_cols = st.columns(2)
-            for i, ex in enumerate(_copilot_examples()):
-                with ex_cols[i % 2]:
-                    if st.button(ex, key=f"copilot_ex_{i}", width="stretch"):
-                        st.session_state["copilot_pending"] = ex
+            st.markdown('<p class="rv-ctx">พร้อมช่วยสร้างคอนเทนต์ ตอบลูกค้า '
+                        'และวิเคราะห์ธุรกิจ</p>', unsafe_allow_html=True)
+
+            with st.form("copilot_hero", border=False, clear_on_submit=True):
+                st.text_area("สิ่งที่อยากให้ AI ช่วย", key="copilot_hero_text",
+                             placeholder="พิมพ์สิ่งที่อยากให้ AI ช่วย…",
+                             height=104, label_visibility="collapsed")
+                if st.form_submit_button("ส่งให้ AI ช่วย", type="primary",
+                                         width="stretch"):
+                    text = (st.session_state.get("copilot_hero_text") or "").strip()
+                    if text:
+                        st.session_state["copilot_pending"] = text
                         st.rerun()
+
+            with st.container(key="rv_sugg"):
+                cols = st.columns(len(_copilot_examples()))
+                for i, (label, target) in enumerate(_copilot_examples()):
+                    with cols[i]:
+                        if st.button(label, key=f"copilot_ex_{i}", width="stretch"):
+                            _run_suggestion(label, target)
+
+            _chips([(_label + (" · สร้างรูปได้" if can_image else ""), "on")])
+
+    # ── Conversation ───────────────────────────────────────────────────────
+    if msgs:
+        head, act = st.columns([4, 1])
+        with head:
+            _page_head("แชท AI", "ร่างแคปชัน ภาพ และคลิป แล้วส่งเข้าคิวอนุมัติ")
+        with act:
+            if st.button("🗑️ เริ่มใหม่", key="copilot_clear", width="stretch"):
+                st.session_state["copilot_msgs"] = []
+                st.rerun()
+        _chips([(_label + (" · สร้างรูปได้" if can_image else ""), "on"),
+                (f"{len([m for m in msgs if m['role'] == 'user'])} คำสั่งในแชทนี้", "")])
 
     for mi, m in enumerate(msgs):
         if m["role"] == "user":
@@ -3581,9 +4176,10 @@ def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
                                           gemini_key=_key if can_image else "")
 
     pending = st.session_state.pop("copilot_pending", None)
-    typed = st.chat_input("พิมพ์บอกสิ่งที่อยากได้…")
-    if typed:
-        pending = typed
+    if msgs:
+        typed = st.chat_input("พิมพ์สิ่งที่อยากให้ AI ช่วย…")
+        if typed:
+            pending = typed
 
     if pending:
         msgs.append({"role": "user", "text": pending})
@@ -3599,17 +4195,12 @@ def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
                 msgs.append({"role": "assistant", "error": str(e)})
         st.rerun()
 
-    if msgs and st.button("🗑️ เริ่มแชทใหม่", key="copilot_clear"):
-        st.session_state["copilot_msgs"] = []
-        st.rerun()
-
 
 # ── AI Chat Inbox ───────────────────────────────────────────────────────────────
 
 def render_ai_inbox_page(ai_mode: str, api_key: str, fb_token: str = "",
                          fb_page_id: str = "", line_token: str = "") -> None:
-    st.title("💬 AI Chat Inbox")
-    st.caption("อ่านแชทลูกค้าจาก Facebook Messenger / Instagram DM แล้วให้ AI ช่วยตอบ")
+    _page_head("💬 AI Chat Inbox", "อ่านแชทลูกค้าจาก Facebook Messenger / Instagram DM แล้วให้ AI ช่วยตอบ")
 
     if not CHAT_INBOX_AVAILABLE:
         st.error("ไม่พบ chat_inbox.py")
@@ -3627,7 +4218,7 @@ def render_ai_inbox_page(ai_mode: str, api_key: str, fb_token: str = "",
 
 **3.** เลือก "ผู้ใช้หรือเพจ" เป็นเพจของคุณ → กด `Generate Access Token`
 
-**4.** Copy token ใหม่มาวางในช่อง Facebook Page Token (แถบซ้าย)
+**4.** Copy token ใหม่มาวางในช่อง Facebook Page Token (หน้า 🔗 การเชื่อมต่อ)
 
 ---
 
@@ -3750,59 +4341,47 @@ cloudflared tunnel --url http://localhost:8001
 
 
 # ── Sidebar ─────────────────────────────────────────────────────────────────────
+#
+# Four destinations, a connection summary, and a theme switch. Everything else —
+# five password fields, three provider guides, an AI-model radio and a POS token
+# — moved onto the Settings and Integrations pages it belongs to. A sidebar that
+# scrolls past the fold on a chat page is a settings panel with a chat box
+# attached, which is the opposite of what this app is for.
+
+CORE_PAGES = ["🗨️ แชท AI", "✋ คิวอนุมัติ",
+              "🔗 การเชื่อมต่อ", "⚙️ ตั้งค่า"]
+MORE_PAGES = [
+    "🧠 Brain Storm", "🎨 Canva", "📣 Content Studio",
+    "💬 AI Inbox", "📊 Dashboard", "📁 Upload Data",
+    "🔌 Connect POS", "🧮 ROI Calculator",
+]
 
 with st.sidebar:
-    _txt_logo = "#F9FAFB" if _theme == "dark" else "#111827"
-    _txt_ver  = "#374151" if _theme == "dark" else "#9CA3AF"
+    _txt_logo = "#F8FAFC" if _theme == "dark" else "#111827"
+    # brand orange is a fill colour — as type on the light sidebar it is 2.0:1
+    _accent  = "#F59E0B" if _theme == "dark" else "#92400E"
+    _txt_ver  = "#8492A6" if _theme == "dark" else "#5B6472"
     st.markdown(f"""
-<div style="padding:0.75rem 0 1.5rem 0;">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">
-    <div style="width:34px;height:34px;background:linear-gradient(135deg,#B45309,#F59E0B);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;box-shadow:0 4px 14px rgba(245,158,11,0.28);">📊</div>
+<div style="padding:0.5rem 0 1.25rem 0;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div style="width:32px;height:32px;background:linear-gradient(135deg,#B45309,#F59E0B);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">📊</div>
     <div>
-      <div style="font-weight:800;font-size:17px;color:{_txt_logo};letter-spacing:0.02em;line-height:1.2;">REVENUE <span style="color:#F59E0B;">AI</span></div>
+      <div style="font-weight:750;font-size:16px;color:{_txt_logo};letter-spacing:-0.01em;line-height:1.2;">REVENUE <span style="color:{_accent};">AI</span></div>
+      <div style="font-size:10px;color:{_txt_ver};font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-top:2px;">Smart Business Suite</div>
     </div>
   </div>
-  <div style="font-size:10px;color:{_txt_ver};font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding-left:44px;">Smart Business Suite</div>
 </div>
 """, unsafe_allow_html=True)
 
-    # ── Mode switch — MUST be the first sidebar widget. The theme toggle below
-    #    calls st.rerun(), which aborts the run before any widget under it is
-    #    instantiated; if the keyed mode radio hasn't rendered yet, Streamlit
-    #    drops `app_mode` and the app falls back to shop mode. Rendering it
-    #    first keeps the selected mode sticky across theme changes. ───────────
+    # Mode switch stays the first sidebar widget: anything that triggers a rerun
+    # before a keyed widget is instantiated makes Streamlit drop that key, and
+    # losing `app_mode` drops the whole app back to shop mode.
     mode = st.radio(
         "โหมดการใช้งาน",
         [MODE_SHOP, MODE_AFFILIATE],
         label_visibility="collapsed",
         key="app_mode",
     )
-    st.divider()
-
-    # ── Theme toggle — use on_click callbacks, NOT `if st.button(): st.rerun()`.
-    #    A mid-run st.rerun() aborts before the menu widgets below are rendered,
-    #    so Streamlit drops their keyed state and the app jumps back to the first
-    #    page/mode. A callback sets the theme before the natural rerun, keeping
-    #    the current mode + page sticky across theme changes. ──────────────────
-    def _set_theme(t: str) -> None:
-        st.session_state["theme"] = t
-
-    tc1, tc2 = st.columns(2)
-    with tc1:
-        st.button(
-            "🌙 Dark" if _theme == "light" else "✓ Dark",
-            width="stretch",
-            type="secondary" if _theme == "light" else "primary",
-            on_click=_set_theme, args=("dark",),
-        )
-    with tc2:
-        st.button(
-            "✓ Light" if _theme == "light" else "☀️ Light",
-            width="stretch",
-            type="primary" if _theme == "light" else "secondary",
-            on_click=_set_theme, args=("light",),
-        )
-
     st.divider()
 
     if mode == MODE_AFFILIATE:
@@ -3816,265 +4395,60 @@ with st.sidebar:
         if AFFILIATE_AVAILABLE:
             affiliate_ui.sidebar_controls()
     else:
-        # Customers open this to do one thing: chat, and get something to post.
-        # Ten equal-weight menu items made that choice look like ten choices, and
-        # the app opened on a dashboard of sample sales data that has nothing to
-        # do with it. The daily path is now the only thing on screen by default.
-        DAILY_PAGES = ["🗨️ แชท AI", "✋ คิวอนุมัติ"]
-        MORE_PAGES = [
-            "🧠 Brain Storm", "🎨 Canva", "📣 Content Studio", "💬 AI Inbox",
-            "📊 Dashboard", "📁 Upload Data", "🔌 Connect POS", "🧮 ROI Calculator",
-        ]
-        show_all = st.toggle("🧰 เครื่องมือทั้งหมด", value=False,
-                             help="เปิดเพื่อใช้เครื่องมือขั้นสูง — งานประจำวันใช้แค่ 2 เมนูบน")
+        # Drain a navigation request from elsewhere in the app before the menu
+        # widgets exist — after that, Streamlit will not let their keys be set.
+        _nav = st.session_state.pop("nav_to", None)
+        if _nav:
+            if _nav in MORE_PAGES:
+                st.session_state["shop_show_all"] = True
+            st.session_state["shop_menu"] = _nav
+
+        show_all = st.toggle("🧰 เครื่องมือทั้งหมด", key="shop_show_all",
+                             help="เปิดเพื่อใช้เครื่องมือขั้นสูง — งานประจำวันใช้แค่ 4 เมนูบน")
         page = st.radio(
             "เมนู",
-            DAILY_PAGES + (MORE_PAGES if show_all else []),
+            CORE_PAGES + (MORE_PAGES if show_all else []),
             label_visibility="collapsed",
             key="shop_menu",
         )
 
-    demo_profile = "General Business"
-    lv_token = ""
-    lv_days = 30
-
-    if page == "📊 Dashboard":
-        st.divider()
-        st.markdown("**Demo Profile**")
-        demo_profile = st.radio(
-            "demo",
-            ["General Business", "ร้านหมูกระทะ", "ร้านเย็นตาโฟ (ข้อมูลจริง)"],
-            label_visibility="collapsed",
-        )
-    elif page == "🔌 Connect POS":
-        st.divider()
-        st.markdown("**Loyverse POS**")
-        lv_token = st.text_input("API Token", type="password", placeholder="ใส่ token จาก Loyverse Back Office")
-        lv_days = st.slider("ดึงข้อมูลย้อนหลัง (วัน)", 7, 90, 30)
-
-    # Defaults so affiliate mode never references undefined shop variables
-    ai_mode = "Local Smart"
-    api_key = ""
-    line_token = fb_token = fb_page_id = ig_business_id = ""
-
-    if mode == MODE_SHOP:
-        st.divider()
-        st.markdown("**🔗 ทางลัด**")
-        st.link_button("🎬 เปิด Google Flow", FLOW_PROJECT_URL, width="stretch")
-        st.link_button("📁 เปิดโฟลเดอร์ Drive", DRIVE_FOLDER_URL, width="stretch")
-
-        st.divider()
-        st.markdown("**⚙️ Settings**")
-
-        ai_mode = st.radio(
-            "AI Insights Mode",
-            ["Local Smart", "Gemini API", "Claude API"],
-            help="Local Smart ใช้ rule-based logic ทำงานได้ทันที | "
-                 "Gemini สร้างรูปได้ด้วย | Claude เน้นคุณภาพงานเขียน",
+        # Connection summary — one line instead of five token fields. Says what
+        # is ready to post right now, and links to the page that fixes it.
+        _conn = _connection_status()
+        _n_ok = sum(1 for _, ok in _conn if ok)
+        _tone = _accent if _n_ok else ("#8492A6" if _theme == "dark" else "#5B6472")
+        st.markdown(
+            f'<div class="rv-conn"><span class="rv-conn-l">เชื่อมต่อแล้ว</span>'
+            f'<span class="rv-conn-v" style="color:{_tone}">{_n_ok}/{len(_conn)} ช่องทาง</span></div>',
+            unsafe_allow_html=True,
         )
 
-        api_key = ""
-        if ai_mode == "Gemini API":
-            api_key = st.text_input("Gemini API Key", type="password", placeholder="AIza...")
-            if api_key:
-                st.success("พร้อมใช้ Gemini — สร้างข้อความ + รูปได้")
-            else:
-                st.caption("ขอฟรีที่ [aistudio.google.com/apikey](https://aistudio.google.com/apikey)")
-        elif ai_mode == "Claude API":
-            if not ANTHROPIC_AVAILABLE:
-                st.warning("ติดตั้ง anthropic ก่อน:\n`pip install anthropic`")
-            api_key = st.text_input("Anthropic API Key", type="password", placeholder="sk-ant-...")
-            if api_key:
-                st.success("พร้อมใช้ Claude API")
+    st.divider()
+    _tc1, _tc2 = st.columns(2)
+    with _tc1:
+        st.button("🌙 มืด" if _theme == "light" else "✓ มืด", width="stretch",
+                  type="secondary" if _theme == "light" else "primary",
+                  on_click=_set_theme, args=("dark",), key="sb_theme_dark")
+    with _tc2:
+        st.button("✓ สว่าง" if _theme == "light" else "☀️ สว่าง", width="stretch",
+                  type="primary" if _theme == "light" else "secondary",
+                  on_click=_set_theme, args=("light",), key="sb_theme_light")
 
-        st.divider()
-        st.markdown("**📱 Platform Tokens**")
-        st.caption("ใส่ token เพื่อโพสต์จริง")
 
-        # ── LINE OA ──────────────────────────────────────────────────────────────
-        line_token = st.text_input(
-            "LINE OA Token",
-            type="password",
-            placeholder="Channel Access Token",
-            help="จาก LINE Developers → Messaging API → Channel Access Token",
-        )
-        if line_token:
-            st.success("LINE OA พร้อมโพสต์")
+# ── Settings read back ──────────────────────────────────────────────────────────
+#
+# One place where every page gets its credentials, whether or not the form that
+# collects them rendered this run.
 
-        with st.expander("📖 วิธีขอ LINE OA Token"):
-            st.markdown("""
-##### ขั้นตอน
+ai_mode = _s(K_AI, "Local Smart")
+api_key = _resolve_api_key(ai_mode)
+line_token = _s(K_LINE)
+fb_token = _s(K_FB)
+fb_page_id = _s(K_FB_PID)
+ig_business_id = _s(K_IG)
+lv_token = _s(K_LV)
+lv_days = st.session_state.get(K_LV_DAY, 30)
 
-**1.** เปิดเว็บ [developers.line.biz](https://developers.line.biz)
-
-**2.** Login ด้วย LINE account
-
-**3.** กดปุ่ม `Create a new provider` (ทำครั้งแรกครั้งเดียว)
-
-**4.** กดปุ่ม `Create a new channel`
-
-**5.** เลือกประเภท `Messaging API`
-
-**6.** กรอกข้อมูล Channel ให้ครบ แล้วกด Create
-
-**7.** เปิด tab `Messaging API`
-
-**8.** เลื่อนลงล่างสุดหา `Channel access token`
-
-**9.** กดปุ่ม `Issue` เพื่อสร้าง token
-
-**10.** Copy token มาวางในช่อง LINE OA Token ด้านบน
-
----
-
-⚠️ ต้องมี LINE Official Account ก่อน
-
-สมัครฟรีที่ [account.line.biz](https://account.line.biz)
-""")
-
-        # ── Facebook ─────────────────────────────────────────────────────────────
-        fb_token = st.text_input(
-            "Facebook Page Token",
-            type="password",
-            placeholder="Page Access Token",
-            help="จาก Meta Developer → Graph API → Page Token",
-        )
-        fb_page_id = ""
-        ig_business_id = ""
-        if fb_token:
-            fb_page_id = st.text_input("Facebook Page ID", placeholder="เช่น 123456789")
-            if fb_page_id:
-                st.success("Facebook พร้อมโพสต์")
-            ig_business_id = st.text_input(
-                "Instagram Business Account ID",
-                placeholder="เช่น 17841...",
-                help="ID ของ IG Business Account ที่ผูกกับ Facebook Page (ใช้ FB Token เดียวกัน)",
-            )
-            if ig_business_id:
-                st.success("Instagram พร้อมโพสต์")
-
-        with st.expander("📖 วิธีหา IG Business ID"):
-            st.markdown("""
-##### ขั้นตอน (ใช้ FB Token เดิม)
-
-**1.** ต้องเชื่อม Instagram กับ Facebook Page ก่อน
-
-**2.** เปิด [Graph API Explorer](https://developers.facebook.com/tools/explorer)
-
-**3.** Method: `GET`
-
-**4.** URL: `{PAGE_ID}?fields=instagram_business_account` (แทน PAGE_ID ด้วย Facebook Page ID)
-
-**5.** กด **ส่ง**
-
-**6.** Response จะมี:
-```
-"instagram_business_account": {
-  "id": "17841xxxxxxxxx"   ← copy เลขนี้
-}
-```
-
-**7.** วางในช่อง Instagram Business Account ID
-
----
-
-⚠️ Instagram ต้องเป็น Business/Creator Account
-""")
-
-        # ── TikTok ───────────────────────────────────────────────────────────────
-        if TIKTOK_AVAILABLE:
-            st.text_input(
-                "TikTok Access Token",
-                type="password",
-                placeholder="act....",
-                key="tiktok_token",
-                help="ต้องมี scope video.publish — token อายุสั้น (~24 ชม.)",
-            )
-            if st.session_state.get("tiktok_token"):
-                st.selectbox(
-                    "การมองเห็นโพสต์ TikTok",
-                    options=list(tiktok_poster.PRIVACY_LEVELS.keys()),
-                    format_func=lambda v: tiktok_poster.PRIVACY_LEVELS[v],
-                    key="tiktok_privacy",
-                )
-                if st.button("ทดสอบ TikTok", width="stretch"):
-                    info, m = tiktok_poster.creator_info(st.session_state["tiktok_token"])
-                    (st.success if info else st.error)(m)
-                    if info and info.get("creator_nickname"):
-                        st.caption(f"บัญชี: {info['creator_nickname']}")
-            with st.expander("⚠️ ข้อจำกัด TikTok API"):
-                st.markdown(tiktok_poster.describe_limits())
-                st.caption("ขอ token ที่ [developers.tiktok.com](https://developers.tiktok.com/)")
-
-        with st.expander("📖 วิธีขอ Facebook Page Token"):
-            st.markdown("""
-##### ขั้นตอน
-
-**1.** เปิดเว็บ [developers.facebook.com](https://developers.facebook.com)
-
-**2.** Login ด้วย Facebook account
-
-**3.** ที่เมนูบน คลิก `My Apps`
-
-**4.** กดปุ่ม `Create App`
-
-**5.** เลือกประเภท `Business` แล้วกรอกชื่อ app
-
-**6.** ไปที่เมนู `Tools` แล้วเลือก `Graph API Explorer`
-
-**7.** ที่แถบขวา เลือก App ที่เพิ่งสร้าง
-
-**8.** คลิก `Generate Access Token`
-
-**9.** เลือก Facebook Page ที่ต้องการโพสต์
-
-**10.** ติ๊ก permissions ทั้ง 2 ตัว:
-- `pages_manage_posts`
-- `pages_read_engagement`
-
-**11.** กดปุ่ม `Generate Token` แล้ว Copy token
-
----
-
-##### วิธีหา Page ID
-
-**1.** เปิด Facebook Page ของคุณ
-
-**2.** คลิกที่แถบ `About`
-
-**3.** เลื่อนลงล่างสุด จะเห็น `Page ID`
-
----
-
-⚠️ ต้องเป็น Admin ของ Facebook Page
-""")
-
-        st.divider()
-        if st.button("🔌 เช็คการเชื่อมต่อทั้งหมด", width="stretch"):
-            from platform_poster import test_line_token, test_facebook_token, test_instagram_account
-            with st.spinner("กำลังเช็ค..."):
-                if line_token:
-                    ok, m = test_line_token(line_token)
-                    (st.success if ok else st.error)(m)
-                else:
-                    st.caption("➖ LINE OA: ยังไม่ใส่ token")
-                if fb_token and fb_page_id:
-                    ok, m = test_facebook_token(fb_token, fb_page_id)
-                    (st.success if ok else st.error)(m)
-                else:
-                    st.caption("➖ Facebook: ยังไม่ใส่ token/Page ID")
-                if fb_token and ig_business_id:
-                    ok, m = test_instagram_account(ig_business_id, fb_token)
-                    (st.success if ok else st.error)(m)
-                else:
-                    st.caption("➖ Instagram: ยังไม่ใส่ IG ID")
-                if GDRIVE_AVAILABLE and not needs_auth():
-                    st.success("Google Drive + YouTube: พร้อม")
-                else:
-                    st.error("Google Drive: ยังไม่ได้ authorize")
-
-        st.divider()
-        st.caption("Built with Streamlit + Claude AI")
 
 
 # ── Affiliate mode routing ───────────────────────────────────────────────────────
@@ -4126,10 +4500,26 @@ if page == "🧮 ROI Calculator":
     render_roi_calculator()
     st.stop()
 
+if page == "🔗 การเชื่อมต่อ":
+    render_integrations_page()
+    st.stop()
+
+if page == "⚙️ ตั้งค่า":
+    render_settings_page()
+    st.stop()
+
 # ── Dashboard ───────────────────────────────────────────────────────────────────
 
-st.title("REVENUE AI")
-st.caption("Data → Insight → Action | สำหรับร้านอาหาร / คาเฟ่ / บาร์ / ยิม")
+_page_head("แดชบอร์ด",
+           "Data → Insight → Action | สำหรับร้านอาหาร / คาเฟ่ / บาร์ / ยิม")
+
+# The demo-data selector belongs next to the data it changes, not in a sidebar
+# that only grew this control when one particular page happened to be open.
+demo_profile = st.radio(
+    "ชุดข้อมูลตัวอย่าง",
+    ["General Business", "ร้านหมูกระทะ", "ร้านเย็นตาโฟ (ข้อมูลจริง)"],
+    horizontal=True, key="demo_profile",
+)
 
 if demo_profile == "ร้านเย็นตาโฟ (ข้อมูลจริง)":
     st.info("กำลังแสดงข้อมูลจริงของลูกค้าร้านเย็นตาโฟจากไฟล์ Excel")
