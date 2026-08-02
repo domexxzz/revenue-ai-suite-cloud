@@ -151,6 +151,114 @@ def generate_json(system: str, user: str, api_key: str, provider: str = "auto",
         return None
 
 
+# ── Vision / document reading ───────────────────────────────────────────────────
+#
+# The opposite direction from generate_image: the user hands the model a picture
+# or a PDF and asks about it. Both providers take the bytes inline, base64, in
+# the same message as the question — no upload step, no file IDs to clean up.
+
+VISION_MIME = {
+    "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif",
+    "application/pdf",
+}
+# Inline attachments are capped by the request body, not by us — but a 20MB photo
+# base64s to ~27MB and both APIs reject it. Refuse early with a clear message
+# rather than after a 60-second upload.
+MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024
+
+
+def can_read_media(api_key: str, provider: str = "auto") -> bool:
+    """True when the key belongs to a provider that can look at an image."""
+    if not api_key or not api_key.strip():
+        return False
+    if provider in ("auto", "", None):
+        provider = detect_provider(api_key)
+    return provider in ("gemini", "claude")
+
+
+def _gemini_vision(parts_media: list[tuple[str, bytes]], system: str, user: str,
+                   api_key: str, max_tokens: int) -> str | None:
+    parts: list[dict] = [
+        {"inline_data": {"mime_type": mime,
+                         "data": base64.b64encode(raw).decode("ascii")}}
+        for mime, raw in parts_media
+    ]
+    parts.append({"text": user})
+    payload = {
+        "contents": [{"role": "user", "parts": parts}],
+        "generationConfig": {"maxOutputTokens": max_tokens},
+    }
+    if system:
+        payload["systemInstruction"] = {"parts": [{"text": system}]}
+
+    for model in [GEMINI_TEXT_MODEL, *GEMINI_TEXT_FALLBACKS]:
+        try:
+            resp = requests.post(
+                f"{GEMINI_BASE}/{model}:generateContent",
+                params={"key": api_key}, json=payload, timeout=120,
+            )
+            if resp.status_code == 404:
+                continue
+            resp.raise_for_status()
+            blocks = (resp.json().get("candidates", [{}])[0]
+                      .get("content", {}).get("parts", []))
+            text = "".join(b.get("text", "") for b in blocks).strip()
+            if text:
+                return text
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Gemini vision (%s) failed: %s", model, e)
+    return None
+
+
+def _claude_vision(parts_media: list[tuple[str, bytes]], system: str, user: str,
+                   api_key: str, max_tokens: int) -> str | None:
+    try:
+        import anthropic
+
+        content: list[dict] = []
+        for mime, raw in parts_media:
+            b64 = base64.b64encode(raw).decode("ascii")
+            if mime == "application/pdf":
+                content.append({"type": "document", "source": {
+                    "type": "base64", "media_type": "application/pdf", "data": b64}})
+            else:
+                # Claude names the type "image/jpeg"; "image/jpg" is rejected.
+                media = "image/jpeg" if mime == "image/jpg" else mime
+                content.append({"type": "image", "source": {
+                    "type": "base64", "media_type": media, "data": b64}})
+        content.append({"type": "text", "text": user})
+
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model=CLAUDE_MODEL, max_tokens=max_tokens, system=system or "",
+            messages=[{"role": "user", "content": content}],
+        )
+        return message.content[0].text.strip()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Claude vision failed: %s", e)
+        return None
+
+
+def analyze_media(media: list[tuple[str, bytes]], question: str, api_key: str,
+                  system: str = "", provider: str = "auto",
+                  max_tokens: int = 1200) -> str | None:
+    """Ask the model about attached images/PDFs. None when it cannot be done.
+
+    `media` is [(mime_type, raw_bytes), ...]. Anything the provider cannot read
+    is dropped by the caller, not here — this fails loudly if handed nothing.
+    """
+    if not media or not api_key or not api_key.strip():
+        return None
+    if provider in ("auto", "", None):
+        provider = detect_provider(api_key)
+    key = api_key.strip()
+    if provider == "gemini":
+        return _gemini_vision(media, system, question, key, max_tokens)
+    if provider == "claude":
+        return _claude_vision(media, system, question, key, max_tokens)
+    return None
+
+
 # ── Image generation (Gemini only) ──────────────────────────────────────────────
 
 def can_generate_images(api_key: str, provider: str = "auto") -> bool:

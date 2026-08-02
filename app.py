@@ -88,6 +88,12 @@ try:
 except ImportError:
     FLOW_SYNC_AVAILABLE = False
 
+try:
+    import attachments
+    ATTACH_AVAILABLE = True
+except ImportError:
+    ATTACH_AVAILABLE = False
+
 # Top-level mode switch labels (shop owner vs affiliate marketing)
 MODE_SHOP = "🏪 ร้านของฉัน"
 MODE_AFFILIATE = "🚀 แอฟฟิลิเอต"
@@ -3429,6 +3435,41 @@ def _copilot_examples() -> list[tuple[str, str]]:
     ]
 
 
+_ATTACH_ICONS = {"image": "🖼️", "pdf": "📄", "table": "📊",
+                 "text": "📝", "unsupported": "📎"}
+
+
+def _can_read_media(key: str, provider: str) -> bool:
+    """Whether the active key can look at a picture. False without ai_provider."""
+    try:
+        import ai_provider
+        return ai_provider.can_read_media(key, provider)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _render_message_attachments(files: list, mi: int) -> None:
+    """Show what was attached, inside the user's own bubble.
+
+    Images render; everything else gets a chip. Only image bytes are kept in
+    session state — a 5MB spreadsheet held for the life of the conversation buys
+    nothing once it has been summarised.
+    """
+    if not files:
+        return
+    images = [(n, data) for n, kind, data in files if kind == "image" and data]
+    others = [(n, kind) for n, kind, data in files if not (kind == "image" and data)]
+    if images:
+        # Fixed width, not "stretch": one attached photo stretched to the full
+        # 900px column and buried the message it was attached to.
+        cols = st.columns(3)
+        for i, (name, data) in enumerate(images):
+            with cols[i % 3]:
+                st.image(data, caption=name, width=240)
+    if others:
+        _chips([(f"{_ATTACH_ICONS.get(kind, '📎')} {name}", "") for name, kind in others])
+
+
 def _run_suggestion(label: str, target: str) -> None:
     """Send a suggestion to the copilot, or open the page that handles it.
 
@@ -4128,17 +4169,30 @@ def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
                 unsafe_allow_html=True,
             )
             st.markdown('<p class="rv-ctx">พร้อมช่วยสร้างคอนเทนต์ ตอบลูกค้า '
-                        'และวิเคราะห์ธุรกิจ</p>', unsafe_allow_html=True)
+                        'และวิเคราะห์ธุรกิจ — แนบรูปหรือไฟล์มาให้ดูได้</p>',
+                        unsafe_allow_html=True)
 
             with st.form("copilot_hero", border=False, clear_on_submit=True):
                 st.text_area("สิ่งที่อยากให้ AI ช่วย", key="copilot_hero_text",
                              placeholder="พิมพ์สิ่งที่อยากให้ AI ช่วย…",
                              height=104, label_visibility="collapsed")
+                st.file_uploader(
+                    "แนบรูป ไฟล์ หรือสเปรดชีต (ไม่บังคับ) — รูป/PDF ไม่เกิน 6 MB",
+                    type=attachments.UPLOAD_TYPES if ATTACH_AVAILABLE else None,
+                    accept_multiple_files=True, key="copilot_hero_files",
+                    help="รูปสินค้า · โพสต์คู่แข่ง · สกรีนช็อตยอดขาย · CSV/Excel · PDF",
+                    disabled=not ATTACH_AVAILABLE,
+                )
                 if st.form_submit_button("ส่งให้ AI ช่วย", type="primary",
                                          width="stretch"):
                     text = (st.session_state.get("copilot_hero_text") or "").strip()
-                    if text:
+                    files = st.session_state.get("copilot_hero_files") or []
+                    # A file on its own is a complete request — "ดูรูปนี้ให้หน่อย"
+                    # is what the upload already said.
+                    if text or files:
                         st.session_state["copilot_pending"] = text
+                        st.session_state["copilot_pending_files"] = \
+                            attachments.from_uploads(files) if ATTACH_AVAILABLE else []
                         st.rerun()
 
             with st.container(key="rv_sugg"):
@@ -4148,7 +4202,13 @@ def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
                         if st.button(label, key=f"copilot_ex_{i}", width="stretch"):
                             _run_suggestion(label, target)
 
-            _chips([(_label + (" · สร้างรูปได้" if can_image else ""), "on")])
+            can_read = ATTACH_AVAILABLE and _can_read_media(_key, _provider)
+            _chips([(_label
+                     + (" · สร้างรูปได้" if can_image else "")
+                     + (" · อ่านรูป/PDF ได้" if can_read else ""), "on")])
+            if ATTACH_AVAILABLE and not can_read:
+                st.caption("อ่านรูป/PDF ต้องใส่ key Gemini หรือ Claude ที่ ⚙️ ตั้งค่า — "
+                           "ส่วน CSV/Excel/ข้อความ อ่านได้เลยในเครื่อง")
 
     # ── Conversation ───────────────────────────────────────────────────────
     if msgs:
@@ -4165,34 +4225,77 @@ def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
     for mi, m in enumerate(msgs):
         if m["role"] == "user":
             with st.chat_message("user"):
-                st.markdown(m["text"])
+                if m.get("text"):
+                    st.markdown(m["text"])
+                _render_message_attachments(m.get("files") or [], mi)
         else:
             with st.chat_message("assistant", avatar="🧴"):
                 if m.get("error"):
                     st.error(f"ร่างไม่สำเร็จ: {m['error']}")
                 else:
-                    _render_copilot_draft(mi, m["brief"], m["package"],
-                                          line_token, fb_token, fb_page_id, ig_business_id,
-                                          gemini_key=_key if can_image else "")
+                    for note in m.get("notes") or []:
+                        st.warning(note)
+                    if m.get("read"):
+                        with st.expander("📎 สิ่งที่ AI อ่านได้จากไฟล์แนบ", expanded=True):
+                            st.markdown(m["read"])
+                    if m.get("brief") is not None:
+                        _render_copilot_draft(mi, m["brief"], m["package"],
+                                              line_token, fb_token, fb_page_id,
+                                              ig_business_id,
+                                              gemini_key=_key if can_image else "")
 
     pending = st.session_state.pop("copilot_pending", None)
+    pending_files = st.session_state.pop("copilot_pending_files", None) or []
     if msgs:
-        typed = st.chat_input("พิมพ์สิ่งที่อยากให้ AI ช่วย…")
+        # accept_file puts the paperclip inside the composer, so attaching mid-
+        # conversation costs no extra chrome. It returns an object, not a string.
+        typed = st.chat_input(
+            "พิมพ์สิ่งที่อยากให้ AI ช่วย… หรือแนบรูป/ไฟล์",
+            accept_file="multiple" if ATTACH_AVAILABLE else False,
+            file_type=attachments.UPLOAD_TYPES if ATTACH_AVAILABLE else None,
+        )
         if typed:
-            pending = typed
+            if isinstance(typed, str):
+                pending = typed
+            else:
+                pending = (typed.text or "").strip()
+                pending_files = attachments.from_uploads(typed.files or [])
 
-    if pending:
-        msgs.append({"role": "user", "text": pending})
+    if pending or pending_files:
+        msgs.append({"role": "user", "text": pending,
+                     "files": [(a.name, a.kind, a.data if a.kind == "image" else None)
+                               for a in pending_files]})
+        notes: list[str] = []
+        read = ""
+        if pending_files:
+            with st.spinner("กำลังอ่านไฟล์แนบ..."):
+                read, notes = attachments.analyze(
+                    pending_files, pending or "ช่วยดูไฟล์นี้ให้หน่อย",
+                    api_key=_key, provider=_provider)
+
+        # Reading a file is worth showing on its own. Without a usable request
+        # there is nothing to draft, so stop at the summary rather than inventing
+        # a campaign the user never asked for.
+        if not pending and not read:
+            msgs.append({"role": "assistant", "brief": None, "package": None,
+                         "notes": notes, "read": read})
+            st.rerun()
+
+        ask = pending or "ช่วยคิดคอนเทนต์จากไฟล์ที่แนบมา"
+        if read:
+            ask = f"{ask}\n\n[บริบทจากไฟล์แนบ]\n{read}"
+
         with st.spinner("กำลังร่างให้..."):
             try:
                 brief, package = content_copilot.generate(
-                    pending, _key, st.session_state.get("copilot_brand", "LEMED"),
+                    ask, _key, st.session_state.get("copilot_brand", "LEMED"),
                     provider=_provider,
                     vertical=st.session_state.get("copilot_vertical", "auto"),
                 )
-                msgs.append({"role": "assistant", "brief": brief, "package": package})
+                msgs.append({"role": "assistant", "brief": brief, "package": package,
+                             "notes": notes, "read": read})
             except Exception as e:  # noqa: BLE001 — surface any failure in-chat
-                msgs.append({"role": "assistant", "error": str(e)})
+                msgs.append({"role": "assistant", "error": str(e), "notes": notes})
         st.rerun()
 
 
