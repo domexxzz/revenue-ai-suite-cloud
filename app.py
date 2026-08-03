@@ -94,6 +94,12 @@ try:
 except ImportError:
     ATTACH_AVAILABLE = False
 
+try:
+    import queue_review
+    QUEUE_REVIEW_AVAILABLE = True
+except ImportError:
+    QUEUE_REVIEW_AVAILABLE = False
+
 # Top-level mode switch labels (shop owner vs affiliate marketing)
 MODE_SHOP = "🏪 ร้านของฉัน"
 MODE_AFFILIATE = "🚀 แอฟฟิลิเอต"
@@ -1192,6 +1198,60 @@ K_LV_DAY = "set_lv_days"
 
 def _s(key: str, default: str = "") -> str:
     return st.session_state.get(key, default) or default
+
+
+# Widget state is not storage.
+#
+# Streamlit drops a keyed widget's session_state entry on the first run where
+# that widget is not instantiated. With the forms living on Settings and
+# Integrations, that means every token evaporates the moment someone navigates
+# to the queue to post — which is the one place they are needed. Found by
+# watching a Gemini key survive on its own page and be gone one click later.
+#
+# So the value lives under a plain key nothing else claims, and the widget gets
+# a separate `w_`-prefixed key it is free to lose. The widget writes back on
+# change; the rest of the app only ever reads the plain key.
+
+def _commit_setting(store_key: str, widget_key: str) -> None:
+    st.session_state[store_key] = st.session_state.get(widget_key)
+
+
+def _setting_text(label: str, store_key: str, *, password: bool = False,
+                  **kw) -> str:
+    wk = "w_" + store_key
+    st.text_input(label, value=_s(store_key), key=wk,
+                  type="password" if password else "default",
+                  on_change=_commit_setting, args=(store_key, wk), **kw)
+    return _s(store_key)
+
+
+def _setting_radio(label: str, options: list[str], store_key: str,
+                   default: str = "", **kw) -> str:
+    wk = "w_" + store_key
+    current = _s(store_key, default or options[0])
+    index = options.index(current) if current in options else 0
+    st.radio(label, options, index=index, key=wk,
+             on_change=_commit_setting, args=(store_key, wk), **kw)
+    return _s(store_key, default or options[0])
+
+
+def _setting_select(label: str, options: list, store_key: str, default=None,
+                    **kw):
+    wk = "w_" + store_key
+    current = st.session_state.get(store_key, default if default is not None
+                                   else options[0])
+    index = options.index(current) if current in options else 0
+    st.selectbox(label, options, index=index, key=wk,
+                 on_change=_commit_setting, args=(store_key, wk), **kw)
+    return st.session_state.get(store_key, options[index])
+
+
+def _setting_slider(label: str, lo: int, hi: int, store_key: str,
+                    default: int, **kw) -> int:
+    wk = "w_" + store_key
+    st.slider(label, lo, hi, value=int(st.session_state.get(store_key, default)),
+              key=wk, on_change=_commit_setting, args=(store_key, wk), **kw)
+    return int(st.session_state.get(store_key, default))
 
 
 def _resolve_api_key(ai_mode: str) -> str:
@@ -2706,6 +2766,149 @@ def _render_scene_score(filename: str) -> None:
                    "ไม่ใช่การทำนายยอด engagement")
 
 
+def _brand_context_for_review() -> str:
+    """The brand material the reviewer scores against."""
+    try:
+        import mandala_client
+        block = mandala_client.build_context_block()
+        if block:
+            return block
+    except Exception:  # noqa: BLE001 — mandala-bot is optional
+        pass
+    if COPILOT_AVAILABLE:
+        try:
+            return content_copilot.load_brand_context()
+        except Exception:  # noqa: BLE001
+            return ""
+    return ""
+
+
+def _run_ai_review(file: dict, platform: str, key: str, provider: str) -> None:
+    """Download the file and have the model look at it. Result cached per file id."""
+    fid = file["id"]
+    data = st.session_state.get(f"q_data_{fid}") or download_file(fid)
+    if not data:
+        st.session_state[f"q_rev_err_{fid}"] = "โหลดไฟล์จาก Drive ไม่สำเร็จ"
+        return
+    # Keep the bytes: approving posts the same file, so this saves a second
+    # download of something already in memory.
+    st.session_state[f"q_data_{fid}"] = data
+    review, err = queue_review.review_file(
+        file["name"], file.get("mimeType", ""), data,
+        brand_context=_brand_context_for_review(),
+        api_key=key, provider=provider,
+        platform=PLATFORM_THAI_NAMES.get(platform, ""),
+    )
+    st.session_state[f"q_rev_{fid}"] = review
+    st.session_state[f"q_rev_err_{fid}"] = err
+
+
+def _render_ai_review(file: dict, platform: str) -> None:
+    """AI's read of the actual file — offered, not run automatically.
+
+    Every review costs a download plus a model call, and a queue page lists up
+    to 100 files. Running them all on load would spend real money answering a
+    question nobody asked yet, so it happens on the button.
+    """
+    if not QUEUE_REVIEW_AVAILABLE:
+        return
+    fid = file["id"]
+    mime = file.get("mimeType", "")
+    # Resolved, not raw: _resolve_ai blanks the key whenever the mode cannot
+    # actually run (Claude selected without the SDK installed, say), and asking
+    # can_review with a key the app will not use would promise a review that
+    # then fails.
+    key, provider, _lbl = _resolve_ai(ai_mode := _s(K_AI, "Local Smart"),
+                                      _resolve_api_key(ai_mode))
+
+    review = st.session_state.get(f"q_rev_{fid}")
+    err = st.session_state.get(f"q_rev_err_{fid}")
+    ok, why = queue_review.can_review(mime, key, provider)
+
+    if review is None and not err:
+        if not ok:
+            st.caption(f"🔍 ให้ AI ดูไฟล์จริง — {why}")
+            return
+        if st.button("🔍 ให้ AI ดูไฟล์จริงแล้วให้คะแนน", key=f"q_rev_go_{fid}",
+                     width="stretch"):
+            with st.spinner("กำลังให้ AI ดูไฟล์..."):
+                _run_ai_review(file, platform, key, provider)
+            st.rerun()
+        return
+
+    if err:
+        st.warning(f"ตรวจไม่สำเร็จ: {err}")
+    if review:
+        label, tone = queue_review.VERDICT_THAI.get(review.verdict,
+                                                    ("🛠️ ควรแก้ก่อน", "on"))
+        chips = [(label, tone)]
+        if review.fit:
+            chips.append((f"{'★' * review.fit}{'·' * (5 - review.fit)} เข้ากับแบรนด์", "on"))
+        if review.scene:
+            chips.append((f"ฉาก: {review.scene}", ""))
+        _chips(chips)
+
+        if review.seen:
+            st.markdown(f"**AI เห็นอะไร:** {review.seen}")
+        if review.risk:
+            st.warning(f"⚠️ {review.risk}")
+        if review.strengths or review.fixes:
+            g1, g2 = st.columns(2)
+            with g1:
+                if review.strengths:
+                    st.markdown("**ข้อดี**\n" +
+                                "\n".join(f"- {s}" for s in review.strengths))
+            with g2:
+                if review.fixes:
+                    st.markdown("**ควรแก้**\n" +
+                                "\n".join(f"- {s}" for s in review.fixes))
+        st.caption("คะแนนนี้คือความเข้ากับแบรนด์ตามบริบทใน Mandala AI "
+                   "ไม่ใช่การทำนายยอด engagement")
+
+    if st.button("🔄 ตรวจใหม่", key=f"q_rev_again_{fid}"):
+        st.session_state.pop(f"q_rev_{fid}", None)
+        st.session_state.pop(f"q_rev_err_{fid}", None)
+        st.rerun()
+
+
+QUEUE_BATCH_CAP = 10
+
+
+def _render_batch_review(files: list[dict], folder_name: str, platform: str) -> None:
+    """Review a whole folder page in one go, with the cost stated up front.
+
+    Capped and counted rather than "review everything": each file is a download
+    plus a model call, and a folder can hold a hundred of them. Whatever the cap
+    leaves out is said out loud — a batch that silently stops at ten reads as
+    "all done" when it is not.
+    """
+    if not QUEUE_REVIEW_AVAILABLE or not files:
+        return
+    key, provider, _lbl = _resolve_ai(ai_mode := _s(K_AI, "Local Smart"),
+                                      _resolve_api_key(ai_mode))
+    todo = [f for f in files
+            if st.session_state.get(f"q_rev_{f['id']}") is None
+            and not st.session_state.get(f"q_rev_err_{f['id']}")
+            and queue_review.can_review(f.get("mimeType", ""), key, provider)[0]]
+    if not todo:
+        return
+
+    batch = todo[:QUEUE_BATCH_CAP]
+    left = len(todo) - len(batch)
+    label = f"🔍 ให้ AI ตรวจ {len(batch)} ไฟล์ในโฟลเดอร์นี้"
+    if left:
+        label += f" (เหลืออีก {left} กดซ้ำได้)"
+    if not st.button(label, key=f"q_batch_{folder_name}", width="stretch"):
+        return
+
+    bar = st.progress(0.0, text="กำลังตรวจ...")
+    for i, f in enumerate(batch, 1):
+        bar.progress(i / len(batch), text=f"กำลังตรวจ {f['name']} ({i}/{len(batch)})")
+        _run_ai_review(f, platform, key, provider)
+    bar.empty()
+    st.rerun()
+
+
 def _render_move_to_platform(file: dict, all_folders: dict, current: str = "") -> None:
     """Let the reviewer say where this clip is going.
 
@@ -2777,6 +2980,8 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
             if caption:
                 st.text_area("ข้อความที่จะโพสต์", value=caption, height=160,
                              key=f"q_cap_{fid}")
+
+        _render_ai_review(file, platform)
 
         top, act = st.columns([3, 1])
         with top:
@@ -3080,6 +3285,8 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
             st.caption(f"แสดง {shown} จาก {len(files)} ไฟล์ · เรียง{order}")
         if not platform:
             st.caption("⚠️ เดาแพลตฟอร์มจากชื่อโฟลเดอร์ไม่ได้ — เลือกปลายทางให้แต่ละไฟล์ก่อน")
+
+        _render_batch_review(files[:shown], folder_name, platform)
 
         for f in files[:shown]:
             total += 1
@@ -3980,7 +4187,7 @@ def render_integrations_page() -> None:
     tabs = st.tabs(["LINE OA", "Facebook", "Instagram", "TikTok", "Google Drive"])
 
     with tabs[0]:
-        st.text_input("LINE OA Token", type="password", key=K_LINE,
+        _setting_text("LINE OA Token", K_LINE, password=True,
                       placeholder="Channel Access Token",
                       help="จาก LINE Developers → Messaging API → Channel Access Token")
         if _s(K_LINE):
@@ -3989,11 +4196,11 @@ def render_integrations_page() -> None:
             st.markdown(_LINE_GUIDE)
 
     with tabs[1]:
-        st.text_input("Facebook Page Token", type="password", key=K_FB,
+        _setting_text("Facebook Page Token", K_FB, password=True,
                       placeholder="Page Access Token",
                       help="จาก Meta Developer → Graph API → Page Token")
         if _s(K_FB):
-            st.text_input("Facebook Page ID", key=K_FB_PID, placeholder="เช่น 123456789")
+            _setting_text("Facebook Page ID", K_FB_PID, placeholder="เช่น 123456789")
             if _s(K_FB_PID):
                 st.success("Facebook พร้อมโพสต์")
         else:
@@ -4005,7 +4212,7 @@ def render_integrations_page() -> None:
         if not _s(K_FB):
             st.info("Instagram ใช้ token เดียวกับ Facebook — ใส่ Page Token ในแท็บ Facebook ก่อน")
         else:
-            st.text_input("Instagram Business Account ID", key=K_IG,
+            _setting_text("Instagram Business Account ID", K_IG,
                           placeholder="เช่น 17841...",
                           help="ID ของ IG Business Account ที่ผูกกับ Facebook Page")
             if _s(K_IG):
@@ -4017,15 +4224,15 @@ def render_integrations_page() -> None:
         if not TIKTOK_AVAILABLE:
             st.info("ยังไม่มีโมดูล tiktok_poster.py ในโปรเจกต์")
         else:
-            st.text_input("TikTok Access Token", type="password", key=K_TIKTOK,
+            _setting_text("TikTok Access Token", K_TIKTOK, password=True,
                           placeholder="act....",
                           help="ต้องมี scope video.publish — token อายุสั้น (~24 ชม.)")
             if _s(K_TIKTOK):
-                st.selectbox(
+                _setting_select(
                     "การมองเห็นโพสต์ TikTok",
-                    options=list(tiktok_poster.PRIVACY_LEVELS.keys()),
+                    list(tiktok_poster.PRIVACY_LEVELS.keys()),
+                    "tiktok_privacy",
                     format_func=lambda v: tiktok_poster.PRIVACY_LEVELS[v],
-                    key="tiktok_privacy",
                 )
                 if st.button("ทดสอบ TikTok", width="stretch"):
                     info, m = tiktok_poster.creator_info(_s(K_TIKTOK))
@@ -4067,51 +4274,48 @@ def render_settings_page() -> None:
     tabs = st.tabs(["AI", "แบรนด์", "หน้าตา", "POS"])
 
     with tabs[0]:
-        st.radio(
+        mode_now = _setting_radio(
             "โมเดลที่ใช้",
             ["Local Smart", "Gemini API", "Claude API"],
-            key=K_AI,
+            K_AI, default="Local Smart",
             help="Local Smart ใช้ rule-based logic ทำงานได้ทันที | "
                  "Gemini สร้างรูปได้ด้วย | Claude เน้นคุณภาพงานเขียน",
         )
-        mode_now = _s(K_AI, "Local Smart")
         if mode_now == "Gemini API":
-            st.text_input("Gemini API Key", type="password", key=K_GEMINI,
+            _setting_text("Gemini API Key", K_GEMINI, password=True,
                           placeholder="AIza...")
             if _s(K_GEMINI):
-                st.success("พร้อมใช้ Gemini — สร้างข้อความ + รูปได้")
+                st.success("พร้อมใช้ Gemini — สร้างข้อความ + รูป + อ่านรูป/คลิปได้")
             else:
                 st.caption("ขอฟรีที่ [aistudio.google.com/apikey](https://aistudio.google.com/apikey)")
         elif mode_now == "Claude API":
             if not ANTHROPIC_AVAILABLE:
                 st.warning("ติดตั้ง anthropic ก่อน:\n`pip install anthropic`")
-            st.text_input("Anthropic API Key", type="password", key=K_CLAUDE,
+            _setting_text("Anthropic API Key", K_CLAUDE, password=True,
                           placeholder="sk-ant-...")
             if _s(K_CLAUDE):
-                st.success("พร้อมใช้ Claude API")
+                st.success("พร้อมใช้ Claude API — อ่านรูปได้ แต่อ่านคลิปไม่ได้")
         else:
             st.caption("ไม่ต้องใส่ key — ทำงานในเครื่อง ไม่ส่งข้อมูลออก")
 
     with tabs[1]:
-        # setdefault, not value= — passing both a value and a key that already
-        # holds state makes Streamlit warn and then ignore one of them.
         st.session_state.setdefault("copilot_brand", "LEMED")
-        st.text_input("ชื่อแบรนด์", key="copilot_brand")
+        _setting_text("ชื่อแบรนด์", "copilot_brand")
         if COPILOT_AVAILABLE:
             known = content_copilot.product_from_context(
                 content_copilot.load_brand_context())
             if known:
                 st.success(f"🔒 สินค้าของแบรนด์: **{known}** — คอนเทนต์จะอ้างถึงสินค้านี้เสมอ "
                            "(อ่านจากบริบทแบรนด์ ไม่ใช่เดาจากคำที่พิมพ์)")
-        st.selectbox(
+        _setting_select(
             "ประเภทธุรกิจ",
-            options=["auto", "product", "fnb"],
+            ["auto", "product", "fnb"],
+            "copilot_vertical", default="auto",
             format_func=lambda v: {
                 "auto": "🔎 ตรวจอัตโนมัติจากคำสั่ง + บริบทแบรนด์",
                 "product": "🧴 สินค้า / สกินแคร์ / ความงาม",
                 "fnb": "🍜 ร้านอาหาร / คาเฟ่",
             }[v],
-            key="copilot_vertical",
             help="กำหนดโทนคอนเทนต์ — ตั้งไว้ถ้าคำสั่งสั้นจนระบบเดาผิด",
         )
         _mandala_badge()
@@ -4131,10 +4335,9 @@ def render_settings_page() -> None:
 
     with tabs[3]:
         st.caption("Loyverse POS — ใช้กับหน้า 🔌 Connect POS")
-        st.text_input("API Token", type="password", key=K_LV,
+        _setting_text("API Token", K_LV, password=True,
                       placeholder="ใส่ token จาก Loyverse Back Office")
-        st.session_state.setdefault(K_LV_DAY, 30)
-        st.slider("ดึงข้อมูลย้อนหลัง (วัน)", 7, 90, key=K_LV_DAY)
+        _setting_slider("ดึงข้อมูลย้อนหลัง (วัน)", 7, 90, K_LV_DAY, 30)
 
 
 def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
