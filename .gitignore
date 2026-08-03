@@ -11,6 +11,8 @@ venv/
 
 # Streamlit
 .streamlit/secrets.toml
+# Tokens the app saves so they survive a restart — plaintext, machine-local
+.streamlit/app_secrets.json
 
 # Logs (dev artifacts)
 pip_out.txt

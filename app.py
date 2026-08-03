@@ -100,6 +100,18 @@ try:
 except ImportError:
     QUEUE_REVIEW_AVAILABLE = False
 
+try:
+    import secrets_store
+    SECRETS_STORE_AVAILABLE = True
+except ImportError:
+    SECRETS_STORE_AVAILABLE = False
+
+try:
+    import facebook_auth
+    FB_AUTH_AVAILABLE = True
+except ImportError:
+    FB_AUTH_AVAILABLE = False
+
 # Top-level mode switch labels (shop owner vs affiliate marketing)
 MODE_SHOP = "🏪 ร้านของฉัน"
 MODE_AFFILIATE = "🚀 แอฟฟิลิเอต"
@@ -1194,6 +1206,21 @@ K_GEMINI = "set_gemini_key"
 K_CLAUDE = "set_claude_key"
 K_LV     = "set_lv_token"
 K_LV_DAY = "set_lv_days"
+K_FB_APP = "set_fb_app_id"
+K_FB_SEC = "set_fb_app_secret"
+
+
+def _load_saved_settings() -> None:
+    """Seed session state from disk, once per session.
+
+    setdefault, not assignment: a value already in session_state came from the
+    person using the app right now and must outrank whatever was saved earlier.
+    """
+    if st.session_state.get("_settings_loaded") or not SECRETS_STORE_AVAILABLE:
+        return
+    for key, value in secrets_store.load().items():
+        st.session_state.setdefault(key, value)
+    st.session_state["_settings_loaded"] = True
 
 
 def _s(key: str, default: str = "") -> str:
@@ -1214,6 +1241,30 @@ def _s(key: str, default: str = "") -> str:
 
 def _commit_setting(store_key: str, widget_key: str) -> None:
     st.session_state[store_key] = st.session_state.get(widget_key)
+
+
+def _stage_settings(values: dict) -> None:
+    """Queue values for the next run, for code that fills a field on the user's
+    behalf (picking a Facebook page, say).
+
+    Writing the store key alone is not enough. The widget on screen still holds
+    its old text, and on the next run its on_change fires and writes that stale
+    text straight back over what was just set — which looked exactly like the
+    assignment never happening. Writing the widget key too would fix it, but
+    Streamlit refuses that once the widget exists this run. So it waits.
+    """
+    st.session_state["_pending_settings"] = {
+        **st.session_state.get("_pending_settings", {}), **values}
+
+
+def _apply_pending_settings() -> None:
+    """Drain the queue. Must run before any settings widget is instantiated."""
+    pending = st.session_state.pop("_pending_settings", None)
+    if not pending:
+        return
+    for key, value in pending.items():
+        st.session_state[key] = value
+        st.session_state["w_" + key] = value
 
 
 def _setting_text(label: str, store_key: str, *, password: bool = False,
@@ -1283,6 +1334,11 @@ def _connection_status() -> list[tuple[str, bool]]:
         ("TikTok", bool(_s(K_TIKTOK))),
         ("Google Drive", drive),
     ]
+
+
+# Before anything reads a token — the sidebar's connection count is the first
+# thing to ask, and it runs before either settings page exists.
+_load_saved_settings()
 
 
 DATA_PATH = Path("data/sample_transactions.csv")
@@ -4140,6 +4196,119 @@ _IG_GUIDE = """
 """
 
 
+def _render_fb_longlived() -> None:
+    """Trade the hour-long Explorer token for one that does not expire.
+
+    Folded away by default: it is a one-time setup step, not something to walk
+    past on every visit. Everything it needs is stated before anything is sent —
+    the App Secret is a credential, and asking for one without saying where it
+    goes is how people learn not to trust a form.
+    """
+    if not FB_AUTH_AVAILABLE:
+        return
+    # Stay open while there is something to act on. An expander defaults to
+    # closed on every run, so pressing the button folded the page picker away
+    # the moment it appeared — the exchange had worked and looked like it had
+    # done nothing.
+    busy = bool(st.session_state.get("fb_pages")
+                or st.session_state.get("fb_exchange_err")
+                or st.session_state.get("fb_debug_info"))
+    with st.expander("🔁 แลกเป็น token ที่ไม่หมดอายุ (ทำครั้งเดียว)", expanded=busy):
+        st.caption(
+            "token ที่ copy จาก Graph API Explorer อยู่ได้ราว 1 ชั่วโมง — "
+            "นานพอให้ทดสอบผ่าน แล้วไปเงียบตอนโพสต์จริง "
+            "แลกครั้งเดียวได้ Page Token ที่ไม่มีวันหมดอายุ"
+        )
+        st.caption("หา App ID / App Secret ได้ที่ developers.facebook.com → "
+                   "App ของคุณ → Settings → Basic (ค่าจะถูกส่งไปที่ Facebook เท่านั้น)")
+        c1, c2 = st.columns(2)
+        with c1:
+            _setting_text("App ID", K_FB_APP, placeholder="เช่น 1234567890")
+        with c2:
+            _setting_text("App Secret", K_FB_SEC, password=True,
+                          placeholder="จาก Settings → Basic")
+
+        app_id, app_secret, token = _s(K_FB_APP), _s(K_FB_SEC), _s(K_FB)
+        ready = bool(app_id and app_secret and token)
+        if not ready:
+            st.caption("ใส่ Page Token ด้านบน + App ID + App Secret ให้ครบก่อน")
+
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("🔁 แลกเป็นแบบถาวร", disabled=not ready,
+                         type="primary", width="stretch", key="fb_exchange"):
+                with st.spinner("กำลังคุยกับ Facebook..."):
+                    user_token, err = facebook_auth.exchange_long_lived(
+                        token, app_id, app_secret)
+                    pages, perr = ([], err) if err else facebook_auth.list_pages(user_token)
+                st.session_state["fb_pages"] = pages
+                st.session_state["fb_exchange_err"] = perr
+                st.rerun()
+        with b2:
+            if st.button("🕒 เช็คว่า token หมดอายุเมื่อไหร่", disabled=not ready,
+                         width="stretch", key="fb_debug"):
+                with st.spinner("กำลังเช็ค..."):
+                    info, err = facebook_auth.describe_token(token, app_id, app_secret)
+                # Kept in state, not printed here: the button triggers a rerun,
+                # the expander folds shut on its own, and anything written inside
+                # the click branch disappears with it.
+                st.session_state["fb_debug_info"] = info
+                st.session_state["fb_debug_err"] = err
+                st.rerun()
+
+        if st.session_state.get("fb_exchange_err"):
+            st.error(st.session_state["fb_exchange_err"])
+        if st.session_state.get("fb_debug_err"):
+            st.error(st.session_state["fb_debug_err"])
+        if info := st.session_state.get("fb_debug_info"):
+            icon = "✅" if info.get("valid") else "❌"
+            st.info(f"{icon} token ชนิด {info.get('type', '?')} · "
+                    f"{info.get('expires_text', '')}")
+            if info.get("scopes"):
+                st.caption("สิทธิ์: " + ", ".join(info["scopes"]))
+
+        pages = st.session_state.get("fb_pages") or []
+        if pages:
+            st.success(f"เจอ {len(pages)} เพจที่คุณเป็นแอดมิน — เลือกเพจที่จะโพสต์")
+            names = [f"{p.get('name', '?')} ({p.get('id', '')})" for p in pages]
+            choice = st.selectbox("เพจ", names, key="fb_page_choice")
+            if st.button("✅ ใช้เพจนี้", type="primary", width="stretch",
+                         key="fb_page_apply"):
+                page = pages[names.index(choice)]
+                token_new, page_id = page.get("access_token", ""), page.get("id", "")
+                values = {K_FB: token_new, K_FB_PID: page_id}
+                # The page token also answers the Instagram question, which is
+                # otherwise a separate trip through Graph API Explorer.
+                ig, _ = facebook_auth.instagram_account_for(page_id, token_new)
+                if ig:
+                    values[K_IG] = ig
+                _stage_settings(values)
+                st.session_state.pop("fb_pages", None)
+                st.session_state["fb_applied"] = page.get("name", "")
+                st.rerun()
+
+
+def _render_saved_settings() -> None:
+    """Save what has been typed so a restart does not undo the setup."""
+    if not SECRETS_STORE_AVAILABLE:
+        return
+    st.divider()
+    st.markdown("**💾 จำค่าไว้ในเครื่อง**")
+    st.caption(f"{secrets_store.describe()} · เก็บเป็นไฟล์ธรรมดาใน "
+               "`.streamlit/app_secrets.json` (git ไม่เก็บให้อยู่แล้ว) — "
+               "ใครเปิดเครื่องนี้ได้ก็อ่าน token ได้ ถ้าไม่สบายใจให้กดลบ")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("💾 บันทึกค่าที่ใส่ไว้", width="stretch", key="save_settings"):
+            ok, msg = secrets_store.save(
+                {k: st.session_state.get(k) for k in secrets_store.SAVED_KEYS})
+            (st.success if ok else st.error)(msg)
+    with c2:
+        if st.button("🗑️ ลบค่าที่บันทึกไว้", width="stretch", key="clear_settings"):
+            ok, msg = secrets_store.clear()
+            (st.success if ok else st.error)(msg)
+
+
 def _run_connection_test() -> None:
     """Check every configured channel, one line of feedback each."""
     from platform_poster import (test_line_token, test_facebook_token,
@@ -4177,8 +4346,12 @@ def render_integrations_page() -> None:
     fields and three step-by-step guides sat permanently next to a chat box that
     most sessions never needed them for.
     """
+    _apply_pending_settings()   # before any widget on this page exists
     _page_head("การเชื่อมต่อ",
                "ต่อช่องทางที่จะใช้โพสต์ — ใส่ token ครั้งเดียว ใช้ได้ทุกหน้า")
+    if applied := st.session_state.pop("fb_applied", ""):
+        st.success(f"ใช้เพจ {applied} แล้ว — Page Token, Page ID "
+                   "และ Instagram ID (ถ้ามี) ถูกเติมให้อัตโนมัติ")
 
     status = _connection_status()
     _chips([(f"{name} · {'เชื่อมแล้ว' if ok else 'ยังไม่เชื่อม'}", "ok" if ok else "")
@@ -4205,6 +4378,7 @@ def render_integrations_page() -> None:
                 st.success("Facebook พร้อมโพสต์")
         else:
             st.caption("ใส่ Page Token ก่อน แล้วช่อง Page ID จะขึ้นมา")
+        _render_fb_longlived()
         with st.expander("📖 วิธีขอ Facebook Page Token"):
             st.markdown(_FB_GUIDE)
 
@@ -4257,6 +4431,8 @@ def render_integrations_page() -> None:
     st.divider()
     if st.button("🔌 เช็คการเชื่อมต่อทั้งหมด", type="primary", width="stretch"):
         _run_connection_test()
+
+    _render_saved_settings()
 
 
 # ── Settings ────────────────────────────────────────────────────────────────────
@@ -4338,6 +4514,8 @@ def render_settings_page() -> None:
         _setting_text("API Token", K_LV, password=True,
                       placeholder="ใส่ token จาก Loyverse Back Office")
         _setting_slider("ดึงข้อมูลย้อนหลัง (วัน)", 7, 90, K_LV_DAY, 30)
+
+    _render_saved_settings()
 
 
 def render_copilot_page(ai_mode: str, api_key: str, line_token: str = "",
