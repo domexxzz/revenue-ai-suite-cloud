@@ -2650,7 +2650,7 @@ def _resolve_ai(ai_mode: str, api_key: str) -> tuple[str, str, str]:
 
 
 def _mandala_badge() -> None:
-    """Show whether the Mandala brand context is wired in."""
+    """Show whether the Mandala brand context is wired in, with a refresh control."""
     try:
         import mandala_client
         info = mandala_client.status()
@@ -2663,6 +2663,29 @@ def _mandala_badge() -> None:
         )
     elif info.get("found"):
         st.caption("🔗 เจอ mandala-bot แต่ยังไม่มี context.txt")
+    else:
+        return
+
+    # ดึงข้อมูลเพจ FB ล่าสุดเข้ามาอัปเดตบริบทแบรนด์ โดยไม่ต้องเปิด terminal mandala-bot แยก
+    try:
+        import mandala_refresh
+    except Exception:  # noqa: BLE001
+        return
+    if st.button(
+        "🔄 ดึงข้อมูลเพจ FB ล่าสุด",
+        key="mandala_refresh_fb",
+        help="รัน fb_insights ของ mandala-bot แล้วอัปเดตบริบทแบรนด์จากโพสต์+engagement จริง",
+    ):
+        with st.spinner("กำลังดึงข้อมูลเพจจาก Facebook..."):
+            res = mandala_refresh.refresh_fb_insights()
+        if res.get("ok"):
+            st.success("อัปเดตบริบทแบรนด์จากเพจแล้ว")
+            st.cache_data.clear()
+            st.rerun()
+        else:
+            st.error("ดึงข้อมูลเพจไม่สำเร็จ (token FB อาจหมดอายุ — ต่อ token ใหม่ใน mandala-bot/.env)")
+            with st.expander("รายละเอียด"):
+                st.code((res.get("stderr") or res.get("stdout") or "")[-1500:])
 
 
 @st.cache_data(ttl=600, show_spinner=False)
