@@ -364,23 +364,21 @@ _VIDEO_AVOID = ("no on-screen text, no watermark, no logo distortion, no jarring
 _PRODUCT_FORMS: dict[str, dict] = {
     "bar": {
         "keywords": ["สบู่", "soap", "ก้อน", "bar"],
-        # Naming the wrong packaging explicitly. Saying "soap bar" once was not
-        # enough — the model rendered a squeeze tube, the default shape for
-        # skincare, because the shot directions all said "the product".
-        "avoid": "no tube, no squeeze tube, no bottle, no pump, no dropper, "
-                 "no jar, no pouch, no liquid container of any kind — "
-                 "the product is a solid bar of soap and nothing else",
-        # Describes the shape only — the subject line already names the product,
-        # so repeating "soap bar" here reads as "a soap bar … a solid soap bar".
-        "desc": "a solid bar with softly rounded edges and a matte surface, "
+        "avoid": "no round soap, no circular puck, no disk, no purple soap, no purple box, "
+                 "no cardboard carton box, no petri dish, no laboratory glassware, no chemical flasks, "
+                 "no beakers, no test tubes, no science lab, no tube, no squeeze tube, no bottle, "
+                 "no pump, no dropper, no serum, no jar, no pouch, no liquid container of any kind — "
+                 "the product is an authentic rectangular solid herbal soap bar with a white paper belly-band wrapper only",
+        "desc": "an authentic rectangular solid herbal soap bar with softly chamfered beveled edges, "
+                "warm honey-amber and natural herbal beige translucent tone with delicate organic flecks, "
+                "wrapped around the middle with a crisp clean matte white paper sleeve belly-band "
+                "featuring the botanical leaf emblem, crisp black LEMED logo, and gold-ochre accent band, "
                 "resting flat and stable",
-        "physics": "a solid bar never pours, drips or squeezes. It lathers only when "
-                   "wet and rubbed — foam builds gradually into small irregular "
-                   "bubbles. Water beads on the surface and runs off downward with "
-                   "gravity. The bar keeps its exact shape and size throughout",
-        "texture": "rich white lather and fine irregular bubbles on a wet bar surface",
-        "handling": "held flat in an open palm or between both hands — never tipped, "
-                    "squeezed or poured",
+        "physics": "a solid dense bar of soap that never pours, drips or squeezes. It produces rich, "
+                   "creamy white micro-lather foam when wet. Natural water beads rest with surface tension "
+                   "on the bar. The rectangular bar maintains its exact shape, bevels and label throughout",
+        "texture": "subtle waxy herbal matte surface, micro-droplets of water, and fine rich white foam",
+        "handling": "held flat in an open palm or between both hands — never tipped, squeezed or poured",
     },
     "bottle": {
         "keywords": ["เซรั่ม", "serum", "โทนเนอร์", "toner", "แชมพู", "shampoo",
@@ -513,21 +511,19 @@ def detect_product_form(item: str, brand_context: str = "") -> dict:
 
 
 def _master_scene(brief: dict) -> tuple[str, str, str]:
-    """(subject, setting, styling) tuned to the vertical and product form."""
-    brand = brief.get("brand_name") or "LEMED"
-    top_item = brief.get("top_item") or "สบู่ก้อน"
-    if top_item in ("the product", "product", "สินค้าเด่น", "เซรั่ม", ""):
-        top_item = "สบู่ก้อน"
-    item = english_item(top_item)
-    if "soap" not in item.lower() and "bar" not in item.lower() and "lemed" in brand.lower():
-        item = "solid soap bar"
+    """(subject, setting, styling) tuned to the exact physical identity of LEMED Soap."""
+    brand = "LEMED"
+    top_item = "สบู่ก้อน"
+    item = "rectangular solid herbal soap bar"
 
-    form = detect_product_form(top_item, brief.get("brand_context", ""))
     return (
-        f"A single {item} by {brand} — {form['desc']}, front-facing hero "
-        "placement, label crisp and fully legible, pure solid herbal soap bar",
-        "clean seamless minimalist bathroom counter or modern studio surface in soft natural light, subtle water droplets and gentle soap foam",
-        "a few fresh botanical herbal leaves and delicate natural water beads as accents, nothing overlapping the label",
+        f"A single hero {item} by {brand} — authentic rectangular solid soap bar with softly beveled edges, "
+        "natural warm honey-amber and beige herbal soap body with subtle natural herbal specks, "
+        "wrapped around the center with a crisp matte white paper sleeve belly-band with botanical leaf emblem, "
+        "bold crisp black 'LEMED' logo, and a gold-ochre horizontal accent banner, resting stable and flat, "
+        "hero front-facing angle, label crisp and 100% legible",
+        "a warm natural wooden desk or modern minimalist bathroom counter with warm afternoon sunlight and soft organic shadows",
+        "a few fresh green botanical leaves (Centella/Cica) and delicate natural clear water droplets, perfectly clean and uncluttered",
     )
 
 
