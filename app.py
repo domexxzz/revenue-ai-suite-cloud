@@ -3425,8 +3425,12 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
     review = {n: i for n, i in folders.items() if n.upper() not in skip}
     st.caption(f"เจอ {len(review)} โฟลเดอร์: " + " · ".join(sorted(review)))
 
+    # ค่าตั้งต้นเลือกเฉพาะโฟลเดอร์ 'รอจัดคิว (Pending Inbox)' เพื่อไม่ให้ปนกับแพลตฟอร์มอื่น
+    inbox_candidates = [n for n in review if any(k in n for k in ["รอจัดคิว", "Pending Inbox", "Inbox", "รอจัด"])]
+    default_pick = inbox_candidates if inbox_candidates else sorted(review)
+
     pick = st.multiselect("เลือกโฟลเดอร์ที่จะตรวจ", options=sorted(review),
-                          default=sorted(review))
+                          default=default_pick)
 
     # Newest first by default: the usual reason to open this page is to review
     # something just generated. Oldest first is for working down a backlog.
