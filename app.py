@@ -4049,19 +4049,22 @@ def _render_copilot_image(mi: int, brief: dict, scene: str,
         img = st.session_state.get(img_key)
         if img:
             st.image(img, caption="ภาพที่สร้างด้วย Gemini", width="stretch")
-            c1, c2, c3 = st.columns(3)
+            c1, c2, c3, c4 = st.columns(4)
             with c1:
                 st.download_button("📥 ดาวน์โหลด", data=img,
                                    file_name=f"lemed_{mi}.png", mime="image/png",
                                    key=f"copilot_dlimg_{mi}", width="stretch")
             with c2:
+                if st.button("📁 ส่งเข้า Catalog", key=f"copilot_img_to_cat_{mi}", width="stretch"):
+                    _copilot_send_to_queue("all", f"รูปภาพสำหรับแคมเปญ {brief.get('campaign', 'LEMED')}", brief, img_bytes=img)
+            with c3:
                 if CANVA_AVAILABLE and st.button("🎨 ส่งไป Canva",
                                                  key=f"copilot_canva_{mi}",
                                                  width="stretch"):
                     st.session_state["canva_pending_image"] = img
                     st.session_state["shop_menu"] = "🎨 Canva"
                     st.rerun()
-            with c3:
+            with c4:
                 if st.button("🗑️ ลบรูป", key=f"copilot_rmimg_{mi}", width="stretch"):
                     del st.session_state[img_key]
                     st.rerun()
@@ -4180,12 +4183,15 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
             st.info(f"🏷️ **Serial Number:** `{vid_sn}`  (รหัสนี้จะส่งต่อไปยังหน้าคิวอนุมัติ)")
             st.video(vid)
             st.caption(f"ขนาดไฟล์ {len(vid)/1024/1024:.1f} MB · รหัสวิดีโอ: **{vid_sn}**")
-            d1, d2 = st.columns(2)
+            d1, d2, d3 = st.columns(3)
             with d1:
                 st.download_button(f"📥 ดาวน์โหลดวิดีโอ ({vid_sn})", data=vid,
                                    file_name=f"{vid_sn}.mp4", mime="video/mp4",
                                    key=f"copilot_dlvid_{mi}", width="stretch")
             with d2:
+                if st.button("📁 ส่งวิดีโอเข้า Catalog", key=f"copilot_vid_to_cat_{mi}", width="stretch"):
+                    _copilot_send_to_queue("all", f"วิดีโอสำหรับแคมเปญ {brief.get('campaign', 'LEMED')} ({vid_sn})", brief, vid_bytes=vid)
+            with d3:
                 if st.button("🗑️ ลบวิดีโอ", key=f"copilot_rmvid_{mi}",
                              width="stretch"):
                     del st.session_state[vid_key]
@@ -4363,7 +4369,7 @@ def _render_copilot_draft(mi: int, brief: dict, package: dict,
                              video_bytes=vid_bytes,
                              video_name=f"lemed_{mi}.mp4")
             with act2:
-                if st.button("📁 ส่งเข้าคิว (Drive)", key=f"copilot_queue_{mi}_{pid}",
+                if st.button("📁 ส่งเข้า Catalog (รอจัดคิว)", key=f"copilot_queue_{mi}_{pid}",
                              width="stretch"):
                     # ดึงไฟล์วิดีโอ/รูปภาพจาก session_state ปัจจุบันถ้าไม่ได้ส่งมา
                     cur_vid = vid_bytes or st.session_state.get(f"copilot_vid_{mi}")
