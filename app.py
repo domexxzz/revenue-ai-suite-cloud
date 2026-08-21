@@ -3842,9 +3842,13 @@ def _render_copilot_image(mi: int, brief: dict, scene: str,
                     import flow_queue
                     import time
                     task_id = flow_queue.submit_request(image_prompt, media_type="image")
+                    status_slot = st.empty()
                     with st.spinner("🤖 บอทกำลังส่งคำสั่งไป Google Flow..."):
-                        for _ in range(45):
+                        for attempt in range(80): # 80 x 2.5s = 200s
                             task = flow_queue.get_request_status(task_id)
+                            status_val = task.get("status") if task else "PENDING"
+                            if status_val == "PROCESSING":
+                                status_slot.info(f"🎨 บอทกำลังวาดรูปใน Google Flow... ({attempt * 2}s)")
                             if task and task.get("status") == "DONE":
                                 st.success("🎉 บอทสร้างใน Google Flow เรียบร้อย!")
                                 media_b = task.get("media_bytes")
@@ -3930,9 +3934,13 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
                     import flow_queue
                     import time
                     task_id = flow_queue.submit_request(video_prompt, media_type="video")
+                    status_slot = st.empty()
                     with st.spinner("🤖 บอทกำลังส่งคำสั่งไป Google Flow..."):
-                        for _ in range(45):
+                        for attempt in range(120): # 120 x 2.5s = 300s (5 นาที)
                             task = flow_queue.get_request_status(task_id)
+                            status_val = task.get("status") if task else "PENDING"
+                            if status_val == "PROCESSING":
+                                status_slot.info(f"🎬 บอทกำลังเรนเดอร์วิดีโอใน Google Flow... (ปกติ 1-3 นาที) [{attempt * 2}s]")
                             if task and task.get("status") == "DONE":
                                 st.success("🎉 บอทสร้างใน Google Flow เรียบร้อย!")
                                 media_b = task.get("media_bytes")
