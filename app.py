@@ -3016,6 +3016,71 @@ def _render_move_to_platform(file: dict, all_folders: dict, current: str = "") -
                 st.error("ย้ายไม่สำเร็จ")
 
 
+
+def _render_sequence_breakdown(file: dict) -> None:
+    """Parse and display shot sequence (Hook -> Decision -> CTA) and source prompt."""
+    name = file.get("name", "")
+    desc = file.get("description", "")
+    
+    # Check if there is an associated prompt or storyboard info in memory / drive
+    import re
+    # Try to find corresponding task or text prompt
+    fid = file.get("id")
+    prompt_text = ""
+    try:
+        import flow_queue
+        # If filename has task id or timestamp
+        m = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', name)
+        if m:
+            task = flow_queue.get_request_status(m.group(1))
+            if task and task.get("prompt"):
+                prompt_text = task.get("prompt")
+    except Exception:
+        pass
+
+    with st.expander("🎬 ดู Sequence & Prompt ที่ใช้สร้างคลิปนี้", expanded=False):
+        if prompt_text:
+            # Parse beats
+            hook_m = re.search(r'\[HOOK[^\]]*\](.*?)(?=\[DECISION|\[CTA|\[|$)', prompt_text, re.DOTALL | re.I)
+            dec_m = re.search(r'\[DECISION[^\]]*\](.*?)(?=\[CTA|\[|$)', prompt_text, re.DOTALL | re.I)
+            cta_m = re.search(r'\[CTA[^\]]*\](.*?)(?=\[STORYBOARD|\[PHYSICS|\[|$)', prompt_text, re.DOTALL | re.I)
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown("🎯 **Shot 1: Hook (0-3s)**")
+                if hook_m:
+                    st.caption(hook_m.group(1).strip()[:180] + "...")
+                else:
+                    st.caption("เปิดเรื่องสะดุดตา หยุดนิ้วคนดู")
+            with c2:
+                st.markdown("✨ **Shot 2: Decision (3-7s)**")
+                if dec_m:
+                    st.caption(dec_m.group(1).strip()[:180] + "...")
+                else:
+                    st.caption("โชว์สินค้าจริง สรรพคุณ และวิธีใช้")
+            with c3:
+                st.markdown("🚀 **Shot 3: CTA (7-10s)**")
+                if cta_m:
+                    st.caption(cta_m.group(1).strip()[:180] + "...")
+                else:
+                    st.caption("ปิดจบ ชวนทักแชท / สั่งซื้อ")
+            
+            st.divider()
+            st.caption("📋 **Master Prompt ต้นฉบับ:**")
+            st.code(prompt_text, language=None)
+        else:
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown("🎯 **Shot 1 (0:00 - 0:03)**")
+                st.caption("🪝 **Hook:** หยุดนิ้วคนดูด้วยปัญหาสิว/หน้ามัน")
+            with c2:
+                st.markdown("✨ **Shot 2 (0:03 - 0:07)**")
+                st.caption("🧼 **Decision:** โชว์สบู่ก้อน LEMED ตีฟองนุ่ม ล้างสะอาดไม่แห้งตึง")
+            with c3:
+                st.markdown("🚀 **Shot 3 (0:07 - 0:10)**")
+                st.caption("🛒 **CTA:** ยิ้มมั่นใจ โชว์สบู่ ชวนทักแชทรับโปรโมชั่น")
+
+
 def _render_queue_file(folder_name: str, platform: str, file: dict,
                        line_token: str, fb_token: str, fb_page_id: str,
                        ig_business_id: str, all_folders: dict | None = None) -> None:
@@ -3075,6 +3140,10 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
             if caption:
                 st.text_area("ข้อความที่จะโพสต์", value=caption, height=160,
                              key=f"q_cap_{fid}")
+
+        # แสดง Sequence แยกแต่ละช็อตของคลิปและ Prompt
+        if is_video or mime.startswith("video/"):
+            _render_sequence_breakdown(file)
 
         _render_ai_review(file, platform)
 
