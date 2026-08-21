@@ -114,11 +114,12 @@ def product_from_context(brand_context: str) -> str:
 
 
 def _constrain_item(item: str, brand_context: str) -> str:
-    """Keep a proposed product inside the brand's catalogue."""
+    """Keep a proposed product inside the brand's catalogue. Default to soap bar for LEMED."""
     brand_product = product_from_context(brand_context)
     if not brand_product:
-        return item or "สินค้าเด่น"
-    # Anything that already refers to the real product is fine as written.
+        if not item or item in ("สินค้าเด่น", "the product", "product", "สกินแคร์", "เซรั่ม"):
+            return "สบู่ก้อน"
+        return item
     if brand_product in (item or ""):
         return item
     return brand_product
@@ -350,7 +351,8 @@ _IMAGE_AVOID = ("no text, no logos, no watermark, no distorted packaging, no ext
                 "no clutter, no harsh blown-out highlights, no plastic-looking skin")
 
 _VIDEO_AVOID = ("no on-screen text, no watermark, no logo distortion, no jarring cuts, "
-                "no warped product geometry, no flickering")
+                "no warped product geometry, no flickering, no bottle, no dropper, no serum, "
+                "no pump, no jar, no liquid container, no squeeze tube — the product is a solid bar of soap only")
 
 
 # ── Product form ────────────────────────────────────────────────────────────────
@@ -512,22 +514,20 @@ def detect_product_form(item: str, brand_context: str = "") -> dict:
 
 def _master_scene(brief: dict) -> tuple[str, str, str]:
     """(subject, setting, styling) tuned to the vertical and product form."""
-    brand = brief.get("brand_name") or "the brand"
-    item = english_item(brief.get("top_item") or "the product")
-    if brief.get("vertical") == "product":
-        form = detect_product_form(brief.get("top_item", ""), brief.get("brand_context", ""))
-        return (
-            f"A single {item} by {brand} — {form['desc']}, front-facing hero "
-            "placement, label crisp and fully legible",
-            "clean seamless studio surface in soft neutral tone, subtle reflection "
-            "beneath the product, uncluttered negative space around it",
-            "a few fresh botanical leaves and delicate water droplets as accents, "
-            "nothing overlapping the label",
-        )
+    brand = brief.get("brand_name") or "LEMED"
+    top_item = brief.get("top_item") or "สบู่ก้อน"
+    if top_item in ("the product", "product", "สินค้าเด่น", "เซรั่ม", ""):
+        top_item = "สบู่ก้อน"
+    item = english_item(top_item)
+    if "soap" not in item.lower() and "bar" not in item.lower() and "lemed" in brand.lower():
+        item = "solid soap bar"
+
+    form = detect_product_form(top_item, brief.get("brand_context", ""))
     return (
-        f"A freshly plated {item} from {brand}, hero angle, steam gently rising",
-        "warm rustic wooden table in an inviting dining setting, soft bokeh background",
-        "fresh ingredients and simple ceramic tableware arranged around the dish",
+        f"A single {item} by {brand} — {form['desc']}, front-facing hero "
+        "placement, label crisp and fully legible, pure solid herbal soap bar",
+        "clean seamless minimalist bathroom counter or modern studio surface in soft natural light, subtle water droplets and gentle soap foam",
+        "a few fresh botanical herbal leaves and delicate natural water beads as accents, nothing overlapping the label",
     )
 
 
