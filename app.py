@@ -3818,17 +3818,21 @@ def _copilot_send_to_queue(pid: str, content: str, brief: dict,
         fname_vid = f"PENDING_{pid}_{ts}.mp4"
         link_vid = upload_file(vid_bytes, fname_vid, target_folder, mime_type="video/mp4")
         if link_vid:
-            media_uploaded.append(f"[🎬 ไฟล์วิดีโอ]({link_vid})")
+            media_uploaded.append(f"[🎬 ไฟล์วิดีโอ ({len(vid_bytes)/1024/1024:.1f} MB)]({link_vid})")
     elif img_bytes:
         fname_img = f"PENDING_{pid}_{ts}.png"
         link_img = upload_file(img_bytes, fname_img, target_folder, mime_type="image/png")
         if link_img:
             media_uploaded.append(f"[🖼️ ไฟล์รูปภาพ]({link_img})")
 
+    # Invalidate cached folders and files so ✋ คิวอนุมัติ page updates immediately
+    _clear_queue_cache()
+
     where = PLATFORM_THAI_NAMES.get(pid, pid) if routed else "โฟลเดอร์รวม"
-    st.success(f"ส่งข้อความ{' + วิดีโอ/รูปภาพ' if media_uploaded else ''} เข้าคิว → {where} สำเร็จแล้ว! · ไปตรวจที่หน้า **✋ คิวอนุมัติ**")
+    st.success(f"🎉 ส่งข้อความ{' + วิดีโอ' if vid_bytes else (' + รูปภาพ' if img_bytes else '')} เข้าคิว → **{where}** เรียบร้อยแล้ว!")
     links_str = " · ".join([f"[📝 แคปชัน]({link_txt})"] + media_uploaded)
     st.markdown(f"🔗 **ไฟล์ใน Drive:** {links_str}")
+    st.info("👉 คุณสามารถคลิกเมนู **✋ คิวอนุมัติ** ที่แถบด้านซ้าย เพื่อดูคลิปวิดีโอและอนุมัติโพสต์ได้ทันทีครับ")
 
 
 def _angle_picker(mi: int, scene: str, medium: str, label: str) -> str:
