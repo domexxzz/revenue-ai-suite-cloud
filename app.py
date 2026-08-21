@@ -3083,14 +3083,33 @@ def _render_sequence_breakdown(file: dict) -> None:
 
 def _render_queue_file(folder_name: str, platform: str, file: dict,
                        line_token: str, fb_token: str, fb_page_id: str,
-                       ig_business_id: str, all_folders: dict | None = None) -> None:
+                       ig_business_id: str, all_folders: dict | None = None,
+                       index: int = 1) -> None:
     """One queued item: preview, then approve-and-post or reject."""
     mime = file.get("mimeType", "")
     fid = file["id"]
     size_mb = int(file.get("size") or 0) / 1024 / 1024
 
     with st.container(border=True):
-        # เนื้อหามาก่อนชื่อไฟล์เสมอ
+        filename = (file.get("name") or "").lower()
+        is_video = mime.startswith("video/") or filename.endswith((".mp4", ".mov", ".avi", ".webm", ".mkv"))
+        is_image = mime.startswith("image/") or filename.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"))
+        
+        # สร้าง Serial Number เฉพาะของแต่ละรายการ
+        prefix = "VDO" if is_video else ("IMG" if is_image else "POST")
+        short_id = fid[-6:].upper()
+        date_str = file.get('createdTime', '')[:10].replace('-', '')
+        serial_code = f"#{index:02d} | LMD-{prefix}-{short_id}"
+        
+        # Header Badge ด้านบนสุดของการ์ด
+        h_col1, h_col2 = st.columns([2, 1])
+        with h_col1:
+            badge_icon = "🎬" if is_video else ("🖼️" if is_image else "📝")
+            st.markdown(f"### {badge_icon} `{serial_code}`")
+        with h_col2:
+            st.caption(f"📁 **{folder_name}** ({size_mb:.1f} MB)")
+
+        st.divider()
         #
         # คนที่มากดอนุมัติตัดสินใจจากตัวคลิป ตัวภาพ หรือตัวข้อความ ไม่ใช่จากชื่อไฟล์
         # อย่าง flow_df3978e5.mp4 ซึ่งไม่บอกอะไรเลย ของเดิมเอาชื่อไฟล์ขึ้นก่อนแล้วซ่อน
@@ -3456,7 +3475,8 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
             total += 1
             _render_queue_file(folder_name, platform, f,
                                line_token, fb_token, fb_page_id, ig_business_id,
-                               all_folders=folders)
+                               all_folders=folders,
+                               index=total)
 
         remaining = len(files) - shown
         if remaining > 0:
