@@ -3425,15 +3425,36 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
     review = {n: i for n, i in folders.items() if n.upper() not in skip}
     st.caption(f"เจอ {len(review)} โฟลเดอร์: " + " · ".join(sorted(review)))
 
-    # ค่าตั้งต้นเลือกเฉพาะโฟลเดอร์ 'รอจัดคิว (Pending Inbox)' เพื่อไม่ให้ปนกับแพลตฟอร์มอื่น
-    inbox_candidates = [n for n in review if any(k in n for k in ["รอจัดคิว", "Pending Inbox", "Inbox", "รอจัด"])]
-    default_pick = inbox_candidates if inbox_candidates else sorted(review)
+    # ── แคตตาล็อกแยกประเภทสื่อและแพลตฟอร์ม (Media & Platform Catalog) ─────────
+    st.markdown("### 🗂️ แคตตาล็อกคิวอนุมัติ (Media Catalog)")
+    cat_col1, cat_col2 = st.columns([1, 1])
+    with cat_col1:
+        media_filter = st.selectbox(
+            "🎨 เลือกประเภทสื่อ",
+            options=["✨ ทั้งหมด (All Media)", "🎬 วิดีโอ (Videos)", "🖼️ รูปภาพ (Images)", "📝 โพสต์ข้อความ (Captions)"],
+            index=0,
+            key="queue_media_cat_filter"
+        )
+    with cat_col2:
+        inbox_candidates = [n for n in review if any(k in n for k in ["รอจัดคิว", "Pending Inbox", "Inbox", "รอจัด"])]
+        plat_options = ["🌐 ทุกโฟลเดอร์"] + sorted(review.keys())
+        default_idx = 0
+        if inbox_candidates and inbox_candidates[0] in plat_options:
+            default_idx = plat_options.index(inbox_candidates[0])
 
-    pick = st.multiselect("เลือกโฟลเดอร์ที่จะตรวจ", options=sorted(review),
-                          default=default_pick)
+        plat_filter = st.selectbox(
+            "📁 เลือกโฟลเดอร์ / แพลตฟอร์ม",
+            options=plat_options,
+            index=default_idx,
+            key="queue_plat_cat_filter"
+        )
 
-    # Newest first by default: the usual reason to open this page is to review
-    # something just generated. Oldest first is for working down a backlog.
+    # Folders to display based on platform filter
+    if plat_filter == "🌐 ทุกโฟลเดอร์":
+        pick = sorted(review.keys())
+    else:
+        pick = [plat_filter] if plat_filter in review else sorted(review.keys())
+
     sort_label = st.radio(
         "เรียงลำดับ", ["🆕 ใหม่สุดก่อน", "⏳ เก่าสุดก่อน (ค้างนานสุด)"],
         horizontal=True, label_visibility="collapsed", key="queue_sort",
@@ -3449,7 +3470,20 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
 
     total = 0
     for folder_name in pick:
-        files = _cached_files(review[folder_name], oldest_first)
+        all_raw_files = _cached_files(review[folder_name], oldest_first)
+        if not all_raw_files:
+            continue
+
+        # กรองตามประเภทสื่อใน Catalog
+        if media_filter.startswith("🎬"):
+            files = [f for f in all_raw_files if (f.get("mimeType", "").startswith("video/") or f.get("name", "").lower().endswith((".mp4", ".mov", ".webm", ".avi")))]
+        elif media_filter.startswith("🖼️"):
+            files = [f for f in all_raw_files if (f.get("mimeType", "").startswith("image/") or f.get("name", "").lower().endswith((".png", ".jpg", ".jpeg", ".webp")))]
+        elif media_filter.startswith("📝"):
+            files = [f for f in all_raw_files if not (f.get("mimeType", "").startswith(("video/", "image/")) or f.get("name", "").lower().endswith((".mp4", ".mov", ".png", ".jpg", ".webp", ".webm")))]
+        else:
+            files = all_raw_files
+
         if not files:
             continue
         platform = _platform_from_folder(folder_name)
