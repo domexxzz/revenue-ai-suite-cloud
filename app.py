@@ -3888,15 +3888,13 @@ def _copilot_send_to_queue(pid: str, content: str, brief: dict,
         st.warning("ยังไม่ได้ต่อ Google Drive — ไปที่หน้า ✋ คิวอนุมัติ เพื่อ authorize ก่อน")
         return
 
-    is_video = bool(vid_bytes) or (pid in ("tiktok", "youtube"))
-    target_folder, routed = QUEUE_ROOT_FOLDER_ID, False
+    # ส่งเข้าโฟลเดอร์กลาง '📥 รอจัดคิว (Pending Inbox)' เพื่อให้ผู้ใช้เลือกแพลตฟอร์มในหน้าคิวอนุมัติ
     try:
-        from google_drive import resolve_platform_folder
-        sub = resolve_platform_folder(QUEUE_ROOT_FOLDER_ID, pid, is_video)
-        if sub:
-            target_folder, routed = sub, True
-    except Exception as e:
-        pass
+        from google_drive import ensure_subfolder
+        inbox_folder = ensure_subfolder(QUEUE_ROOT_FOLDER_ID, "📥 รอจัดคิว (Pending Inbox)")
+        target_folder, routed = (inbox_folder or QUEUE_ROOT_FOLDER_ID), True
+    except Exception:
+        target_folder, routed = QUEUE_ROOT_FOLDER_ID, False
 
     ts = dt.datetime.now().strftime('%Y%m%d_%H%M%S')
     import hashlib
@@ -3925,11 +3923,11 @@ def _copilot_send_to_queue(pid: str, content: str, brief: dict,
     # 3. ล้างแคชเพื่อให้ไฟล์ใหม่ปรากฏในหน้าคิวตรวจทันที
     _clear_queue_cache()
 
-    where = PLATFORM_THAI_NAMES.get(pid, pid) if routed else "โฟลเดอร์รวม"
-    st.success(f"🎉 ส่งข้อความ{' + วิดีโอ' if vid_bytes else (' + รูปภาพ' if img_bytes else '')} เข้าคิว → **{where}** เรียบร้อยแล้ว!")
+    where = "📥 รอจัดคิว (Pending Inbox)"
+    st.success(f"🎉 ส่งข้อความ{' + วิดีโอ' if vid_bytes else (' + รูปภาพ' if img_bytes else '')} เข้าสู่ **{where}** เรียบร้อยแล้ว!")
     links_str = " · ".join([f"[📝 แคปชัน]({link_txt})"] + media_uploaded)
     st.markdown(f"🔗 **ไฟล์ใน Drive:** {links_str}")
-    st.info("👉 คุณสามารถคลิกเมนู **✋ คิวอนุมัติ** ที่แถบด้านซ้าย เพื่อดูคลิปวิดีโอและอนุมัติโพสต์ได้ทันทีครับ")
+    st.info("👉 คุณสามารถคลิกเมนู **✋ คิวอนุมัติ** ที่แถบด้านซ้าย เพื่อเลือกแพลตฟอร์มและอนุมัติโพสต์ได้ทันทีครับ")
 
 
 def _angle_picker(mi: int, scene: str, medium: str, label: str) -> str:
