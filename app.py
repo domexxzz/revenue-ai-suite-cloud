@@ -4044,8 +4044,28 @@ def _render_copilot_carousel(mi: int, brief: dict, scene: str, gemini_key: str) 
                         file_name=f"carousel_{mi}_{s['n']}.png", mime="image/png",
                         key=f"copilot_cardl_{mi}_{s['n']}", width="stretch")
                 st.code(s["prompt"], language=None)
-                st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้",
-                               FLOW_PROJECT_URL, width="stretch")
+                c_cflow1, c_cflow2 = st.columns([1, 1])
+                with c_cflow1:
+                    st.link_button("🎬 เปิด Google Flow เอง", FLOW_PROJECT_URL, width="stretch")
+                with c_cflow2:
+                    if st.button("🤖 สั่งบอทสร้างใน Flow", key=f"copilot_bot_car_{mi}_{s['n']}", width="stretch"):
+                        try:
+                            import flow_queue
+                            import time
+                            task_id = flow_queue.submit_request(s["prompt"], media_type="image")
+                            with st.spinner("🤖 บอทกำลังส่งคำสั่งไป Google Flow..."):
+                                for _ in range(45):
+                                    task = flow_queue.get_request_status(task_id)
+                                    if task and task.get("status") == "DONE":
+                                        st.success("🎉 บอทป้อนคำสั่งและสร้างใน Google Flow แล้ว!")
+                                        time.sleep(1)
+                                        break
+                                    elif task and task.get("status") == "ERROR":
+                                        st.error(f"❌ ข้อผิดพลาด: {task.get('error_message')}")
+                                        break
+                                    time.sleep(2)
+                        except Exception as e:
+                            st.error(f"เรียกบอทไม่สำเร็จ: {e}")
 
 
 def _render_copilot_draft(mi: int, brief: dict, package: dict,
