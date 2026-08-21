@@ -3772,8 +3772,9 @@ def _run_suggestion(label: str, target: str) -> None:
     st.rerun()
 
 
-def _copilot_send_to_queue(pid: str, content: str, brief: dict) -> None:
-    """Write a pending draft into its per-platform Drive folder.
+def _copilot_send_to_queue(pid: str, content: str, brief: dict,
+                           img_bytes: bytes = None, vid_bytes: bytes = None) -> None:
+    """Write a pending draft AND attached media (video/image) into its per-platform Drive folder.
 
     Drive is the queue — the ✋ คิวอนุมัติ page reads straight from those folders,
     so there is no second list to keep in sync here.
@@ -3782,27 +3783,36 @@ def _copilot_send_to_queue(pid: str, content: str, brief: dict) -> None:
         st.warning("ยังไม่ได้ต่อ Google Drive — ไปที่หน้า ✋ คิวอนุมัติ เพื่อ authorize ก่อน")
         return
 
-    # Copilot drafts are captions/scripts. TikTok & YouTube live in VDO folders;
-    # the rest go to their Post folder.
-    is_video = pid in ("tiktok", "youtube")
+    is_video = bool(vid_bytes) or (pid in ("tiktok", "youtube"))
     target_folder, routed = QUEUE_ROOT_FOLDER_ID, False
     try:
         from google_drive import resolve_platform_folder
         sub = resolve_platform_folder(QUEUE_ROOT_FOLDER_ID, pid, is_video)
         if sub:
             target_folder, routed = sub, True
-    except Exception:  # noqa: BLE001 — routing is a nicety; the root still works
+    except Exception:  # noqa: BLE001
         pass
 
-    fname = f"PENDING_{pid}_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-    link = upload_text(content, fname, target_folder)
-    if not link:
-        st.error("ส่งเข้าคิวไม่สำเร็จ — ลองใหม่อีกครั้ง")
-        return
+    ts = dt.datetime.now().strftime('%Y%m%d_%H%M%S')
+    fname_txt = f"PENDING_{pid}_{ts}.txt"
+    link_txt = upload_text(content, fname_txt, target_folder)
+    
+    media_uploaded = []
+    if vid_bytes:
+        fname_vid = f"PENDING_{pid}_{ts}.mp4"
+        link_vid = upload_file(vid_bytes, fname_vid, target_folder, mime_type="video/mp4")
+        if link_vid:
+            media_uploaded.append(f"[🎬 ไฟล์วิดีโอ]({link_vid})")
+    elif img_bytes:
+        fname_img = f"PENDING_{pid}_{ts}.png"
+        link_img = upload_file(img_bytes, fname_img, target_folder, mime_type="image/png")
+        if link_img:
+            media_uploaded.append(f"[🖼️ ไฟล์รูปภาพ]({link_img})")
 
     where = PLATFORM_THAI_NAMES.get(pid, pid) if routed else "โฟลเดอร์รวม"
-    st.success(f"ส่งเข้าคิว → {where} แล้ว · ไปตรวจที่หน้า **✋ คิวอนุมัติ**")
-    st.markdown(f"[🔗 เปิดไฟล์ใน Drive]({link})")
+    st.success(f"ส่งข้อความ{' + วิดีโอ/รูปภาพ' if media_uploaded else ''} เข้าคิว → {where} สำเร็จแล้ว! · ไปตรวจที่หน้า **✋ คิวอนุมัติ**")
+    links_str = " · ".join([f"[📝 แคปชัน]({link_txt})"] + media_uploaded)
+    st.markdown(f"🔗 **ไฟล์ใน Drive:** {links_str}")
 
 
 def _angle_picker(mi: int, scene: str, medium: str, label: str) -> str:
