@@ -3033,19 +3033,29 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
         media_bytes = None
         caption = ""
 
-        if mime.startswith("image/"):
-            # thumbnailLink มากับรายการไฟล์อยู่แล้ว โชว์ได้ทันทีโดยไม่ต้องโหลดไฟล์เต็ม
+        filename = (file.get("name") or "").lower()
+        is_video = mime.startswith("video/") or filename.endswith((".mp4", ".mov", ".avi", ".webm", ".mkv"))
+        is_image = mime.startswith("image/") or filename.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"))
+
+        if is_image and not is_video:
             thumb = file.get("thumbnailLink")
             if thumb:
-                st.image(thumb.replace("=s220", "=s800"), width="stretch")
+                try:
+                    st.image(thumb.replace("=s220", "=s800"), width="stretch")
+                except Exception:
+                    pass
             if st.button("🔍 ดูรูปเต็ม", key=f"q_prev_{fid}", width="stretch"):
                 st.session_state[f"q_data_{fid}"] = download_file(fid)
             media_bytes = st.session_state.get(f"q_data_{fid}")
             if media_bytes:
-                st.image(media_bytes, width="stretch")
-        elif mime.startswith("video/"):
-            # เล่นผ่านตัวเล่นของ Drive — เห็นคลิปได้ทันทีโดยไม่ต้องดึงไฟล์ทั้งก้อน
-            # ลงมาก่อน (คลิปละ ~2.4MB × 15 ต่อหน้า จะช้ามากถ้าโหลดทุกอัน)
+                try:
+                    st.image(media_bytes, width="stretch")
+                except Exception:
+                    try:
+                        st.video(media_bytes)
+                    except Exception:
+                        st.info("💡 ไม่สามารถเปิดแสดงรูปภาพได้โดยตรง (กดดาวน์โหลดไฟล์ด้านล่างได้ครับ)")
+        elif is_video:
             st.components.v1.iframe(
                 f"https://drive.google.com/file/d/{fid}/preview", height=340)
             with st.expander("โหลดไฟล์มาดูแบบเต็ม (ถ้าตัวเล่นด้านบนไม่ขึ้น)"):
@@ -3053,7 +3063,10 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
                     st.session_state[f"q_data_{fid}"] = download_file(fid)
                 media_bytes = st.session_state.get(f"q_data_{fid}")
                 if media_bytes:
-                    st.video(media_bytes)
+                    try:
+                        st.video(media_bytes)
+                    except Exception:
+                        st.info("💡 ไม่สามารถเล่นวิดีโอนี้ในเบราว์เซอร์ได้ (กดดาวน์โหลดไฟล์ด้านล่างได้ครับ)")
         else:
             caption = _queue_caption_for(file)
             if caption:
