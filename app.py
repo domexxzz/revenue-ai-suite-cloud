@@ -3833,8 +3833,28 @@ def _render_copilot_image(mi: int, brief: dict, scene: str,
         image_prompt = content_copilot.build_master_image_prompt(brief, scene, angle)
         st.caption("📋 คัดลอกไปวางใน Google Flow / Midjourney ได้เลย (กดไอคอนคัดลอกมุมขวาบน)")
         st.code(image_prompt, language=None)
-        st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้", FLOW_PROJECT_URL,
-                       width="stretch")
+        c_flow1, c_flow2 = st.columns([1, 1])
+        with c_flow1:
+            st.link_button("🎬 เปิด Google Flow เอง", FLOW_PROJECT_URL, width="stretch")
+        with c_flow2:
+            if st.button("🤖 สั่งบอทสร้างใน Flow", key=f"copilot_bot_img_{mi}", width="stretch"):
+                try:
+                    import flow_queue
+                    import time
+                    task_id = flow_queue.submit_request(image_prompt, media_type="image")
+                    with st.spinner("🤖 บอทกำลังส่งคำสั่งไป Google Flow..."):
+                        for _ in range(45):
+                            task = flow_queue.get_request_status(task_id)
+                            if task and task.get("status") == "DONE":
+                                st.success("🎉 บอทป้อนคำสั่งและสร้างใน Google Flow แล้ว!")
+                                time.sleep(1)
+                                break
+                            elif task and task.get("status") == "ERROR":
+                                st.error(f"❌ ข้อผิดพลาด: {task.get('error_message')}")
+                                break
+                            time.sleep(2)
+                except Exception as e:
+                    st.error(f"เรียกบอทไม่สำเร็จ: {e}")
 
         if gemini_key:
             if st.button("✨ สร้างรูปด้วย Gemini", key=f"copilot_genimg_{mi}",
@@ -3891,10 +3911,30 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
 
         st.caption(f"📋 คัดลอกไปวางใน Google Flow ได้เลย · สัดส่วน {aspect} · "
                    "10 วินาที · Hook → Decision → CTA · เสียงพากย์ไทย")
-        st.code(content_copilot.build_master_video_prompt(brief, scene, 10, angle),
-                language=None)
-        st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้", FLOW_PROJECT_URL,
-                       width="stretch")
+        video_prompt = content_copilot.build_master_video_prompt(brief, scene, 10, angle)
+        st.code(video_prompt, language=None)
+        c_vflow1, c_vflow2 = st.columns([1, 1])
+        with c_vflow1:
+            st.link_button("🎬 เปิด Google Flow เอง", FLOW_PROJECT_URL, width="stretch")
+        with c_vflow2:
+            if st.button("🤖 สั่งบอทสร้างใน Flow", key=f"copilot_bot_vid_{mi}", width="stretch"):
+                try:
+                    import flow_queue
+                    import time
+                    task_id = flow_queue.submit_request(video_prompt, media_type="video")
+                    with st.spinner("🤖 บอทกำลังส่งคำสั่งไป Google Flow..."):
+                        for _ in range(45):
+                            task = flow_queue.get_request_status(task_id)
+                            if task and task.get("status") == "DONE":
+                                st.success("🎉 บอทป้อนคำสั่งและสร้างใน Google Flow แล้ว!")
+                                time.sleep(1)
+                                break
+                            elif task and task.get("status") == "ERROR":
+                                st.error(f"❌ ข้อผิดพลาด: {task.get('error_message')}")
+                                break
+                            time.sleep(2)
+                except Exception as e:
+                    st.error(f"เรียกบอทไม่สำเร็จ: {e}")
 
         if gemini_key:
             st.info("ℹ️ Veo สร้างได้สูงสุด **8 วินาที** ต่อคลิป — ตัว Master Prompt ด้านบน "
