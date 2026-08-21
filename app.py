@@ -3047,12 +3047,12 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
             if st.button("🔍 ดูรูปเต็ม", key=f"q_prev_{fid}", width="stretch"):
                 st.session_state[f"q_data_{fid}"] = download_file(fid)
             media_bytes = st.session_state.get(f"q_data_{fid}")
-            if media_bytes:
-                try:
-                    st.image(media_bytes, width="stretch")
-                except Exception:
+            if media_bytes is not None:
+                if len(media_bytes) < 100:
+                    st.warning("⚠️ ไฟล์นี้ใน Google Drive มีขนาด 0 KB (ว่างเปล่า)")
+                else:
                     try:
-                        st.video(media_bytes)
+                        st.image(media_bytes, width="stretch")
                     except Exception:
                         st.info("💡 ไม่สามารถเปิดแสดงรูปภาพได้โดยตรง (กดดาวน์โหลดไฟล์ด้านล่างได้ครับ)")
         elif is_video:
@@ -3062,11 +3062,14 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
                 if st.button("▶️ โหลดวิดีโอ", key=f"q_prev_{fid}", width="stretch"):
                     st.session_state[f"q_data_{fid}"] = download_file(fid)
                 media_bytes = st.session_state.get(f"q_data_{fid}")
-                if media_bytes:
-                    try:
-                        st.video(media_bytes)
-                    except Exception:
-                        st.info("💡 ไม่สามารถเล่นวิดีโอนี้ในเบราว์เซอร์ได้ (กดดาวน์โหลดไฟล์ด้านล่างได้ครับ)")
+                if media_bytes is not None:
+                    if len(media_bytes) < 1000:
+                        st.warning("⚠️ ไฟล์วิดีโอนี้ใน Google Drive มีขนาด 0 KB (ว่างเปล่า)")
+                    else:
+                        try:
+                            st.video(media_bytes)
+                        except Exception:
+                            st.info("💡 ไม่สามารถเล่นวิดีโอนี้ในเบราว์เซอร์ได้ (กดดาวน์โหลดไฟล์ด้านล่างได้ครับ)")
         else:
             caption = _queue_caption_for(file)
             if caption:
