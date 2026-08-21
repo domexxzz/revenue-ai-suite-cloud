@@ -3939,7 +3939,7 @@ def _copilot_send_to_queue(pid: str, content: str, brief: dict,
     
     # 1. อัปโหลดไฟล์วิดีโอ/รูปภาพก่อน
     media_uploaded = []
-    if vid_bytes:
+    if vid_bytes and len(vid_bytes) > 1000:
         sn_val = f"LMD-VDO-{hashlib.md5(vid_bytes[:500]).hexdigest()[:6].upper()}"
         fname_vid = f"PENDING_{pid}_{sn_val}_{ts}.mp4"
         link_vid = upload_file(vid_bytes, fname_vid, target_folder, mime_type="video/mp4")
@@ -4172,7 +4172,7 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
             st.caption("💡 ใส่ **Gemini API key** ในแถบซ้าย แล้วจะสร้างวิดีโอได้จากในแชท")
 
         vid = st.session_state.get(vid_key)
-        if vid:
+        if vid and len(vid) > 1000:
             import hashlib
             sn_key = f"sn_vid_{mi}"
             if sn_key not in st.session_state:
