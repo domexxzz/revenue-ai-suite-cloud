@@ -3899,22 +3899,27 @@ def _copilot_send_to_queue(pid: str, content: str, brief: dict,
         pass
 
     ts = dt.datetime.now().strftime('%Y%m%d_%H%M%S')
+    import hashlib
     
     # 1. อัปโหลดไฟล์วิดีโอ/รูปภาพก่อน
     media_uploaded = []
     if vid_bytes:
-        fname_vid = f"PENDING_{pid}_{ts}.mp4"
+        sn_val = f"LMD-VDO-{hashlib.md5(vid_bytes[:500]).hexdigest()[:6].upper()}"
+        fname_vid = f"PENDING_{pid}_{sn_val}_{ts}.mp4"
         link_vid = upload_file(vid_bytes, fname_vid, target_folder, mime_type="video/mp4")
         if link_vid:
-            media_uploaded.append(f"[🎬 ไฟล์วิดีโอ ({len(vid_bytes)/1024/1024:.1f} MB)]({link_vid})")
+            media_uploaded.append(f"[🎬 ไฟล์วิดีโอ `{sn_val}` ({len(vid_bytes)/1024/1024:.1f} MB)]({link_vid})")
     elif img_bytes:
-        fname_img = f"PENDING_{pid}_{ts}.png"
+        sn_val = f"LMD-IMG-{hashlib.md5(img_bytes[:500]).hexdigest()[:6].upper()}"
+        fname_img = f"PENDING_{pid}_{sn_val}_{ts}.png"
         link_img = upload_file(img_bytes, fname_img, target_folder, mime_type="image/png")
         if link_img:
-            media_uploaded.append(f"[🖼️ ไฟล์รูปภาพ]({link_img})")
+            media_uploaded.append(f"[🖼️ ไฟล์รูปภาพ `{sn_val}`]({link_img})")
+    else:
+        sn_val = f"LMD-POST-{hashlib.md5(content.encode()).hexdigest()[:6].upper()}"
 
     # 2. อัปโหลดแคปชันข้อความ
-    fname_txt = f"PENDING_{pid}_{ts}.txt"
+    fname_txt = f"PENDING_{pid}_{sn_val}_{ts}.txt"
     link_txt = upload_text(content, fname_txt, target_folder)
 
     # 3. ล้างแคชเพื่อให้ไฟล์ใหม่ปรากฏในหน้าคิวตรวจทันที
@@ -4129,13 +4134,20 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
 
         vid = st.session_state.get(vid_key)
         if vid:
-            st.success("🎬 วิดีโอของคุณพร้อมแล้ว:")
+            import hashlib
+            sn_key = f"sn_vid_{mi}"
+            if sn_key not in st.session_state:
+                h_val = hashlib.md5(vid[:500] if isinstance(vid, (bytes, bytearray)) else f"{mi}_{time.time()}".encode()).hexdigest()[:6].upper()
+                st.session_state[sn_key] = f"LMD-VDO-{h_val}"
+            vid_sn = st.session_state[sn_key]
+
+            st.info(f"🏷️ **Serial Number:** `{vid_sn}`  (รหัสนี้จะส่งต่อไปยังหน้าคิวอนุมัติ)")
             st.video(vid)
-            st.caption(f"ขนาดไฟล์ {len(vid)/1024/1024:.1f} MB")
+            st.caption(f"ขนาดไฟล์ {len(vid)/1024/1024:.1f} MB · รหัสวิดีโอ: **{vid_sn}**")
             d1, d2 = st.columns(2)
             with d1:
-                st.download_button("📥 ดาวน์โหลดวิดีโอ", data=vid,
-                                   file_name=f"lemed_{mi}.mp4", mime="video/mp4",
+                st.download_button(f"📥 ดาวน์โหลดวิดีโอ ({vid_sn})", data=vid,
+                                   file_name=f"{vid_sn}.mp4", mime="video/mp4",
                                    key=f"copilot_dlvid_{mi}", width="stretch")
             with d2:
                 if st.button("🗑️ ลบวิดีโอ", key=f"copilot_rmvid_{mi}",
