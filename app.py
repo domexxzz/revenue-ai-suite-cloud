@@ -3806,13 +3806,12 @@ def _copilot_send_to_queue(pid: str, content: str, brief: dict,
         sub = resolve_platform_folder(QUEUE_ROOT_FOLDER_ID, pid, is_video)
         if sub:
             target_folder, routed = sub, True
-    except Exception:  # noqa: BLE001
+    except Exception as e:
         pass
 
     ts = dt.datetime.now().strftime('%Y%m%d_%H%M%S')
-    fname_txt = f"PENDING_{pid}_{ts}.txt"
-    link_txt = upload_text(content, fname_txt, target_folder)
     
+    # 1. อัปโหลดไฟล์วิดีโอ/รูปภาพก่อน
     media_uploaded = []
     if vid_bytes:
         fname_vid = f"PENDING_{pid}_{ts}.mp4"
@@ -3825,7 +3824,11 @@ def _copilot_send_to_queue(pid: str, content: str, brief: dict,
         if link_img:
             media_uploaded.append(f"[🖼️ ไฟล์รูปภาพ]({link_img})")
 
-    # Invalidate cached folders and files so ✋ คิวอนุมัติ page updates immediately
+    # 2. อัปโหลดแคปชันข้อความ
+    fname_txt = f"PENDING_{pid}_{ts}.txt"
+    link_txt = upload_text(content, fname_txt, target_folder)
+
+    # 3. ล้างแคชเพื่อให้ไฟล์ใหม่ปรากฏในหน้าคิวตรวจทันที
     _clear_queue_cache()
 
     where = PLATFORM_THAI_NAMES.get(pid, pid) if routed else "โฟลเดอร์รวม"
@@ -4225,7 +4228,12 @@ def _render_copilot_draft(mi: int, brief: dict, package: dict,
             with act2:
                 if st.button("📁 ส่งเข้าคิว (Drive)", key=f"copilot_queue_{mi}_{pid}",
                              width="stretch"):
-                    _copilot_send_to_queue(pid, edited, brief)
+                    # ดึงไฟล์วิดีโอ/รูปภาพจาก session_state ปัจจุบันถ้าไม่ได้ส่งมา
+                    cur_vid = vid_bytes or st.session_state.get(f"copilot_vid_{mi}")
+                    cur_img = img_bytes or st.session_state.get(f"copilot_img_{mi}")
+                    _copilot_send_to_queue(pid, edited, brief,
+                                           img_bytes=cur_img,
+                                           vid_bytes=cur_vid)
 
     if st.button("🚀 อนุมัติ + โพสต์ทั้งหมด", key=f"copilot_postall_{mi}",
                  width="stretch"):
