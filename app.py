@@ -3965,8 +3965,14 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
                             if status_val == "PROCESSING":
                                 status_slot.info(f"🎬 บอทกำลังเรนเดอร์วิดีโอใน Google Flow... (ปกติ 1-3 นาที) [{attempt * 2}s]")
                             if task and task.get("status") == "DONE":
-                                st.success("🎉 บอทสร้างใน Google Flow เรียบร้อย!")
+                                status_slot.success("🎉 บอทสร้างใน Google Flow เรียบร้อย!")
                                 media_b = task.get("media_bytes")
+                                if not media_b and task.get("drive_file_id"):
+                                    # Fallback download directly
+                                    try:
+                                        media_b = flow_queue.get_request_status(task_id).get("media_bytes")
+                                    except Exception:
+                                        pass
                                 if media_b:
                                     st.session_state[vid_key] = media_b
                                     st.rerun()
@@ -4024,6 +4030,7 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
 
         vid = st.session_state.get(vid_key)
         if vid:
+            st.success("🎬 วิดีโอของคุณพร้อมแล้ว:")
             st.video(vid)
             st.caption(f"ขนาดไฟล์ {len(vid)/1024/1024:.1f} MB")
             d1, d2 = st.columns(2)
