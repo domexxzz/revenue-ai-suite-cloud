@@ -1,10 +1,15 @@
-# Streamlit paints its own frame — the app background, sidebar, header and the
-# bar holding the chat box — from these values, and in this version that wins
-# over the app's injected CSS regardless of specificity or !important. Whatever
-# is set here is what those areas look like.
 [theme]
 base = "light"
 primaryColor = "#F59E0B"
 backgroundColor = "#F8F7F4"
 secondaryBackgroundColor = "#FFFFFF"
 textColor = "#111827"
+
+[server]
+enableCORS = false
+enableXsrfProtection = false
+headless = true
+enableWebsocketCompression = false
+
+[browser]
+gatherUsageStats = false
