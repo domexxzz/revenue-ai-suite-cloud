@@ -3846,8 +3846,11 @@ def _render_copilot_image(mi: int, brief: dict, scene: str,
                         for _ in range(45):
                             task = flow_queue.get_request_status(task_id)
                             if task and task.get("status") == "DONE":
-                                st.success("🎉 บอทป้อนคำสั่งและสร้างใน Google Flow แล้ว!")
-                                time.sleep(1)
+                                st.success("🎉 บอทสร้างใน Google Flow เรียบร้อย!")
+                                res_path = task.get("result_path")
+                                if res_path and Path(res_path).exists():
+                                    st.session_state[img_key] = Path(res_path).read_bytes()
+                                    st.rerun()
                                 break
                             elif task and task.get("status") == "ERROR":
                                 st.error(f"❌ ข้อผิดพลาด: {task.get('error_message')}")
@@ -3926,8 +3929,11 @@ def _render_copilot_video(mi: int, brief: dict, scene: str, aspect: str,
                         for _ in range(45):
                             task = flow_queue.get_request_status(task_id)
                             if task and task.get("status") == "DONE":
-                                st.success("🎉 บอทป้อนคำสั่งและสร้างใน Google Flow แล้ว!")
-                                time.sleep(1)
+                                st.success("🎉 บอทสร้างใน Google Flow เรียบร้อย!")
+                                res_path = task.get("result_path")
+                                if res_path and Path(res_path).exists():
+                                    st.session_state[vid_key] = Path(res_path).read_bytes()
+                                    st.rerun()
                                 break
                             elif task and task.get("status") == "ERROR":
                                 st.error(f"❌ ข้อผิดพลาด: {task.get('error_message')}")
