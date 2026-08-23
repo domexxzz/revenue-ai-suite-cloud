@@ -3071,6 +3071,64 @@ def _render_sequence_breakdown(file: dict) -> None:
             st.divider()
             st.caption("📋 **Master Prompt ต้นฉบับ:**")
             st.code(prompt_text, language=None)
+
+            # ── 🅱️ บอทคิด คนกดครั้งเดียว: แก้ prompt คลิปนี้ตาม feedback ────────
+            # เจ้าของ/ลูกค้าไม่ถูกใจคลิป → พิมพ์สิ่งที่อยากแก้เป็นภาษาไทย →
+            # บอทเอา prompt เดิม + feedback ไปให้ Gemini เกลา แล้วโชว์ prompt ใหม่
+            # พร้อมก๊อป + ปุ่มเปิด Google Flow (เราไม่ได้เจนวิดีโอเองในแอป)
+            clip_id = file.get("id") or file.get("name") or "clip"
+            st.markdown("##### 💬 ไม่ถูกใจคลิปนี้? บอกว่าอยากแก้อะไร")
+            fb = st.text_area(
+                "พิมพ์สิ่งที่อยากแก้ (ภาษาไทยได้)",
+                key=f"clip_fb_{clip_id}",
+                placeholder="เช่น เปลี่ยนพื้นหลังเป็นห้องน้ำ, ให้เห็นสบู่ชัดขึ้น, จังหวะช้าลง",
+            )
+            if st.button("🔄 ปรับ prompt ตามที่บอก", key=f"clip_revise_{clip_id}"):
+                feedback = (fb or "").strip()
+                if not feedback:
+                    st.warning("พิมพ์สิ่งที่อยากแก้ก่อนนะ")
+                else:
+                    new_prompt = ""
+                    used_ai = False
+                    gemini_key = _s(K_GEMINI)
+                    if gemini_key:
+                        try:
+                            revise_user = (
+                                "นี่คือ prompt สำหรับสร้างวิดีโอโฆษณา:\n\n"
+                                f"{prompt_text}\n\n"
+                                f'ลูกค้าขอแก้: "{feedback}"\n\n'
+                                "ช่วยแก้ prompt ให้ตรงตามที่ลูกค้าขอ โดยคงโครงสร้าง/รูปแบบเดิมไว้ "
+                                "(เช่น หัวข้อ [HOOK]/[DECISION]/[CTA]/กล้อง/แสง ถ้ามี) "
+                                "แล้วส่งกลับเฉพาะ prompt ที่แก้แล้วเต็ม ๆ ไม่ต้องมีคำอธิบายอื่น"
+                            )
+                            import ai_provider
+                            ai_out = ai_provider.generate_text(
+                                "", revise_user, gemini_key,
+                                provider="gemini", max_tokens=2000)
+                            if ai_out and ai_out.strip():
+                                new_prompt = ai_out.strip()
+                                used_ai = True
+                        except Exception:  # noqa: BLE001 — ห้าม raise เด็ดขาด
+                            new_prompt = ""
+                    if not new_prompt:
+                        # Fallback: รวมข้อความแบบ deterministic ไม่ต้องมี Gemini
+                        new_prompt = f"{prompt_text}\n\n[ปรับตามคำขอลูกค้า: {feedback}]"
+                        used_ai = False
+                    st.session_state[f"clip_newprompt_{clip_id}"] = new_prompt
+                    st.session_state[f"clip_newprompt_ai_{clip_id}"] = used_ai
+                    st.rerun()
+
+            revised = st.session_state.get(f"clip_newprompt_{clip_id}")
+            if revised:
+                st.success("✅ prompt ใหม่ (ก๊อปไปวางใน Flow)")
+                st.code(revised, language=None)
+                if not st.session_state.get(f"clip_newprompt_ai_{clip_id}"):
+                    st.caption(
+                        "นี่คือการรวมข้อความแบบพื้นฐาน — ใส่ Gemini key ที่ ⚙️ ตั้งค่า "
+                        "เพื่อให้ AI ปรับ prompt ได้ฉลาดขึ้น")
+                st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้",
+                               FLOW_PROJECT_URL, width="stretch")
+                st.caption("ก๊อป prompt ด้านบน → เปิด Flow → วาง → กด Generate")
         else:
             c1, c2, c3 = st.columns(3)
             with c1:
