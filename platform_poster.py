@@ -28,12 +28,22 @@ def post_line_oa(message: str, token: str) -> tuple[bool, str]:
 
 
 def post_facebook(message: str, token: str, page_id: str, image_bytes: bytes | None = None,
-                  image_name: str = "image.jpg") -> tuple[bool, str]:
-    """Post to Facebook Page feed. If image_bytes provided, posts as photo with caption."""
+                  image_name: str = "image.jpg", video_bytes: bytes | None = None,
+                  video_name: str = "video.mp4") -> tuple[bool, str]:
+    """Post to Facebook Page feed. Supports video, photo, and text-only posts."""
     if not token or not page_id:
         return False, "ไม่มี Facebook Token หรือ Page ID"
     try:
-        if image_bytes:
+        if video_bytes:
+            # Post video with description (multipart upload to graph-video)
+            resp = requests.post(
+                f"https://graph-video.facebook.com/v19.0/{page_id}/videos",
+                params={"access_token": token},
+                data={"description": message},
+                files={"source": (video_name, video_bytes, "video/mp4")},
+                timeout=90,
+            )
+        elif image_bytes:
             # Post photo with caption (multipart upload)
             resp = requests.post(
                 f"https://graph.facebook.com/v19.0/{page_id}/photos",
@@ -52,7 +62,12 @@ def post_facebook(message: str, token: str, page_id: str, image_bytes: bytes | N
             )
         if resp.status_code == 200:
             post_id = resp.json().get("id") or resp.json().get("post_id", "")
-            kind = "ภาพ + ข้อความ" if image_bytes else "ข้อความ"
+            if video_bytes:
+                kind = "วิดีโอ + ข้อความ"
+            elif image_bytes:
+                kind = "ภาพ + ข้อความ"
+            else:
+                kind = "ข้อความ"
             return True, f"โพสต์ Facebook ({kind}) สำเร็จ ✅"
         return False, f"Error {resp.status_code}: {resp.text[:200]}"
     except Exception as e:

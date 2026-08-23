@@ -173,8 +173,11 @@ def _do_post(platform_key: str, content: str,
             msg = "ใส่ Facebook Token และ Page ID ก่อน"
         else:
             with st.spinner("กำลังโพสต์ Facebook..."):
-                ok, msg = post_facebook(content, fb_token, fb_page_id,
-                                        image_bytes=image_bytes, image_name=image_name)
+                ok, msg = post_facebook(
+                    content, fb_token, fb_page_id,
+                    image_bytes=image_bytes, image_name=image_name,
+                    video_bytes=video_bytes, video_name=video_name
+                )
 
     elif platform_key == "instagram":
         if not fb_token or not ig_business_id:
