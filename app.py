@@ -3234,7 +3234,7 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
                 data = media_bytes or (download_file(fid)
                                        if mime.startswith(("image/", "video/")) else None)
                 ok, msg = _do_post(
-                    selected_post_platform, text_to_post or file["name"],
+                    selected_post_platform, text_to_post or "",
                     line_token, fb_token, fb_page_id,
                     ig_business_id=ig_business_id,
                     image_bytes=data if mime.startswith("image/") else None,
