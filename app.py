@@ -2772,6 +2772,29 @@ def _queue_caption_for(file: dict) -> str:
         return ""
 
 
+def _find_paired_caption_file(file: dict, folder_files: list | None) -> dict | None:
+    """The .txt caption sharing a media file's basename in the same folder, if any.
+
+    Same basename-matching the preview uses, but returns the caption's file dict so
+    approve/reject can move and dismiss it alongside the media it belongs to.
+    """
+    if not folder_files:
+        return None
+    import os
+    base_name, _ = os.path.splitext(file.get("name", "") or "")
+    if not base_name:
+        return None
+    for f in folder_files:
+        if f.get("id") == file.get("id"):
+            continue
+        f_base, f_ext = os.path.splitext(f.get("name", "") or "")
+        if f_base == base_name and (
+            f_ext.lower() == ".txt" or (f.get("mimeType") or "").startswith("text/")
+        ):
+            return f
+    return None
+
+
 def _render_flow_paste_links() -> None:
     """วางลิงก์ที่บุ๊กมาร์กเล็ตคัดลอกมา แล้วให้ Python โหลดไฟล์ลง Drive
 
@@ -3306,6 +3329,21 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
                         st.success(f"{msg} — ย้ายไฟล์ไปโฟลเดอร์ POSTED แล้ว")
                     else:
                         st.warning(f"{msg} — แต่ย้ายไฟล์ไม่สำเร็จ")
+                    # Drive list is eventually consistent, so the re-read right after
+                    # a move can still show the posted file; dismiss it in-session so
+                    # it vanishes from the UI immediately regardless.
+                    st.session_state.setdefault("q_dismissed", set()).add(fid)
+                    # Its matched caption .txt is a queue entry of its own — move and
+                    # dismiss it too so it doesn't linger. Never let this block the post.
+                    try:
+                        cap_file = _find_paired_caption_file(file, folder_files)
+                        cap_id = (cap_file or {}).get("id")
+                        if cap_id:
+                            if dest:
+                                move_file(cap_id, dest)
+                            st.session_state["q_dismissed"].add(cap_id)
+                    except Exception:  # noqa: BLE001
+                        pass
                     # The listing just changed; a stale cache would keep showing
                     # a file that is no longer in the queue.
                     _clear_queue_cache()
@@ -3317,6 +3355,20 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
                 dest = ensure_subfolder(QUEUE_ROOT_FOLDER_ID, "REJECTED")
                 if dest and move_file(fid, dest):
                     st.info("ย้ายไปโฟลเดอร์ REJECTED แล้ว")
+                    # Drive list is eventually consistent, so the re-read right after
+                    # a move can still show the rejected file; dismiss it in-session so
+                    # it vanishes from the UI immediately regardless.
+                    st.session_state.setdefault("q_dismissed", set()).add(fid)
+                    # Its matched caption .txt is a queue entry of its own — move and
+                    # dismiss it too. Never let a missing/failed caption block the reject.
+                    try:
+                        cap_file = _find_paired_caption_file(file, folder_files)
+                        cap_id = (cap_file or {}).get("id")
+                        if cap_id:
+                            move_file(cap_id, dest)
+                            st.session_state["q_dismissed"].add(cap_id)
+                    except Exception:  # noqa: BLE001
+                        pass
                     _clear_queue_cache()
                     st.rerun()
                 else:
@@ -3507,6 +3559,11 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
             st.rerun()
         return
 
+    # Ids the user just approved/rejected this session. Drive's list is eventually
+    # consistent, so a moved file (and its caption) can still come back on the next
+    # read; skipping these ids keeps them out of the UI immediately either way.
+    st.session_state.setdefault("q_dismissed", set())
+
     folders = _cached_child_folders(QUEUE_ROOT_FOLDER_ID)
     if not folders:
         st.warning(
@@ -3581,6 +3638,14 @@ def render_queue_page(line_token: str = "", fb_token: str = "",
             files = [f for f in all_raw_files if not (f.get("mimeType", "").startswith(("video/", "image/")) or f.get("name", "").lower().endswith((".mp4", ".mov", ".png", ".jpg", ".webp", ".webm")))]
         else:
             files = all_raw_files
+
+        # Drop items the user just approved/rejected this session so they disappear
+        # right away, even if Drive's next list still returns them. Also drop them
+        # from all_raw_files so a dismissed caption can't re-match a media preview.
+        dismissed = st.session_state.get("q_dismissed", set())
+        if dismissed:
+            files = [f for f in files if f.get("id") not in dismissed]
+            all_raw_files = [f for f in all_raw_files if f.get("id") not in dismissed]
 
         if not files:
             continue
