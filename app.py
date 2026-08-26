@@ -3144,6 +3144,22 @@ def _render_sequence_breakdown(file: dict) -> None:
                     "เพื่อให้ AI ปรับ prompt ได้ฉลาดขึ้น")
             st.link_button("🎬 เปิด Google Flow แล้ววาง prompt นี้",
                            FLOW_PROJECT_URL, width="stretch")
+            # 🚀 ส่ง prompt ที่ปรับแล้วเข้าคิว Flow ให้บอทในเครื่องสร้างคลิปใหม่อัตโนมัติ
+            # แสดงเฉพาะเมื่อ flow_queue พร้อมใช้งาน (ไม่งั้นใช้ปุ่มเปิด Flow เองด้านบน)
+            try:
+                import flow_queue
+                _flow_queue_ok = True
+            except Exception:
+                _flow_queue_ok = False
+            if _flow_queue_ok:
+                if st.button("🚀 ส่งเข้าคิว Flow (ให้บอทสร้างให้อัตโนมัติ)",
+                             key=f"clip_flowq_{clip_id}", width="stretch"):
+                    try:
+                        flow_queue.submit_request(revised, media_type="video")
+                        st.success("ส่งเข้าคิว Flow แล้ว — บอทในเครื่องจะสร้างคลิปใหม่ให้ "
+                                   "· ผลจะกลับมาที่คิวอนุมัติ")
+                    except Exception as e:  # noqa: BLE001 — ห้าม raise เด็ดขาด
+                        st.error(f"ส่งเข้าคิว Flow ไม่สำเร็จ: {e}")
             st.caption("ก๊อป prompt ด้านบน → เปิด Flow → วาง → กด Generate")
 
         st.divider()
