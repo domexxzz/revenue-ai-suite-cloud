@@ -3064,7 +3064,7 @@ def _render_sequence_breakdown(file: dict) -> None:
     except Exception:
         pass
 
-    with st.expander("🎬 ดู Sequence & Prompt ที่ใช้สร้างคลิปนี้", expanded=False):
+    with st.expander("🎬 ไม่ถูกใจคลิป? แก้ไข / สร้างใหม่ ที่นี่ (+ ดู Prompt)", expanded=True):
         if prompt_text:
             # Parse beats
             hook_m = re.search(r'\[HOOK[^\]]*\](.*?)(?=\[DECISION|\[CTA|\[|$)', prompt_text, re.DOTALL | re.I)
@@ -3274,6 +3274,7 @@ def _render_queue_file(folder_name: str, platform: str, file: dict,
 
         # แสดงให้กรอก/แก้ไขข้อความที่จะโพสต์สำหรับทุกประเภทไฟล์
         text_to_post = st.text_area("✍️ แก้ไขข้อความที่จะโพสต์", value=caption, height=140, key=f"q_cap_{fid}")
+        st.caption("ℹ️ ช่องนี้ = ข้อความ/แคปชันที่จะโพสต์ · ถ้าอยากแก้ตัวคลิป (ลบโลโก้ / แก้ภาพ) ให้พิมพ์ในกล่อง 🎬 ด้านล่าง")
 
         # แสดง Sequence แยกแต่ละช็อตของคลิปและ Prompt
         if is_video or mime.startswith("video/"):
