@@ -77,6 +77,12 @@ except ImportError:
     SCENES_AVAILABLE = False
 
 try:
+    import brand_assets
+    BRAND_ASSETS_AVAILABLE = bool(brand_assets.list_assets())
+except Exception:  # noqa: BLE001 — รูปแบรนด์เป็นของแถม ไม่ใช่ของบังคับ
+    BRAND_ASSETS_AVAILABLE = False
+
+try:
     import tiktok_poster
     TIKTOK_AVAILABLE = True
 except ImportError:
@@ -3043,6 +3049,156 @@ def _render_move_to_platform(file: dict, all_folders: dict, current: str = "") -
 
 
 
+# ── ✨ ตัวช่วยสร้างคลิปแบบไม่ต้องพิมพ์ prompt ───────────────────────────────────
+# ปัญหาที่แก้: เจ้าของแบรนด์พิมพ์ prompt เอง คลิปที่ได้จึงหลุดแบรนด์ — ไม่ใช่สบู่ LEMED
+# ทางแก้: ให้ "เลือก" แทน "พิมพ์" → แนวคลิป + มุมเล่า + รูปสินค้าจริง แล้วประกอบเป็น
+# Master Prompt ด้วยตัวสร้างชุดเดียวกับ Content Studio ซึ่งใส่โครงแบรนด์ให้ครบอยู่แล้ว
+
+LEMED_BRIEF = {
+    "campaign": "hero_product",
+    "tone": "friendly",
+    "platforms": ["facebook", "instagram"],
+    "brand_name": "LEMED",
+    "top_item": "สบู่ล้างหน้าลดสิว LEMED",
+    "discount": 20,
+    "summary": "สบู่ล้างหน้าสูตรอ่อนโยน สำหรับผิวมันและเป็นสิว",
+    "source": "preset",
+}
+
+
+def _brand_image_picker(clip_id: str) -> str:
+    """ให้เลือกรูปสินค้าจริงที่จะใช้เป็น reference ตอนสร้างคลิป คืนชื่อไฟล์ที่เลือก
+
+    โชว์ทีละ 8 รูปพร้อมปุ่มสุ่มชุดใหม่ — โชว์ทั้ง 53 รูปรวดเดียวจะยาวจนหาปุ่มไม่เจอ
+    """
+    if not BRAND_ASSETS_AVAILABLE:
+        return ""
+    pick_key = f"clip_asset_{clip_id}"
+    seed_key = f"clip_asset_seed_{clip_id}"
+    seed = st.session_state.get(seed_key, clip_id)
+    shots = brand_assets.sample(8, seed=seed)
+    if not shots:
+        return ""
+
+    chosen = st.session_state.get(pick_key, "")
+    st.markdown("**2️⃣ เลือกรูปสินค้าจริง** — บอทจะแนบรูปนี้เข้า Flow ให้คลิปออกมาเป็นสบู่ LEMED ของจริง")
+    for row_start in (0, 4):
+        cols = st.columns(4)
+        for col, img in zip(cols, shots[row_start:row_start + 4]):
+            with col:
+                st.image(str(img), width="stretch")
+                is_on = (chosen == img.name)
+                if st.button("✅ เลือกอยู่" if is_on else "เลือกรูปนี้",
+                             key=f"pick_{clip_id}_{img.name}", width="stretch",
+                             type="primary" if is_on else "secondary"):
+                    st.session_state[pick_key] = img.name
+                    st.rerun()
+    if st.button("🔀 ดูรูปชุดอื่น", key=f"shuf_{clip_id}"):
+        st.session_state[seed_key] = f"{seed}x"
+        st.rerun()
+    if not chosen:
+        st.caption("ยังไม่ได้เลือก — ถ้าไม่เลือก บอทจะสุ่มรูปสินค้าให้เอง")
+    return chosen
+
+
+def _flow_submit_with_progress(prompt: str, asset_name: str, slot_key: str) -> None:
+    """ส่งเข้าคิว Flow แล้วยืนรอผลให้ผู้ใช้เห็นความคืบหน้า
+
+    เดิมปุ่มส่งแล้วขึ้น "ส่งแล้ว" ทันทีแล้วเงียบ ผู้ใช้ไม่รู้ว่าคลิปเสร็จหรือยัง
+    จึงกดซ้ำจนคิวบวม — จึงต้องยืนรอและรายงานสถานะจริงจากคิว
+    """
+    import time
+    try:
+        import flow_queue
+    except Exception as e:  # noqa: BLE001
+        st.error(f"ส่งเข้าคิว Flow ไม่สำเร็จ: {e}")
+        return
+    try:
+        task_id = flow_queue.submit_request(prompt, media_type="video",
+                                            asset_name=asset_name)
+    except Exception as e:  # noqa: BLE001 — ห้าม raise เด็ดขาด
+        st.error(f"ส่งเข้าคิว Flow ไม่สำเร็จ: {e}")
+        return
+
+    status_slot = st.empty()
+    status_slot.info("📤 ส่งเข้าคิวแล้ว — รอบอทในเครื่องรับงาน...")
+    with st.spinner("🤖 กำลังให้บอทสร้างคลิปใหม่ใน Google Flow..."):
+        for attempt in range(150):  # 150 × 2s = 5 นาที
+            try:
+                task = flow_queue.get_request_status(task_id)
+            except Exception:  # noqa: BLE001 — Drive สะดุดชั่วคราวไม่ใช่เหตุให้เลิกรอ
+                task = None
+            status_val = (task or {}).get("status", "PENDING")
+            if status_val == "PROCESSING":
+                status_slot.info(f"🎬 บอทกำลังเรนเดอร์ใน Google Flow... (ปกติ 1-3 นาที) [{attempt * 2}s]")
+            elif status_val == "PENDING":
+                status_slot.warning(
+                    f"⏳ รอบอทในเครื่องรับงาน [{attempt * 2}s] — "
+                    "ถ้าค้างนาน แปลว่าบอทยังไม่ได้เปิด")
+            if status_val == "DONE":
+                status_slot.success("🎉 คลิปใหม่เสร็จแล้ว! กลับไปดูที่คิวอนุมัติได้เลย")
+                _clear_queue_cache()
+                return
+            if status_val == "ERROR":
+                status_slot.error(f"❌ บอทสร้างไม่สำเร็จ: {(task or {}).get('error_message', '')}")
+                return
+            time.sleep(2)
+    status_slot.warning(
+        "⏱️ รอครบ 5 นาทีแล้วยังไม่เสร็จ — งานยังอยู่ในคิว "
+        "ถ้าบอทเปิดอยู่คลิปจะมาเองที่คิวอนุมัติ ไม่ต้องกดซ้ำ")
+
+
+def _render_clip_suggestions(clip_id: str) -> None:
+    """แผงแนะนำ: เลือกแนว + รูปสินค้า → ได้ Master Prompt แบรนด์ LEMED → ส่งเข้าคิวเลย"""
+    if not (SCENES_AVAILABLE and COPILOT_AVAILABLE):
+        return
+    st.markdown("#### ✨ อยากได้คลิปใหม่? เลือกเอา ไม่ต้องพิมพ์ prompt")
+    st.caption("เลือกแนว + รูปสินค้าจริง แล้วระบบจะเขียน Master Prompt แบบแบรนด์ LEMED ให้เอง")
+
+    # 1️⃣ แนวคลิป — จัดกลุ่มตามหมวดเพื่อให้ไล่หาง่ายกว่ารายการยาว ๆ
+    scenes = scene_presets.scene_choices()
+    scene = st.selectbox(
+        "1️⃣ อยากได้คลิปแนวไหน?", options=scenes,
+        format_func=lambda k: f"{scene_presets.group_for(k)} · {scene_presets.label_for(k)}",
+        key=f"clip_scene_{clip_id}")
+    st.caption(f"🎯 {scene_presets.goal_for(scene)}")
+
+    # 2️⃣ รูปสินค้าจริง
+    asset_name = _brand_image_picker(clip_id)
+
+    # 3️⃣ มุมเล่า
+    angles = scene_presets.angles_for(scene, "video")
+    angle = ""
+    if angles:
+        angle = st.radio("3️⃣ เล่ายังไงดี?", options=angles,
+                         format_func=scene_presets.angle_label, horizontal=True,
+                         key=f"clip_angle_{clip_id}")
+        st.caption(f"🎯 {scene_presets.angle_goal(angle)}")
+
+    if st.button("✨ สร้าง Master Prompt ให้เลย", key=f"clip_mk_{clip_id}",
+                 width="stretch", type="primary"):
+        try:
+            st.session_state[f"clip_master_{clip_id}"] =                 content_copilot.build_master_video_prompt(
+                    LEMED_BRIEF, scene=scene, seconds=10, angle=angle)
+        except Exception as e:  # noqa: BLE001
+            st.error(f"สร้าง prompt ไม่สำเร็จ: {e}")
+        st.rerun()
+
+    master = st.session_state.get(f"clip_master_{clip_id}")
+    if master:
+        st.success("✅ Master Prompt แบรนด์ LEMED — พร้อมสร้าง")
+        st.code(master, language=None)
+        pretty = asset_name or "(บอทสุ่มให้)"
+        st.caption(f"🖼️ รูปที่จะแนบ: {pretty}")
+        c_a, c_b = st.columns(2)
+        with c_a:
+            st.link_button("🎬 เปิด Flow วางเอง", FLOW_PROJECT_URL, width="stretch")
+        with c_b:
+            if st.button("🚀 ให้บอทสร้างให้เลย", key=f"clip_go_{clip_id}",
+                         width="stretch", type="primary"):
+                _flow_submit_with_progress(master, asset_name, clip_id)
+
+
 def _render_sequence_breakdown(file: dict) -> None:
     """Parse and display shot sequence (Hook -> Decision -> CTA) and source prompt."""
     name = file.get("name", "")
@@ -3078,7 +3234,13 @@ def _render_sequence_breakdown(file: dict) -> None:
         # แล้วโชว์ prompt ใหม่ พร้อมก๊อป + ปุ่มเปิด Google Flow
         # (แสดงเสมอ แม้ยังไม่มี prompt ต้นฉบับของคลิปนี้ ลูกค้าจะได้มีที่พิมพ์แก้)
         clip_id = file.get("id") or file.get("name") or "clip"
-        st.markdown("##### 💬 ไม่ถูกใจคลิปนี้? บอกว่าอยากแก้อะไร")
+
+        # ทางหลัก: เลือกเอา ไม่ต้องพิมพ์ — กันคลิปหลุดแบรนด์ตั้งแต่ต้นทาง
+        _render_clip_suggestions(clip_id)
+        st.divider()
+
+        # ทางรอง: พิมพ์บอกเองว่าอยากแก้อะไร (ใช้ตอนอยากแก้คลิปเดิมเฉพาะจุด)
+        st.markdown("##### 💬 หรือบอกเองว่าอยากแก้อะไรจากคลิปเดิม")
         fb = st.text_area(
             "พิมพ์สิ่งที่อยากแก้ (ภาษาไทยได้)",
             key=f"clip_fb_{clip_id}",
@@ -3154,12 +3316,9 @@ def _render_sequence_breakdown(file: dict) -> None:
             if _flow_queue_ok:
                 if st.button("🚀 ส่งเข้าคิว Flow (ให้บอทสร้างให้อัตโนมัติ)",
                              key=f"clip_flowq_{clip_id}", width="stretch"):
-                    try:
-                        flow_queue.submit_request(revised, media_type="video")
-                        st.success("ส่งเข้าคิว Flow แล้ว — บอทในเครื่องจะสร้างคลิปใหม่ให้ "
-                                   "· ผลจะกลับมาที่คิวอนุมัติ")
-                    except Exception as e:  # noqa: BLE001 — ห้าม raise เด็ดขาด
-                        st.error(f"ส่งเข้าคิว Flow ไม่สำเร็จ: {e}")
+                    _flow_submit_with_progress(
+                        revised, st.session_state.get(f"clip_asset_{clip_id}", ""),
+                        clip_id)
             st.caption("ก๊อป prompt ด้านบน → เปิด Flow → วาง → กด Generate")
 
         st.divider()

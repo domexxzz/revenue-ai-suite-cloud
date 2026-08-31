@@ -42,8 +42,14 @@ def _get_or_create_flow_folder(service) -> Optional[str]:
         logger.error(f"Error getting flow folder: {e}")
         return None
 
-def submit_request(prompt: str, media_type: str = "image") -> str:
-    """Submit a request to Google Drive flow queue."""
+def submit_request(prompt: str, media_type: str = "image",
+                   asset_name: str = "") -> str:
+    """Submit a request to Google Drive flow queue.
+
+    asset_name = ชื่อไฟล์รูปสินค้าจริงที่ผู้ใช้เลือก (จาก brand_assets)
+    ฝั่งบอทจะ resolve ชื่อนี้เป็นไฟล์ในเครื่องแล้วแนบเข้า Google Flow
+    ว่างไว้ = ให้บอทสุ่มรูปแบรนด์เองเหมือนเดิม
+    """
     task_id = str(uuid.uuid4())
     task_data = {
         "id": task_id,
@@ -53,7 +59,8 @@ def submit_request(prompt: str, media_type: str = "image") -> str:
         "created_at": time.time(),
         "result_path": None,
         "drive_file_id": None,
-        "error_message": None
+        "error_message": None,
+        "asset_name": asset_name or "",
     }
     
     # Save to local queue directory as fallback
