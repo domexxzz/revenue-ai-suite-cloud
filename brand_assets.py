@@ -17,6 +17,11 @@ ASSETS_DIR = Path(__file__).parent / "assets" / "lemed"
 
 _VALID_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
+# โฟลเดอร์ Assets ของเว็บมีรูปสบู่สมุนไพรเปลือกมังคุด (คนละแบรนด์ กล่องเขียว-ส้ม) ปนอยู่
+# ชื่อขึ้นต้น th-11134207 ถ้าหลุดเข้ามาเป็น reference ให้ Google Flow คลิปจะออกมาเป็น
+# สบู่ก้อนสีน้ำตาล เพราะโมเดลเชื่อรูปมากกว่าข้อความ — กันไว้ตรงนี้เผื่อมีใครก๊อปกลับเข้ามา
+_NOT_LEMED_PREFIXES = ("th-11134207",)
+
 
 def list_assets() -> list[Path]:
     """รูปแบรนด์ทั้งหมด เรียงชื่อคงที่ เพื่อให้ลำดับไม่สลับทุกครั้งที่รีเฟรช"""
@@ -25,6 +30,7 @@ def list_assets() -> list[Path]:
     return sorted(
         p for p in ASSETS_DIR.iterdir()
         if p.suffix.lower() in _VALID_EXTS and p.is_file()
+        and not p.name.lower().startswith(_NOT_LEMED_PREFIXES)
     )
 
 
