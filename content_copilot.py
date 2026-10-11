@@ -357,7 +357,9 @@ _IMAGE_AVOID = ("no text, no logos, no watermark, no distorted packaging, no ext
 
 _VIDEO_AVOID = ("no on-screen text, no watermark, no logo distortion, no jarring cuts, "
                 "no warped product geometry, no flickering, no bottle, no dropper, no serum, "
-                "no pump, no jar, no liquid container, no squeeze tube — the product is a solid bar of soap only")
+                "no pump, no jar, no liquid container, no squeeze tube, no rectangular brown herbal bar, "
+                "no honey-amber or beige soap, no herbal flecks, no kraft paper belly-band, no leaf emblem — "
+                "the product is a glossy translucent pink-to-lavender rounded octagonal soap puck only")
 
 
 # ── Product form ────────────────────────────────────────────────────────────────
@@ -369,20 +371,22 @@ _VIDEO_AVOID = ("no on-screen text, no watermark, no logo distortion, no jarring
 _PRODUCT_FORMS: dict[str, dict] = {
     "bar": {
         "keywords": ["สบู่", "soap", "ก้อน", "bar"],
-        "avoid": "no round soap, no circular puck, no disk, no purple soap, no purple box, "
-                 "no cardboard carton box, no petri dish, no laboratory glassware, no chemical flasks, "
-                 "no beakers, no test tubes, no science lab, no tube, no squeeze tube, no bottle, "
-                 "no pump, no dropper, no serum, no jar, no pouch, no liquid container of any kind — "
-                 "the product is an authentic rectangular solid herbal soap bar with a white paper belly-band wrapper only",
-        "desc": "an authentic rectangular solid herbal soap bar with softly chamfered beveled edges, "
-                "warm honey-amber and natural herbal beige translucent tone with delicate organic flecks, "
-                "wrapped around the middle with a crisp clean matte white paper sleeve belly-band "
-                "featuring the botanical leaf emblem, crisp black LEMED logo, and gold-ochre accent band, "
-                "resting flat and stable",
-        "physics": "a solid dense bar of soap that never pours, drips or squeezes. It produces rich, "
+        "avoid": "no rectangular bar, no brown or tan or honey-amber soap, no herbal specks or flecks, "
+                 "no kraft paper, no gold-ochre band, no botanical leaf emblem, no paper belly-band wrapper, "
+                 "no rustic artisanal farmhouse look, no wooden boards, no petri dish, no laboratory glassware, "
+                 "no tube, no squeeze tube, no bottle, no pump, no dropper, no serum, no jar, no pouch, "
+                 "no liquid container of any kind — the product is a glossy translucent pink-to-lavender "
+                 "rounded octagonal soap puck with its white-and-lilac carton only",
+        "desc": "an authentic rounded octagonal soap puck with smooth softly curved edges, glossy "
+                "semi-translucent rose-pink fading to soft mauve-lavender with a gentle pearlescent swirl "
+                "inside, shown with its slim matte white carton carrying a lilac semicircular arc across "
+                "the top and the elegant letterspaced 'LEMED' wordmark, resting flat and stable",
+        "physics": "a solid translucent soap puck that never pours, drips or squeezes. It produces rich, "
                    "creamy white micro-lather foam when wet. Natural water beads rest with surface tension "
-                   "on the bar. The rectangular bar maintains its exact shape, bevels and label throughout",
-        "texture": "subtle waxy herbal matte surface, micro-droplets of water, and fine rich white foam",
+                   "on the glossy surface. The rounded octagonal puck maintains its exact shape, translucency "
+                   "and carton artwork throughout",
+        "texture": "glossy semi-translucent surface that catches light from within, micro-droplets of water, "
+                   "and fine rich white foam",
         "handling": "held flat in an open palm or between both hands — never tipped, squeezed or poured",
     },
     "bottle": {
@@ -519,16 +523,16 @@ def _master_scene(brief: dict) -> tuple[str, str, str]:
     """(subject, setting, styling) tuned to the exact physical identity of LEMED Soap."""
     brand = "LEMED"
     top_item = "สบู่ก้อน"
-    item = "rectangular solid herbal soap bar"
+    item = "rounded octagonal translucent soap puck"
 
     return (
-        f"A single hero {item} by {brand} — authentic rectangular solid soap bar with softly beveled edges, "
-        "natural warm honey-amber and beige herbal soap body with subtle natural herbal specks, "
-        "wrapped around the center with a crisp matte white paper sleeve belly-band with botanical leaf emblem, "
-        "bold crisp black 'LEMED' logo, and a gold-ochre horizontal accent banner, resting stable and flat, "
+        f"A single hero {item} by {brand} — glossy semi-translucent rose-pink fading to soft "
+        "mauve-lavender, smooth rounded octagonal edges with a gentle pearlescent swirl inside, "
+        "shown with its slim matte white carton carrying a lilac semicircular arc across the top and "
+        "the elegant letterspaced 'LEMED' wordmark, resting stable and flat, "
         "hero front-facing angle, label crisp and 100% legible",
-        "a warm natural wooden desk or modern minimalist bathroom counter with warm afternoon sunlight and soft organic shadows",
-        "a few fresh green botanical leaves (Centella/Cica) and delicate natural clear water droplets, perfectly clean and uncluttered",
+        "a clean modern bathroom vanity or bright minimalist counter in soft natural daylight with gentle shadows",
+        "a soft pink and lilac palette with delicate clear water droplets and light white lather, perfectly clean and uncluttered",
     )
 
 
