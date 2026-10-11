@@ -51,7 +51,7 @@ STATE_FILE = BASE_DIR / "flow_bot_state.json"     # จำสิ่งที่�
 
 DEFAULT_PROJECT_URL = os.getenv(
     "FLOW_PROJECT_URL",
-    "https://labs.google/fx/th/tools/flow/project/c9bfbfd9-88ea-4c56-b6b5-7711df26d9b8",
+    "https://flow.google.com/project/9c063982-0f1c-422c-b26c-a452fae251c3",
 )
 DEFAULT_DEST = Path(os.getenv("FLOW_BOT_DEST", r"G:\My Drive\Lemed"))
 

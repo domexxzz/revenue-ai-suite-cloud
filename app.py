@@ -280,7 +280,7 @@ def _get_shortcut(key: str, fallback: str) -> str:
 # hunt for the tab. Override per deployment via [shortcuts] in secrets.toml.
 FLOW_PROJECT_URL = _get_shortcut(
     "flow_project",
-    "https://labs.google/fx/th/tools/flow/project/c9bfbfd9-88ea-4c56-b6b5-7711df26d9b8",
+    "https://flow.google.com/project/9c063982-0f1c-422c-b26c-a452fae251c3",
 )
 DRIVE_FOLDER_URL = _get_shortcut(
     "drive_folder",
